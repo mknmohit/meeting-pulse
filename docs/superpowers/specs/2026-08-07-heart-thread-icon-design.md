@@ -22,6 +22,7 @@ The app icon uses the selected Heart Thread artwork:
 - A white heart outline as the primary silhouette.
 - A muted pink thread behind the heart and a warm gold pulse/thread crossing the lower heart.
 - A small mint-green dot at the end of the thread as the active signal accent.
+- Transparent corners outside the rounded square; no white matte is baked into the PNG renditions.
 - No text, initials, meeting-platform logos, or state-specific artwork in the app icon.
 
 The artwork must be drawn as clean geometric paths with rounded caps and joins. The heart remains recognizable at 16 px, and the thread must not collapse into a noisy ECG trace at small sizes. The app icon is static; it is a brand mark, not a live status indicator. Do not add gradients, glows, bloom, or drop shadows.
