@@ -154,7 +154,7 @@ This is not academic: it is the state of the machine every morning before the ow
 | B15 | `pairing_attempts` window reset semantics undefined | Unimplementable as written | v2 §8.5 — fixed 15-minute tumbling window, reset on first attempt after window end |
 | B16 | No secret scanning despite an open-source goal | The one failure mode that is irreversible once pushed | plan §7.3 — `gitleaks` in CI + pre-commit, `.gitignore` allowlist test |
 | B17 | License undecided | Blocks public release | v2 §5.6 — **MIT** |
-| B18 | `og.techdevix.com` repeated as a recommendation inside a config-driven spec | Invites hardcoding | v2 §5.6 — documentation example only; build fails if `PUBLIC_STATUS_ORIGIN` is unset |
+| B18 | `og.techdevix.com` repeated as a recommendation inside a config-driven spec | Invites hardcoding | v2 §5.6 — documentation example only; build fails if `PUBLIC_STATUS_ORIGINS` is unset |
 
 ---
 
@@ -201,7 +201,7 @@ These decisions are correct and were **not** modified — an implementer should 
 | §5.2 | macOS 14.0, Universal 2, Xcode/Swift pinning | A9 |
 | §5.4 | Sandbox off, Hardened Runtime, Developer ID, notarization, stable identity | A8 |
 | §5.5 | Single-instance guard | B14 |
-| §5.6 | MIT license; `PUBLIC_STATUS_ORIGIN` mandatory, no default | B17, B18 |
+| §5.6 | MIT license; `PUBLIC_STATUS_ORIGINS` mandatory, no default | B17, B18 |
 | §6.4 | Ordered reducer + full 4×4 decision table | A2, A10 |
 | §6.5 | Override persistence, expiry timer, duration presets | B1, B2, C2 |
 | §7.2 | Observation enum renamed `sourceAbsent` | C5 |

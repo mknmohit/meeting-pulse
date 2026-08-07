@@ -301,7 +301,7 @@ MP_TURNSTILE_SITE_KEY = YOUR_TURNSTILE_SITE_KEY
 ```
 PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_ANON_KEY
-PUBLIC_STATUS_ORIGIN=https://status.example.com
+PUBLIC_STATUS_ORIGINS=https://status.example.com,https://status.example.net
 PUBLIC_TURNSTILE_SITE_KEY=YOUR_TURNSTILE_SITE_KEY
 ```
 
@@ -310,7 +310,7 @@ PUBLIC_TURNSTILE_SITE_KEY=YOUR_TURNSTILE_SITE_KEY
 ```
 PUBLIC_SUPABASE_URL=https://ci000000000000000000.supabase.co
 PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ci.ci
-PUBLIC_STATUS_ORIGIN=https://meetingpulse-ci.pages.dev
+PUBLIC_STATUS_ORIGINS=https://meetingpulse-ci.pages.dev
 PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
 ```
 
@@ -1989,10 +1989,16 @@ function required(name: string, value: string | undefined): string {
   return value;
 }
 
+const statusOrigins = requiredUrls(
+  "PUBLIC_STATUS_ORIGINS",
+  import.meta.env.PUBLIC_STATUS_ORIGINS,
+);
+
 export const CONFIG = {
   supabaseUrl:      required("PUBLIC_SUPABASE_URL",       import.meta.env.PUBLIC_SUPABASE_URL),
   supabaseAnonKey:  required("PUBLIC_SUPABASE_ANON_KEY",  import.meta.env.PUBLIC_SUPABASE_ANON_KEY),
-  statusOrigin:     required("PUBLIC_STATUS_ORIGIN",      import.meta.env.PUBLIC_STATUS_ORIGIN),
+  statusOrigin:     statusOrigins[0],
+  statusOrigins,
   turnstileSiteKey: required("PUBLIC_TURNSTILE_SITE_KEY", import.meta.env.PUBLIC_TURNSTILE_SITE_KEY),
 } as const;
 
@@ -2431,7 +2437,7 @@ Log the code, never the underlying text.
 | `MP_TURNSTILE_SITE_KEY` | `Config.xcconfig` | yes | no | **none** |
 | `PUBLIC_SUPABASE_URL` | viewer `.env` | yes | no | **none** |
 | `PUBLIC_SUPABASE_ANON_KEY` | viewer `.env` | yes | no | **none** |
-| `PUBLIC_STATUS_ORIGIN` | viewer `.env` | yes | no | **none** |
+| `PUBLIC_STATUS_ORIGINS` | viewer `.env` | yes | no | **none** |
 | `PUBLIC_TURNSTILE_SITE_KEY` | viewer `.env` | yes | no | **none** |
 | `TURNSTILE_SECRET_KEY` | Supabase Auth settings | yes | **yes** | — |
 | `SUPABASE_SERVICE_ROLE_KEY` | operator secret store | migrations and runbook only | **yes** | — |

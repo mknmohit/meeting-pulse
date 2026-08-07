@@ -221,7 +221,7 @@ All deployment-specific values are supplied through configuration and never hard
 |---|---|---|---|
 | `PUBLIC_SUPABASE_URL` | yes | no | Supabase project URL |
 | `PUBLIC_SUPABASE_ANON_KEY` | yes | no | Publishable anon key |
-| `PUBLIC_STATUS_ORIGIN` | yes | no | Public origin for docs/links |
+| `PUBLIC_STATUS_ORIGINS` | yes | no | Comma-separated public origins for docs/links; first is canonical |
 | `PUBLIC_TURNSTILE_SITE_KEY` | yes | no | Turnstile widget key |
 
 Commit only `.env.example`. **Missing or malformed required configuration must fail the build or startup with a clear setup error. Never fall back to a production project, a developer's project, or an invented default** — including `og.techdevix.com`, which appears only in documentation prose (audit B18).
@@ -794,7 +794,7 @@ Every "open decision" from v1 §12 is now closed. These are binding.
 |---|---|
 | Minimum macOS target | **14.0**, Universal 2, Xcode 16.x / Swift 6.0 |
 | Exact AX labels/roles | Determined empirically by **Spikes S1 and S2**; isolated to one module per detector |
-| Cloudflare Pages project & DNS | Project `meetingpulse-viewer`; `PUBLIC_STATUS_ORIGIN` is required build config with no default. `og.techdevix.com` appears only as a documentation example |
+| Cloudflare Pages project & DNS | Project `meetingpulse-viewer`; `PUBLIC_STATUS_ORIGINS` is required build config with no default. `og.techdevix.com` appears only as a documentation example |
 | Code alphabet and length | **Crockford Base32, 10 chars, 50 bits**, shown `XXXXX-XXXXX` |
 | RPC only, or an Edge Function | **Postgres RPC only.** Turnstile is verified by Supabase Auth natively; no Edge Function is needed |
 | Heartbeat interval | **60 s**, stale at **180 s**; viewer polls **30 s** when focused. Revisit after real-world use |

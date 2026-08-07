@@ -1,30 +1,24 @@
-import { ConfigurationError, required } from './lib/configValidation';
+import {
+  ConfigurationError,
+  required,
+  requiredUrl,
+  requiredUrls,
+} from './lib/configValidation';
 
 const SUPABASE_HOST = /^[a-z0-9-]{8,}\.supabase\.co$/;
 const JWT_SEGMENTS = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const PUBLISHABLE_KEY = /^sb_publishable_[A-Za-z0-9_-]+$/;
 
-function requiredUrl(name: string, value: string | undefined): string {
-  const raw = required(name, value);
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    throw new ConfigurationError(name, 'is malformed');
-  }
-  if (parsed.protocol !== 'https:') {
-    throw new ConfigurationError(name, 'must use https');
-  }
-  if (name === 'PUBLIC_SUPABASE_URL' && !SUPABASE_HOST.test(parsed.hostname)) {
-    throw new ConfigurationError(name, 'must point to a Supabase host');
-  }
-  return parsed.toString().replace(/\/$/, '');
-}
-
 const supabaseUrl = requiredUrl(
   'PUBLIC_SUPABASE_URL',
   import.meta.env.PUBLIC_SUPABASE_URL,
 );
+if (!SUPABASE_HOST.test(new URL(supabaseUrl).hostname)) {
+  throw new ConfigurationError(
+    'PUBLIC_SUPABASE_URL',
+    'must point to a Supabase host',
+  );
+}
 const supabaseAnonKey = required(
   'PUBLIC_SUPABASE_ANON_KEY',
   import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
@@ -39,13 +33,16 @@ if (
   );
 }
 
+const statusOrigins = requiredUrls(
+  'PUBLIC_STATUS_ORIGINS',
+  import.meta.env.PUBLIC_STATUS_ORIGINS,
+);
+
 export const CONFIG = {
   supabaseUrl,
   supabaseAnonKey,
-  statusOrigin: requiredUrl(
-    'PUBLIC_STATUS_ORIGIN',
-    import.meta.env.PUBLIC_STATUS_ORIGIN,
-  ),
+  statusOrigin: statusOrigins[0],
+  statusOrigins,
   turnstileSiteKey: required(
     'PUBLIC_TURNSTILE_SITE_KEY',
     import.meta.env.PUBLIC_TURNSTILE_SITE_KEY,
