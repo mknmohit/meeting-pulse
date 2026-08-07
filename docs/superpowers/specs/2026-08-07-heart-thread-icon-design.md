@@ -18,13 +18,13 @@ The design covers both macOS surfaces:
 The app icon uses the selected Heart Thread artwork:
 
 - A rounded-square macOS icon silhouette.
-- A deep plum-to-coral gradient background with enough contrast for light and dark Finder surfaces.
+- A single solid rose-pink background (`#D94C99`) with enough contrast for light and dark Finder surfaces.
 - A white heart outline as the primary silhouette.
 - A warm gold pulse/thread crossing the lower heart.
 - A small mint-green dot at the end of the thread as the active signal accent.
 - No text, initials, meeting-platform logos, or state-specific artwork in the app icon.
 
-The artwork must be drawn as clean geometric paths with rounded caps and joins. The heart remains recognizable at 16 px, and the thread must not collapse into a noisy ECG trace at small sizes. The app icon is static; it is a brand mark, not a live status indicator.
+The artwork must be drawn as clean geometric paths with rounded caps and joins. The heart remains recognizable at 16 px, and the thread must not collapse into a noisy ECG trace at small sizes. The app icon is static; it is a brand mark, not a live status indicator. Do not add gradients, glows, bloom, or drop shadows.
 
 ## Menu-bar behavior
 
