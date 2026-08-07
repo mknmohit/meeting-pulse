@@ -1,0 +1,20 @@
+{
+  "source": "slackHuddle",
+  "scenario": "huddleEnded",
+  "nodes": [
+    {
+      "path": "window/<main>/huddles-row",
+      "role": "AXRow",
+      "subrole": "AXOutlineRow",
+      "description": "Huddles",
+      "windowToken": "<window:main>"
+    },
+    {
+      "path": "window/<main>/huddles-row/start",
+      "role": "AXButton",
+      "roleDescription": "button",
+      "descriptionToken": "<start-huddle-control>",
+      "windowToken": "<window:main>"
+    }
+  ]
+}

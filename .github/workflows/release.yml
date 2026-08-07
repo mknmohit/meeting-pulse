@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MP_DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MP_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MP_BUILD_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/meetingpulse-build.keychain-db"
+          CERTIFICATE="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERTIFICATE" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
+      - name: Build, notarize, and staple
+        env:
+          MP_SIGN_IDENTITY: ${{ secrets.MP_SIGN_IDENTITY }}
+          MP_TEAM_ID: ${{ secrets.MP_TEAM_ID }}
+          MP_NOTARY_PROFILE: ${{ secrets.MP_NOTARY_PROFILE }}
+        run: |
+          cp mac-app/Config.xcconfig.example mac-app/Config.xcconfig
+          ./mac-app/Tools/notarize.sh
+      - name: Attach DMG
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "build/Meeting Pulse.dmg"
+      - name: Delete temporary keychain
+        if: ${{ always() }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/meetingpulse-build.keychain-db" || true

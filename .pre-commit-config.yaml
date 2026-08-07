@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks
+        entry: gitleaks detect --no-banner --redact --no-git
+        language: system
+        pass_filenames: false
+      - id: swift-format
+        name: swift-format
+        entry: swift-format lint --strict --recursive mac-app/Packages
+        language: system
+        pass_filenames: false
+      - id: prettier
+        name: prettier
+        entry: pnpm --dir viewer exec prettier --check .
+        language: system
+        pass_filenames: false

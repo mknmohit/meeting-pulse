@@ -1,0 +1,36 @@
+title = "Meeting Pulse"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-project-url"
+regex = '''https://[a-z0-9]{20}\.supabase\.co'''
+
+[[rules]]
+id = "supabase-jwt"
+regex = '''eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'''
+
+[[rules]]
+id = "meetingpulse-pairing-code"
+regex = '''\b[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}\b'''
+
+[[rules]]
+id = "meetingpulse-recovery-phrase"
+regex = '''\b([0-9A-HJKMNP-TV-Z]{5}-){5}[0-9A-HJKMNP-TV-Z]\b'''
+
+[allowlist]
+paths = [
+  '''\.example$''',
+  '''\.ci$''',
+  '''docs/.*\.md$''',
+  '''docs/fixtures/.*''',
+  '''supabase/tests/generated_normalization_values\..*''',
+  '''\.gitleaks\.toml$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.build/''',
+  '''(^|/)viewer/dist/''',
+  '''(^|/)viewer/\.astro/''',
+  '''(^|/)supabase/\.temp/''',
+  '''(^|/)supabase/\.branches/''',
+]

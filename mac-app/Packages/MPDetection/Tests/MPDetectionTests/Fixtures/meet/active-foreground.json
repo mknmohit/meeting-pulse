@@ -1,0 +1,35 @@
+{
+  "source": "googleMeet",
+  "scenario": "activeForeground",
+  "nodes": [
+    {
+      "path": "window/<main>/web-area",
+      "role": "AXWebArea",
+      "roleDescription": "HTML content",
+      "titleToken": "<meet-title>",
+      "windowToken": "<window:main>"
+    },
+    {
+      "path": "window/<main>/web-area/call-controls",
+      "role": "AXGroup",
+      "subrole": "AXLandmarkRegion",
+      "roleDescription": "region",
+      "description": "Call controls",
+      "windowToken": "<window:main>"
+    },
+    {
+      "path": "window/<main>/web-area/call-controls/share",
+      "role": "AXButton",
+      "roleDescription": "button",
+      "description": "Share screen",
+      "windowToken": "<window:main>"
+    },
+    {
+      "path": "window/<main>/web-area/call-controls/leave",
+      "role": "AXButton",
+      "roleDescription": "button",
+      "description": "Leave call",
+      "windowToken": "<window:main>"
+    }
+  ]
+}

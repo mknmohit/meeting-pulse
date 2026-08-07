@@ -10,23 +10,22 @@ Make the Meeting Pulse menu-bar Heart Thread mark visually match the heavier nei
 
 ## Chosen approach
 
-Tune the existing `HeartThreadMenuIcon` SwiftUI drawing in `mac-app/MeetingPulse/MeetingPulseApp.swift`. This is the smallest change and avoids changing the app icon asset, state model, or menu interactions.
+Keep `HeartThreadMenuIcon` as the state and accessibility boundary, but render its label as one composed `NSImage` in `mac-app/MeetingPulse/MeetingPulseApp.swift`. macOS `MenuBarExtra` preserves the base image representation but does not reliably retain layered SwiftUI drawing views in the status item.
 
-Use the selected **Balanced** treatment:
+Use the selected **Balanced** treatment, preserving the geometry from `mac-app/MeetingPulse/Resources/heart-thread.svg`:
 
-- Increase the rendered label from 20x20 to approximately 22x22 points.
-- Increase the heart symbol's size and weight.
-- Increase the upper thread and lower wave stroke widths modestly.
-- Slightly enlarge and reposition the status dot to stay optically aligned with the larger mark.
+- Render the logo paths in a 24-point coordinate scale inside a 22x22 point image.
+- Keep the heart as the primary white/label-color outline, with the muted upper thread and gold lower wave from the logo.
+- Draw the state dot at the logo's upper-right endpoint and keep its existing state colors.
 
 The three state colors, state-derived accessibility labels, stable accessibility identifier, reduce-motion handling, and existing `.menu` `MenuBarExtra` style remain unchanged.
 
 ## Validation
 
-Build the macOS target and run the existing package tests. Confirm visually that the icon is slightly larger and heavier than the current mark without crowding adjacent system icons. Confirm that `busy`, `available`, and `unavailable` still use their existing dot colors and spoken labels.
+Build the macOS target and run the existing package tests. Confirm visually that the single rendered image is slightly larger and heavier than the current mark without crowding adjacent system icons. Confirm that `busy`, `available`, and `unavailable` still use their existing dot colors and spoken labels.
 
 ## Out of scope
 
-- Replacing the SF Symbol or introducing a new vector asset.
+- Changing the app icon or introducing a new app-icon asset.
 - Changing the app icon, menu contents, status reducer, sync transport, or state model.
 - Adding animation beyond the existing short dot transition.

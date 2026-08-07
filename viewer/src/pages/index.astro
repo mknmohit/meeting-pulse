@@ -1,0 +1,73 @@
+---
+import '@fontsource/archivo/400.css';
+import '@fontsource/archivo/600.css';
+import Base from '../layouts/Base.astro';
+import { COPY } from '../lib/copy';
+import '../styles/global.css';
+import '../styles/board.css';
+---
+
+<Base>
+  <main class="station" data-viewer>
+    <section class="board" data-board hidden>
+      <div class="plate" data-plate data-state="unavailable">
+        <div class="plate__content" data-state-region aria-live="polite">
+          <p class="plate__name" data-name></p>
+          <div class="plate__shape" aria-hidden="true">
+            <svg data-shape="disc" viewBox="0 0 120 180">
+              <path d="M60 176V52" />
+              <circle cx="60" cy="34" r="24" />
+            </svg>
+            <svg data-shape="cone" viewBox="0 0 120 180">
+              <path d="M60 18 28 74h64L60 18Z" />
+              <path d="M60 74v102M32 132h56" />
+            </svg>
+            <svg data-shape="pennant" viewBox="0 0 120 180">
+              <path d="M60 18 28 74h64L60 18Z" />
+              <path d="M60 74v76M32 116h56" />
+              <path d="M60 150h34l-17 14-17-14Z" />
+            </svg>
+            <svg data-shape="mast" viewBox="0 0 120 180">
+              <path d="M60 18v158M24 64h72M36 64v22M84 64v22" />
+            </svg>
+          </div>
+          <h1 class="plate__headline" data-headline>{COPY.board.unavailable.headline}</h1>
+          <p class="plate__supporting" data-supporting>{COPY.board.unavailable.supporting}</p>
+        </div>
+      </div>
+      <div class="rail">
+        <p class="rail__checked" data-checked>{COPY.rail.checkedJustNow}</p>
+        <button class="rail__button" type="button" data-refresh>{COPY.rail.checkAgain}</button>
+      </div>
+    </section>
+
+    <section class="pairing" data-pairing>
+      <div class="pairing__content">
+        <h1>{COPY.pairing.heading}</h1>
+        <p>{COPY.pairing.lede}</p>
+        <form class="pairing__form" data-pairing-form>
+          <label class="pairing__label" for="pairing-code">{COPY.pairing.fieldLabel}</label>
+          <input
+            class="pairing__input"
+            id="pairing-code"
+            data-code
+            inputmode="text"
+            autocapitalize="characters"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="11"
+            required
+          />
+          <button class="pairing__button" type="submit" data-connect>{COPY.pairing.button}</button>
+          <p class="pairing__message" data-pairing-message aria-live="polite"></p>
+        </form>
+        <div class="visually-hidden" data-turnstile aria-hidden="true"></div>
+      </div>
+    </section>
+    <p class="offline" data-offline hidden>{COPY.pairing.offline}</p>
+  </main>
+  <script>
+    import { boot } from '../ui/board';
+    boot();
+  </script>
+</Base>

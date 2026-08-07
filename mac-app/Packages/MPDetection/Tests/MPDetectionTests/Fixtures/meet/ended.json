@@ -1,0 +1,21 @@
+{
+  "source": "googleMeet",
+  "scenario": "ended",
+  "nodes": [
+    {
+      "path": "window/<main>/tab-strip/meet-tab",
+      "role": "AXRadioButton",
+      "subrole": "AXTabButton",
+      "roleDescription": "radio button",
+      "descriptionToken": "<meet-tab-ended>",
+      "windowToken": "<window:main>"
+    },
+    {
+      "path": "window/<main>/web-area",
+      "role": "AXWebArea",
+      "roleDescription": "HTML content",
+      "titleToken": "<meet-title-ended>",
+      "windowToken": "<window:main>"
+    }
+  ]
+}

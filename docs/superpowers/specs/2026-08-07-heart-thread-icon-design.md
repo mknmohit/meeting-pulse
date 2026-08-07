@@ -1,4 +1,4 @@
-# MeetingPulse Heart Thread icon design
+# Meeting Pulse Heart Thread icon design
 
 **Date:** 2026-08-07
 
@@ -6,7 +6,7 @@
 
 ## Goal
 
-Give MeetingPulse a recognizable, personal visual identity that connects the product to the relationship it protects: a private heartbeat between two people. The selected direction is **Heart Thread**, a heart outline crossed by a continuous pulse/thread, with a small status dot at the end of the thread.
+Give Meeting Pulse a recognizable, personal visual identity that connects the product to the relationship it protects: a private heartbeat between two people. The selected direction is **Heart Thread**, a heart outline crossed by a continuous pulse/thread, with a small status dot at the end of the thread.
 
 The design covers both macOS surfaces:
 
@@ -39,7 +39,7 @@ The menu-bar label has one small state dot. The dot is the only changing visual 
 | `available` | Rose/pink | No meeting signal is active. |
 | `unavailable` | Muted gray | Meeting status cannot be trusted. |
 
-The menu-bar menu text remains the authoritative status cue and must expose the same state in words. The icon must include an accessibility label such as “MeetingPulse, meeting active” or “MeetingPulse, status unavailable”; color is never the only way to learn the state.
+The menu-bar menu text remains the authoritative status cue and must expose the same state in words. The icon must include an accessibility label such as “Meeting Pulse, meeting active” or “Meeting Pulse, status unavailable”; color is never the only way to learn the state.
 
 There is no infinite horizontal movement, repeating pulse, `TimelineView`, display-link loop, or timer-driven animation. On a state change, only the dot uses a short ease-in/ease-out color transition of about 180 ms. This preserves the premium feel while keeping the background app idle between detector and sync work.
 

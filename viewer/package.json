@@ -1,0 +1,35 @@
+{
+  "name": "meetingpulse-viewer",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check && tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "format:check": "prettier --check .",
+    "headers": "node scripts/gen-headers.mjs",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@fontsource/archivo": "^5.3.0",
+    "@supabase/supabase-js": "^2.112.2",
+    "astro": "^7.2.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^26.1.2",
+    "eslint": "^10.8.0",
+    "eslint-plugin-astro": "^3.1.0",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
+  }
+}

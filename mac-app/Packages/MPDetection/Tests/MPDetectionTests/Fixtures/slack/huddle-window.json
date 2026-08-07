@@ -1,0 +1,39 @@
+{
+  "source": "slackHuddle",
+  "scenario": "activeHuddle",
+  "nodes": [
+    {
+      "path": "window/<huddle>",
+      "role": "AXWindow",
+      "subrole": "AXStandardWindow",
+      "roleDescription": "standard window",
+      "titleToken": "<huddle-window-title>",
+      "windowToken": "<window:huddle>"
+    },
+    {
+      "path": "window/<huddle>/web-area",
+      "role": "AXWebArea",
+      "titleToken": "<huddle-window-title>",
+      "windowToken": "<window:huddle>"
+    },
+    {
+      "path": "window/<huddle>/toolbar",
+      "role": "AXToolbar",
+      "description": "Huddle window actions",
+      "windowToken": "<window:huddle>"
+    },
+    {
+      "path": "window/<huddle>/controls",
+      "role": "AXToolbar",
+      "description": "Huddles actions",
+      "windowToken": "<window:huddle>"
+    },
+    {
+      "path": "window/<huddle>/controls/leave",
+      "role": "AXButton",
+      "roleDescription": "button",
+      "description": "Leave Huddle",
+      "windowToken": "<window:huddle>"
+    }
+  ]
+}

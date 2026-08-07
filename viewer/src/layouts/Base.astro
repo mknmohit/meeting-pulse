@@ -1,0 +1,24 @@
+---
+const { title = 'Meeting Pulse' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <!--
+    THESIS: A signal station publishes what one observer can see to people who cannot see it, and an empty mast is information rather than silence. This page refuses the arrangement the category always ships: a card holding a coloured dot, a name, and a timestamp.
+    OWN-WORLD: Painted marine enamel on a harbour-night ground. One vitreous plate with a hard painted rim, a hoisted day-shape as the signal, and the observation time chalked on the lower rail. Materials are flat and printed. There is no glass, no glow, no gradient.
+    STORY: She glances at her phone outside a closed door. In under a second she reads one shape and one word and knows whether to open it. When the Mac has stopped reporting she sees an empty mast, understands that nothing is being claimed, and treats it as "he might be busy" rather than as a broken page.
+    FIRST VIEWPORT: The plate fills the screen. The day-shape sits above the centre at roughly a third of the viewport height. The state word sits directly beneath it at the largest size the width allows. The chalked observation line and the refresh control sit on the lower rail, thumb-height on a phone.
+    FORM: Harbour signal station, position 6 of 7 on the grounded list, seed key 950bbeef.
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
+    <slot />
+  </body>
+</html>

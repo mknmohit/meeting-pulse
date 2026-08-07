@@ -1,0 +1,34 @@
+:root {
+  --ground: #0c1418;
+  --ground-rail: #070e11;
+  --plate-clear: #10614a;
+  --plate-clear-rim: #0a4534;
+  --plate-storm: #8c2a22;
+  --plate-storm-rim: #5e1a14;
+  --plate-bare: #3a4247;
+  --plate-bare-rim: #272d31;
+  --paint-white: #f2efe8;
+  --chalk: #c8cdcb;
+  --pennant: #f2efe8;
+  --focus: #e8b23a;
+  --step: 4px;
+  --radius-plate: 14px;
+  --ease-hoist: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-hoist: 220ms;
+  --type-state: clamp(3.5rem, 22vw, 9rem);
+  --type-lede: 1.125rem;
+  --type-body: 1rem;
+  --type-chalk: 0.875rem;
+  --track-state: -0.03em;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --ground: #e7e3da;
+    --ground-rail: #d6d1c6;
+    --plate-clear: #14785a;
+    --plate-storm: #a8352b;
+    --plate-bare: #8a9094;
+    --chalk: #3a403e;
+  }
+}

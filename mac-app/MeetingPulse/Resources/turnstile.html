@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  </head>
+  <body>
+    <div id="turnstile"></div>
+    <script>
+      window.meetingPulseTurnstile = {
+        render(siteKey) {
+          if (!window.turnstile) {
+            window.webkit.messageHandlers.meetingPulse.postMessage({ error: "TURNSTILE_FAILED" });
+            return;
+          }
+          window.turnstile.render("#turnstile", {
+            sitekey: siteKey,
+            callback(token) {
+              window.webkit.messageHandlers.meetingPulse.postMessage({ token: token });
+            },
+            "expired-callback"() {
+              window.webkit.messageHandlers.meetingPulse.postMessage({ error: "TURNSTILE_EXPIRED" });
+            },
+            "error-callback"() {
+              window.webkit.messageHandlers.meetingPulse.postMessage({ error: "TURNSTILE_FAILED" });
+            }
+          });
+        }
+      };
+    </script>
+  </body>
+</html>
