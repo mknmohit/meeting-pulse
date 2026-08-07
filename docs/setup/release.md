@@ -20,16 +20,5 @@ The script fails if any required value or local configuration is missing. It
 archives, exports, creates the DMG, signs it, submits it to notarytool,
 staples the ticket, and runs `spctl`.
 
-## GitHub Actions
-
-The release workflow expects these repository secrets:
-
-- `MP_DEVELOPER_ID_CERTIFICATE_BASE64`
-- `MP_DEVELOPER_ID_CERTIFICATE_PASSWORD`
-- `MP_BUILD_KEYCHAIN_PASSWORD`
-- `MP_SIGN_IDENTITY`
-- `MP_TEAM_ID`
-- `MP_NOTARY_PROFILE`
-
-The temporary keychain is deleted in an `always()` step. No certificate,
-private key, notary credential, or local configuration is committed.
+GitHub-hosted release automation is currently disabled. Releases must be
+created locally with the steps above.

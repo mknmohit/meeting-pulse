@@ -7,7 +7,8 @@ logic for the macOS app. Copy the committed example configuration files before
 running a local build:
 
 - `viewer/.env.example` is a human-facing template and must not build.
-- `viewer/.env.ci` contains shape-valid, fake values for CI-only builds.
+- `viewer/.env.ci` contains shape-valid, fake values for reproducible local
+  builds.
 - `mac-app/Config.xcconfig.example` is copied to the ignored
   `mac-app/Config.xcconfig`.
 

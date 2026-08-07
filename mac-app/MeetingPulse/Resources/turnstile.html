@@ -3,20 +3,39 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+        background: Canvas;
+        color: CanvasText;
+        font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main { display: grid; gap: 16px; justify-items: center; padding: 24px; text-align: center; }
+      p { margin: 0; }
+    </style>
   </head>
   <body>
-    <div id="turnstile"></div>
+    <main>
+      <p id="message">Loading security check...</p>
+      <div id="turnstile"></div>
+    </main>
     <script>
       window.meetingPulseTurnstile = {
         render(siteKey) {
-          if (!window.turnstile) {
-            window.webkit.messageHandlers.meetingPulse.postMessage({ error: "TURNSTILE_FAILED" });
+          if (!window.turnstile || typeof window.turnstile.render !== "function") {
+            window.setTimeout(() => this.render(siteKey), 250);
             return;
           }
+          document.querySelector("#message").textContent = "Complete the security check.";
           window.turnstile.render("#turnstile", {
             sitekey: siteKey,
             callback(token) {
+              document.querySelector("#message").textContent = "Security check complete.";
               window.webkit.messageHandlers.meetingPulse.postMessage({ token: token });
             },
             "expired-callback"() {

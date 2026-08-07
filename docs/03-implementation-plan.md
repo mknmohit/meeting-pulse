@@ -64,7 +64,7 @@ A task is done when all of these hold. No exceptions, no "will fix in the next t
 
 | Phase | Name | Depends on | Gate |
 |---|---|---|---|
-| 0 | Repository, scaffolds, tooling, CI | — | |
+| 0 | Repository, scaffolds, tooling, local verification | — | |
 | 1 | Detection spikes | 0 | **G1, G2** |
 | 2 | Database: schema, RPCs, RLS | 0 | **G3** |
 | 3 | Core models and the status reducer | 0 | |
@@ -207,17 +207,16 @@ meetingpulse/
 │   │          05_viewer_read,06_concurrency,07_normalization}.sql
 │   └── seed/seed.sql
 │
-└── .github/workflows/{ci.yml,release.yml}
 ```
 
 ---
 
-## 3. Phase 0 — Repository, scaffolds, tooling, CI
+## 3. Phase 0 — Repository, scaffolds, tooling, local verification
 
-**Goal:** a repository a stranger clones, configures from `.example` files, builds, and tests, with CI green from the first commit and no way to leak a secret.
+**Goal:** a repository a stranger clones, configures from `.example` files, builds, and tests locally from the first commit, with no way to leak a secret.
 **Depends on:** nothing.
 
-Phase 0 now scaffolds the viewer and the Supabase project too. In v1 those lived in Phases 6 and 2, which meant Phase 0's CI referenced directories that did not exist yet and could never pass (defect B3).
+Phase 0 now scaffolds the viewer and the Supabase project too. In v1 those lived in Phases 6 and 2, which meant the initial verification commands referenced directories that did not exist yet and could never pass (defect B3).
 
 ### T0.1 — Repository, licence, and the constraint that outlives everyone
 
@@ -314,9 +313,9 @@ PUBLIC_STATUS_ORIGINS=https://meetingpulse-ci.pages.dev
 PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
 ```
 
-`1x00000000000000000000AA` is Cloudflare's documented always-passes test site key, so CI never depends on a real Turnstile account.
+`1x00000000000000000000AA` is Cloudflare's documented always-passes test site key, so local verification never depends on a real Turnstile account.
 
-**This two-file split is the fix for defect B2.** v1 had CI copy `.env.example` and then reject it, which made a green build impossible.
+**This two-file split is the fix for defect B2.** v1 copied `.env.example` and then rejected it, which made a green build impossible.
 
 ### T0.4 — Configuration loading with no fallbacks, and the failure as a test
 
@@ -349,7 +348,7 @@ Rules, all of which are tested:
 
 `viewer/src/config.ts` mirrors this and throws at module scope, which fails `astro build`.
 
-**Acceptance:** unit tests for missing, empty, placeholder, and malformed on both sides. A CI step asserts that `cp .env.example .env && pnpm build` **fails** and that its message names `PUBLIC_SUPABASE_URL`. The bug that was defect B2 is now a regression test.
+**Acceptance:** unit tests for missing, empty, placeholder, and malformed on both sides. A local check asserts that `cp .env.example .env && pnpm build` **fails** and that its message names `PUBLIC_SUPABASE_URL`. The bug that was defect B2 is now a regression test.
 
 ### T0.5 — Viewer scaffold (moved from Phase 6)
 
@@ -364,7 +363,7 @@ pnpm add -D vitest jsdom @types/node prettier eslint typescript-eslint eslint-pl
 
 Scripts: `dev`, `build`, `check` (`astro check && tsc --noEmit`), `lint`, `test`, `headers` (`node scripts/gen-headers.mjs`).
 
-Ship a placeholder `index.astro` that renders the config values' presence and nothing else. Phase 6 replaces it. The point is that CI has something real to build from commit one.
+Ship a placeholder `index.astro` that renders the config values' presence and nothing else. Phase 6 replaces it. The point is that local verification has something real to build from commit one.
 
 ### T0.6 — Supabase scaffold (moved from Phase 2)
 
@@ -384,79 +383,20 @@ MPSync      → MPCore, MPSupport, supabase-swift
 App         → all four
 ```
 
-**Acceptance:** `swift build && swift test` in each package. A CI grep asserts `MPCore` imports neither `AppKit` nor `ApplicationServices`.
+**Acceptance:** `swift build && swift test` in each package. A local grep asserts `MPCore` imports neither `AppKit` nor `ApplicationServices`.
 
-### T0.8 — CI
+### T0.8 — Local verification
 
-```yaml
-name: CI
-on: { pull_request: , push: { branches: [main] } }
-concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
+GitHub Actions workflows are intentionally not included. Run the checks in
+`CONTRIBUTING.md` locally, including viewer checks, Swift package tests, and
+secret scanning. Use `viewer/.env.ci` for a shape-valid viewer build and
+`mac-app/Config.xcconfig.example` for an unsigned app-shell build.
 
-jobs:
-  secrets:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
-        env: { GITLEAKS_CONFIG: .gitleaks.toml }
+For the database checks, run `supabase start`, `supabase db reset`, and
+`supabase test db` locally.
 
-  swift:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo xcode-select -s /Applications/Xcode_16.2.app
-      - run: brew install swift-format
-      - run: swift-format lint --strict --recursive mac-app/Packages
-      - run: |
-          for p in MPCore MPSupport MPDetection MPSync; do
-            (cd mac-app/Packages/$p && swift test --enable-code-coverage) || exit 1
-          done
-      - name: MPCore stays pure
-        run: |
-          ! grep -rE '^import (AppKit|ApplicationServices|Supabase)' \
-              mac-app/Packages/MPCore/Sources
-      - name: App compiles with placeholder config
-        run: |
-          cp mac-app/Config.xcconfig.example mac-app/Config.xcconfig
-          xcodebuild -project mac-app/MeetingPulse.xcodeproj -scheme MeetingPulse \
-            -configuration Debug CODE_SIGNING_ALLOWED=NO build
-        # Compiling with placeholders is correct. The app fails at RUNTIME with a
-        # setup error, which is the designed behaviour and is unit-tested in T0.4.
-
-  viewer:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm, cache-dependency-path: viewer/pnpm-lock.yaml }
-      - run: pnpm install --frozen-lockfile
-        working-directory: viewer
-      - run: pnpm run check && pnpm run lint && pnpm test
-        working-directory: viewer
-      - name: Placeholder config must FAIL the build
-        working-directory: viewer
-        run: |
-          cp .env.example .env
-          if pnpm run build; then echo "::error::.env.example must not build"; exit 1; fi
-      - name: CI config must SUCCEED
-        working-directory: viewer
-        run: cp .env.ci .env && pnpm run headers && pnpm run build
-
-  database:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
-        with: { version: latest }
-      - run: supabase start
-      - run: supabase db reset
-      - run: supabase test db          # pgTAP; see §5.8
-```
-
-**Acceptance:** all four jobs green on a pull request from a clean clone with **no repository secrets configured**. That is the proof the repository is contributor-safe.
+**Acceptance:** the local checks pass from a clean clone with **no repository
+secrets configured**. That is the proof the repository is contributor-safe.
 
 ---
 
@@ -1294,7 +1234,7 @@ end; $$ language plpgsql;
 | 13 | Second active pairing for one viewer | unique violation |
 | 14 | The definer role of `publish_status` has `rolbypassrls` | true |
 
-Test 14 is the explicit check of the assumption that replaced `FORCE ROW LEVEL SECURITY` (defect M2). If it ever fails, the security model changed underneath us and we find out in CI rather than in production.
+Test 14 is the explicit check of the assumption that replaced `FORCE ROW LEVEL SECURITY` (defect M2). If it ever fails, the security model changed underneath us and we find out in local verification rather than in production.
 
 **`02_pairing.sql`.** Create, claim, then: claim again, claim an expired code, claim a revoked code, claim garbage. Assert all four failure payloads are **byte-identical**. Assert the raw code appears in no column of any table.
 
@@ -1308,7 +1248,7 @@ Test 14 is the explicit check of the assumption that replaced `FORCE ROW LEVEL S
 
 **`07_normalization.sql`.** Runs the generated `VALUES` fixture (§7.3) through `mp_normalize_code` and `mp_hash_code` and asserts every row matches, plus a checksum over the fixture that Swift and TypeScript assert too.
 
-**Gate G3 exit criterion:** every test above passes in CI. Phases 5 and 6 do not begin before that.
+**Gate G3 exit criterion:** every test above passes locally. Phases 5 and 6 do not begin before that.
 
 ---
 
@@ -1499,7 +1439,7 @@ Three tests, one fixture:
 - TypeScript `normalization.test.ts` reads the JSON.
 - SQL `07_normalization.sql` reads the generated `VALUES` and asserts the embedded checksum matches the JSON's.
 
-CI regenerates the SQL and fails if it differs from the committed copy, so the three cannot drift.
+A local check regenerates the SQL and fails if it differs from the committed copy, so the three cannot drift.
 
 **Acceptance:** all three suites pass; deliberately changing one character in the JSON fails all three.
 
@@ -1900,7 +1840,7 @@ public struct StatusPayload: Sendable, Equatable {
 }
 ```
 
-`SupabaseStatusTransport` calls **only** the twelve RPCs. It contains no table reads or writes, which a CI grep enforces by asserting the file contains no `.from(` outside the two owner-readable tables.
+`SupabaseStatusTransport` calls **only** the twelve RPCs. It contains no table reads or writes, which a local grep enforces by asserting the file contains no `.from(` outside the two owner-readable tables.
 
 On an unrecoverable auth failure it surfaces `SYNC_IDENTITY_LOST` and offers recovery. It never silently signs in as a new anonymous user, which is precisely how a device becomes an orphan.
 
@@ -2215,7 +2155,8 @@ xcrun stapler staple "build/Meeting Pulse.dmg"
 spctl -a -t open --context context:primary-signature -v "build/Meeting Pulse.dmg"
 ```
 
-`release.yml` is tag-triggered, imports the Developer ID certificate into a temporary keychain, runs the script, attaches the DMG to a GitHub Release, and **deletes the temporary keychain in an `always()` step**.
+Releases are created locally with the signing, notarization, stapling, and
+verification commands above. No tag-triggered hosted release job is included.
 
 ---
 
@@ -2335,7 +2276,7 @@ Assert that every request body contains **only** the `StatusPayload` fields plus
 | T0.5 | Viewer scaffold | 0 | T0.1 | S |
 | T0.6 | Supabase scaffold | 0 | T0.1 | S |
 | T0.7 | Four SPM packages, dependency direction | 0 | T0.1 | S |
-| T0.8 | CI: secrets, swift, viewer, database | 0 | T0.4–T0.7 | M |
+| T0.8 | Local verification: secrets, Swift, viewer, database | 0 | T0.4–T0.7 | M |
 | T1.1 | `axdump` with `--diff` and `--watch` | 1 | T0.7 | M |
 | T1.2 | Fixture sanitisation rules and review | 1 | T1.1 | S |
 | T1.3 ⛔ | **Spike S1, Chrome and Meet, decision 0001** | 1 | T1.1 | L |
@@ -2387,7 +2328,7 @@ Assert that every request body contains **only** the `StatusPayload` fields plus
 | T7.3 | Menu, status icons, countdown | 7 | T7.2 | L |
 | T7.4 | Onboarding, pairing, settings, recovery windows | 7 | T7.2, T5.7 | L |
 | T7.5 | Signing, notarisation, DMG | 7 | T7.3, T7.4 | M |
-| T7.6 | Release workflow | 7 | T7.5 | M |
+| T7.6 | Local release process | 7 | T7.5 | M |
 | T8.1 | Acceptance matrix, 30 scenarios | 8 | all | L |
 | T8.2 | Performance measurement | 8 | T7.5 | S |
 | T8.3 | Privacy capture | 8 | T7.5 | M |
@@ -2441,7 +2382,7 @@ Log the code, never the underlying text.
 | `PUBLIC_TURNSTILE_SITE_KEY` | viewer `.env` | yes | no | **none** |
 | `TURNSTILE_SECRET_KEY` | Supabase Auth settings | yes | **yes** | — |
 | `SUPABASE_SERVICE_ROLE_KEY` | operator secret store | migrations and runbook only | **yes** | — |
-| `MP_SIGN_IDENTITY` | CI secret / local keychain | release only | **yes** | — |
+| `MP_SIGN_IDENTITY` | local keychain | release only | **yes** | — |
 | `MP_NOTARY_PROFILE` | local keychain profile | release only | **yes** | — |
 | `idleSampleInterval` | `UserDefaults` | no | no | 15 s |
 | `activeSampleInterval` | `UserDefaults` | no | no | 2 s |

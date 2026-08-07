@@ -1,8 +1,11 @@
 import AppKit
 import Observation
 import MPCore
+import MPDetection
 import MPSupport
+import MPSync
 import SwiftUI
+import WebKit
 
 typealias MeetingPulseState = MPCore.State
 
@@ -17,14 +20,14 @@ struct MeetingPulseApp: App {
         }
         let coordinator = AppLaunchCoordinator()
         _launchCoordinator = SwiftUI.State(initialValue: coordinator)
-        Task {
-            await coordinator.start()
-        }
     }
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(model: model)
+                .task {
+                    await launchCoordinator.start(model: model)
+                }
         }
         label: {
             HeartThreadMenuIcon(state: model.state)
@@ -37,7 +40,7 @@ struct MeetingPulseApp: App {
         .windowResizability(.contentSize)
 
         Window("Pairing", id: "pairing") {
-            PairingWindow()
+            PairingWindow(model: model)
         }
         .windowResizability(.contentSize)
 
@@ -54,22 +57,193 @@ struct MeetingPulseApp: App {
 }
 
 @MainActor
+final class OwnerRuntime {
+    private let model: OwnerAppModel
+    private let scheduler: DetectionScheduler
+    private let transport: any StatusTransport
+    private let recovery: RecoveryService
+    private let secrets: any SecretStore
+    private let existingRegistration: DeviceRegistration?
+    private let pairing: PairingService
+    private var task: Task<Void, Never>?
+    private var sync: SyncCoordinator?
+
+    init(
+        model: OwnerAppModel,
+        transport: any StatusTransport,
+        recovery: RecoveryService,
+        secrets: any SecretStore,
+        existingRegistration: DeviceRegistration?
+    ) {
+        self.model = model
+        self.transport = transport
+        self.recovery = recovery
+        self.secrets = secrets
+        self.existingRegistration = existingRegistration
+        pairing = PairingService(transport: transport)
+        let meet = GoogleMeetDetector()
+        let slack = SlackHuddleDetector()
+        scheduler = DetectionScheduler(meet: meet, slack: slack)
+    }
+
+    func start() async throws {
+        let registration = try await registration()
+        sync = SyncCoordinator(
+            transport: transport,
+            nonce: registration.instanceNonce
+        )
+        let stream = await scheduler.readings
+        task = Task { [weak self] in
+            guard let self else {
+                return
+            }
+            await self.scheduler.start()
+            NSLog("Meeting Pulse scheduler started")
+            for await reading in stream {
+                NSLog(
+                    "Meeting Pulse reading meet=%@ slack=%@ permission=%d",
+                    reading.meet.rawValue,
+                    reading.slack.rawValue,
+                    reading.accessibilityGranted
+                )
+                let status = StatusReducer.reduce(
+                    ReducerInput(
+                        meet: reading.meet,
+                        slack: reading.slack,
+                        accessibilityGranted: reading.accessibilityGranted,
+                        override: nil,
+                        callOkay: self.model.callOkay,
+                        monotonicNow: SystemMonotonicClock().now()
+                    )
+                )
+                self.model.applyAutomatic(status)
+                if let sync = self.sync {
+                    await sync.submit(
+                        StatusPayload(
+                            state: status.state,
+                            callOkay: status.callOkay,
+                            overrideMode: self.model.manualOverrideState,
+                            overrideExpiresAt: nil
+                        )
+                    )
+                    if await sync.currentState == .idle {
+                        self.model.connectionLine = "Last published just now"
+                    }
+                }
+            }
+        }
+    }
+
+    private func registration() async throws -> DeviceRegistration {
+        if let existingRegistration {
+            return existingRegistration
+        }
+        return try await recovery.registerDevice().registration
+    }
+
+    func createPairingCode() async throws -> PairingCodeResult {
+        try await pairing.createCode()
+    }
+
+    func stop() async {
+        task?.cancel()
+        task = nil
+        await scheduler.stop()
+    }
+}
+
+@MainActor
 @Observable
 final class OwnerAppModel {
     var state: MeetingPulseState = .unavailable
     var callOkay = false
     var statusLine = "Status unavailable"
     var connectionLine = "Can't reach the server. Retrying."
+    var pairingCode: PairingCodeResult?
+    var pairingExpiresAt: Date?
+    var runtime: OwnerRuntime?
+    private var pairingWindow: NSWindow?
 
     func setBusy() {
         state = .busy
+        manualState = .busy
         statusLine = "Busy for another 30 minutes"
     }
 
     func setAvailable() {
         state = .available
+        manualState = .available
         statusLine = "Watching automatically"
     }
+
+    func clearOverride() {
+        manualState = nil
+        statusLine = "Watching automatically"
+    }
+
+    var manualOverrideState: MeetingPulseState? {
+        manualState
+    }
+
+    func createPairingCode() {
+        showPairingWindow()
+        Task { @MainActor in
+            do {
+                let result = try await runtime?.createPairingCode()
+                pairingCode = result
+                pairingExpiresAt = result.map { _ in Date().addingTimeInterval(600) }
+            } catch {
+                connectionLine = "Can't reach the server. Retrying."
+            }
+        }
+    }
+
+    private func showPairingWindow() {
+        if let pairingWindow {
+            pairingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let window = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 260),
+            styleMask: [.titled, .closable, .utilityWindow],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Pairing"
+        window.isReleasedWhenClosed = false
+        window.hidesOnDeactivate = false
+        window.contentViewController = NSHostingController(
+            rootView: PairingWindow(model: self)
+        )
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        pairingWindow = window
+    }
+
+    func applyAutomatic(_ status: EffectiveStatus) {
+        guard manualState == nil else {
+            return
+        }
+        NSLog(
+            "Meeting Pulse reducer state=%@ reason=%@",
+            status.state.rawValue,
+            status.reason.rawValue
+        )
+        state = status.state
+        callOkay = status.callOkay
+        statusLine = switch status.state {
+        case .available:
+            "Watching automatically"
+        case .busy:
+            "Busy"
+        case .unavailable:
+            "Status unavailable"
+        }
+    }
+
+    private var manualState: MeetingPulseState?
 }
 
 @MainActor
@@ -83,25 +257,127 @@ final class AppLaunchCoordinator {
 
     private var instanceLock: SingleInstanceLock?
     private var permissionCoordinator: PermissionCoordinator?
+    private var runtime: OwnerRuntime?
+    private var turnstilePanel: NSPanel?
     private(set) var state: LaunchState = .starting
 
-    func start() async {
+    func start(model: OwnerAppModel) async {
+        NSLog("Meeting Pulse launch sequence started")
+        guard state == .starting else {
+            return
+        }
         do {
             instanceLock = try SingleInstanceLock()
-            _ = try AppConfiguration.load()
+            let configuration = try AppConfiguration.load()
+            NSLog("Meeting Pulse configuration loaded")
             guard InstallLocation().isValid() else {
+                NSLog("Meeting Pulse install location is invalid")
                 state = .wrongInstallLocation
                 return
             }
             let coordinator = PermissionCoordinator()
             permissionCoordinator = coordinator
             await coordinator.start()
+            NSLog("Meeting Pulse permission coordinator started")
+            let secrets = KeychainStore()
+            let existingRegistration = try existingRegistration(from: secrets)
+            let provider: any TurnstileProvider
+            if existingRegistration == nil {
+                guard
+                    let htmlURL = Bundle.main.url(
+                        forResource: "turnstile",
+                        withExtension: "html"
+                    )
+                else {
+                    throw LaunchError.turnstileResourceMissing
+                }
+                let webProvider = WKTurnstileProvider(
+                    siteKey: configuration.turnstileSiteKey,
+                    htmlURL: htmlURL,
+                    baseURL: URL(string: "https://localhost")
+                )
+                provider = webProvider
+                showTurnstile(webProvider.view)
+            } else {
+                provider = UnavailableTurnstileProvider()
+            }
+            let gate = TurnstileGate(provider: provider)
+            let transport = SupabaseStatusTransport(
+                configuration: configuration,
+                turnstile: gate
+            )
+            let recovery = RecoveryService(transport: transport, secrets: secrets)
+            let runtime = OwnerRuntime(
+                model: model,
+                transport: transport,
+                recovery: recovery,
+                secrets: secrets,
+                existingRegistration: existingRegistration
+            )
+            self.runtime = runtime
+            model.runtime = runtime
+            try await runtime.start()
+            turnstilePanel?.close()
+            turnstilePanel = nil
+            NSLog("Meeting Pulse detection runtime started")
             state = .running
         } catch let error as AppConfiguration.ConfigurationError {
+            NSLog("Meeting Pulse configuration error: %@", error.description)
             state = .setupRequired(error.description)
         } catch {
+            NSLog("Meeting Pulse launch error: %@", String(describing: error))
             state = .setupRequired("Meeting Pulse is not configured yet.")
         }
+    }
+
+    private enum LaunchError: Error {
+        case turnstileResourceMissing
+        case keychainLocked
+        case invalidDeviceIdentity
+    }
+
+    private func existingRegistration(
+        from secrets: any SecretStore
+    ) throws -> DeviceRegistration? {
+        let deviceID = try secrets.read(.deviceID)
+        let nonce = try secrets.read(.deviceInstanceNonce)
+        switch (deviceID, nonce) {
+        case (.missing, .missing):
+            return nil
+        case let (.present(deviceData), .present(nonceData)):
+            guard
+                let device = UUID(
+                    uuidString: String(decoding: deviceData, as: UTF8.self)
+                ),
+                let instanceNonce = UUID(
+                    uuidString: String(decoding: nonceData, as: UTF8.self)
+                )
+            else {
+                throw LaunchError.invalidDeviceIdentity
+            }
+            return DeviceRegistration(deviceID: device, instanceNonce: instanceNonce)
+        case (.temporarilyUnavailable, _), (_, .temporarilyUnavailable):
+            throw LaunchError.keychainLocked
+        default:
+            throw LaunchError.invalidDeviceIdentity
+        }
+    }
+
+    private func showTurnstile(_ webView: WKWebView) {
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 260),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "Meeting Pulse"
+        webView.frame = NSRect(origin: .zero, size: NSSize(width: 420, height: 260))
+        webView.autoresizingMask = [.width, .height]
+        panel.contentView = webView
+        panel.center()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        turnstilePanel = panel
     }
 }
 
@@ -130,12 +406,14 @@ struct MenuBarView: View {
             Button("4 hours") { model.setAvailable() }
             Button("Until I clear it") { model.setAvailable() }
         }
-        Button("Clear override") { model.setAvailable() }
+        Button("Clear override") { model.clearOverride() }
         Toggle("Calls are okay", isOn: $model.callOkay)
         Button("Check and publish now") {}
         Divider()
         Button("Display name…") {}
-        Button("Create pairing code…") {}
+        Button("Create pairing code…") {
+            model.createPairingCode()
+        }
         Button("Rotate codes") {}
         Button("Disconnect viewer") {}
         Button("Show recovery phrase…") {}
@@ -301,22 +579,43 @@ struct OnboardingWindow: View {
 }
 
 struct PairingWindow: View {
+    @Bindable var model: OwnerAppModel
+
     var body: some View {
-        let exampleCode = ["ABCDE", "FGHJK"].joined(separator: "-")
         VStack(alignment: .leading, spacing: 16) {
             Text("Give her this code")
                 .font(.title2.weight(.semibold))
             Text("It works once and expires in ten minutes. If she needs another one later, come back here and make a new one.")
-            Text(exampleCode)
-                .font(.system(.title, design: .monospaced))
-            HStack {
-                Button("Copy") {}
-                Text("Expires in 9:42")
+            if let pairingCode = model.pairingCode {
+                Text(pairingCode.displayCode)
+                    .font(.system(.title, design: .monospaced))
+                HStack {
+                    Button("Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(
+                            pairingCode.displayCode,
+                            forType: .string
+                        )
+                    }
+                    if let expiresAt = model.pairingExpiresAt {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text("Expires in \(countdown(for: expiresAt, at: context.date))")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } else {
+                Text("Create pairing code…")
                     .foregroundStyle(.secondary)
             }
         }
         .padding(24)
         .frame(width: 420)
+    }
+
+    private func countdown(for date: Date, at now: Date) -> String {
+        let seconds = max(0, Int(date.timeIntervalSince(now)))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }
 

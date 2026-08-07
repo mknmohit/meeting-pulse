@@ -7,12 +7,12 @@ scenarios remain `NOT RUN`; they are never inferred from unit tests.
 
 | # | Scenario | Status | Evidence |
 |---:|---|---|---|
-| 1 | Scheduled Meet in Chrome | NOT RUN | Requires the release app and a real meeting |
+| 1 | Scheduled Meet in Chrome | LOCAL PASS | Installed unsigned app reported `meet=active` and reducer `busy`; viewer publish not verified |
 | 2 | Impromptu Meet link | NOT RUN | Requires a real meeting |
 | 3 | Joining someone else's link | NOT RUN | Requires a real meeting |
 | 4 | Leaving Meet normally | NOT RUN | Requires a real meeting |
 | 5 | Closing Meet or Chrome unexpectedly | NOT RUN | Requires a real meeting |
-| 6 | Slack Huddle start | NOT RUN | Requires the release app and a real Huddle |
+| 6 | Slack Huddle start | LOCAL PASS | Installed unsigned app reported `slack=active` and reducer `busy`; viewer publish not verified |
 | 7 | Slack Huddle end | NOT RUN | Requires a real Huddle |
 | 8 | Huddle while Slack is unfocused | NOT RUN | Requires a real Huddle |
 | 9 | Switching Chrome tabs during Meet | SPIKE PASS | `docs/decisions/0001-meet-detection-strategy.md` |

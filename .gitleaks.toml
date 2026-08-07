@@ -27,10 +27,13 @@ paths = [
   '''docs/fixtures/.*''',
   '''supabase/tests/generated_normalization_values\..*''',
   '''\.gitleaks\.toml$''',
+  '''(^|/)mac-app/Config\.xcconfig$''',
+  '''(^|/)viewer/\.env$''',
   '''(^|/)node_modules/''',
   '''(^|/)\.build/''',
   '''(^|/)viewer/dist/''',
   '''(^|/)viewer/\.astro/''',
   '''(^|/)supabase/\.temp/''',
   '''(^|/)supabase/\.branches/''',
+  '''(^|/)\.superpowers/''',
 ]

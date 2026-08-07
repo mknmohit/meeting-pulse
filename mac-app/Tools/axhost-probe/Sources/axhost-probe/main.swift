@@ -34,7 +34,7 @@ private struct AXHostProbe {
           break
         }
       }
-      try await Task.sleep(for: .seconds(15))
+      try await Task.sleep(for: .seconds(30))
       eventTask.cancel()
       await host.stopObserving(pid: app.processIdentifier)
       print("OBSERVER_COMPLETE")

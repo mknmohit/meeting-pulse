@@ -45,13 +45,20 @@ public struct UnavailableTurnstileProvider: TurnstileProvider {
 
 @MainActor
 public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMessageHandler,
+  WKNavigationDelegate,
   @unchecked Sendable
 {
   private let siteKey: String
   private let webView: WKWebView
   private var continuation: CheckedContinuation<String, Error>?
+  private var pageLoaded = false
+  private var loadWaiters = [CheckedContinuation<Void, Error>]()
 
-  public init(siteKey: String, htmlURL: URL) {
+  public var view: WKWebView {
+    webView
+  }
+
+  public init(siteKey: String, htmlURL: URL, baseURL: URL? = nil) {
     self.siteKey = siteKey
     let configuration = WKWebViewConfiguration()
     let controller = WKUserContentController()
@@ -59,13 +66,19 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     webView = WKWebView(frame: .zero, configuration: configuration)
     super.init()
     controller.add(self, name: "meetingPulse")
-    webView.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
+    webView.navigationDelegate = self
+    if let html = try? String(contentsOf: htmlURL, encoding: .utf8) {
+      webView.loadHTMLString(html, baseURL: baseURL)
+    } else {
+      webView.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
+    }
   }
 
   public func token(for reason: TurnstileReason) async throws -> String {
     guard continuation == nil else {
       throw TurnstileError.unavailable
     }
+    try await waitForPage()
     let encodedKey = try JSONSerialization.data(
       withJSONObject: siteKey,
       options: [.fragmentsAllowed]
@@ -83,6 +96,44 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
         }
         self?.resume(with: .failure(error))
       }
+    }
+  }
+
+  public func webView(
+    _: WKWebView,
+    didFinish navigation: WKNavigation!
+  ) {
+    pageLoaded = true
+    let waiters = loadWaiters
+    loadWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume()
+    }
+  }
+
+  public func webView(
+    _: WKWebView,
+    didFail navigation: WKNavigation!,
+    withError error: Error
+  ) {
+    NSLog("Meeting Pulse Turnstile page failed: %@", error.localizedDescription)
+    let waiters = loadWaiters
+    loadWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume(throwing: error)
+    }
+  }
+
+  public func webView(
+    _: WKWebView,
+    didFailProvisionalNavigation navigation: WKNavigation!,
+    withError error: Error
+  ) {
+    NSLog("Meeting Pulse Turnstile navigation failed: %@", error.localizedDescription)
+    let waiters = loadWaiters
+    loadWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume(throwing: error)
     }
   }
 
@@ -108,5 +159,14 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     }
     self.continuation = nil
     continuation.resume(with: result)
+  }
+
+  private func waitForPage() async throws {
+    if pageLoaded {
+      return
+    }
+    try await withCheckedThrowingContinuation { continuation in
+      loadWaiters.append(continuation)
+    }
   }
 }

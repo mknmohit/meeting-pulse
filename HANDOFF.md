@@ -42,7 +42,7 @@ The plan is built to be split. Phases 2, 3, and 6 run alongside the critical pat
 
 **Give:** the four core files.
 **Scope:** plan §3 in full.
-**Done when:** all four CI jobs are green on a pull request from a clean clone with no repository secrets configured.
+**Done when:** the local verification commands pass from a clean clone with no repository secrets configured.
 
 This agent goes first and alone. Everything else depends on the scaffolds it creates.
 
