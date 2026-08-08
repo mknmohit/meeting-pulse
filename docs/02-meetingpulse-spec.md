@@ -23,7 +23,11 @@ The project is open source. Deployment configuration is injectable, secrets stay
 
 The MVP exposes **no** meeting title, platform, participants, duration, microphone state, camera state, screen-sharing state, calendar data, audio, video, or meeting content.
 
-The owner can rely on automatic detection or apply a manual Busy/Available override. A manual override expires at a user-selected time, defaulting to 30 minutes. The `call okay` note is independent of the Busy/Available state.
+The owner can rely on automatic detection or apply a manual Busy/Available
+override. A manual override expires at a user-selected time, defaulting to 30
+minutes. Station also accepts a custom duration from 1 minute through 24 hours
+alongside the fixed presets. The `call okay` note is independent of the
+Busy/Available state.
 
 ---
 
@@ -780,7 +784,7 @@ Record both numbers in the release notes. A regression of > 20% between releases
 
 ### 12.1 Unit tests (reducer)
 
-All 16 cells of the §6.4 table · the permission-denied collapse · override busy/available · every duration preset including the 30-minute default and "until cleared" · override persistence across a simulated relaunch · override expiry firing an immediate publish · clear-override returning to automatic · `call_okay` independence · the two-consecutive-sample end rule · stale-heartbeat derivation · `unknown` is never coerced to `inactive`.
+All 16 cells of the §6.4 table · the permission-denied collapse · override busy/available · every fixed duration preset including the 30-minute default and "until cleared" · custom duration bounds · override persistence across a simulated relaunch · override expiry firing an immediate publish · clear-override returning to automatic · `call_okay` independence · the two-consecutive-sample end rule · stale-heartbeat derivation · `unknown` is never coerced to `inactive`.
 
 ### 12.2 Detector tests
 

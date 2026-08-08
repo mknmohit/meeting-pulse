@@ -259,6 +259,7 @@ final class OwnerRuntime {
   private var networkTask: Task<Void, Never>?
   private var sync: SyncCoordinator?
   private var overrideStore: ManualOverrideStore?
+  private let overrideOperationQueue = SerialOperationQueue()
 
   init(
     model: OwnerAppModel,
@@ -430,22 +431,29 @@ final class OwnerRuntime {
   func setOverride(
     state: MeetingPulseState,
     duration: ManualOverride.Duration
-  ) async throws {
-    guard let overrideStore else {
-      throw OwnerRuntimeError.unavailable
+  ) async throws -> ManualOverride {
+    try await enqueueOverrideOperation { [weak self] in
+      guard let self, let overrideStore = self.overrideStore else {
+        throw OwnerRuntimeError.unavailable
+      }
+      let override = try await overrideStore.set(state: state, duration: duration)
+      self.model.applyManualOverride(override)
+      await self.restartHeartbeat()
+      await self.publishOverride(override)
+      return override
     }
-    let override = try await overrideStore.set(state: state, duration: duration)
-    model.applyManualOverride(override)
-    await publishOverride(override)
   }
 
   func clearOverride() async throws {
-    guard let overrideStore else {
-      throw OwnerRuntimeError.unavailable
+    try await enqueueOverrideOperation { [weak self] in
+      guard let self, let overrideStore = self.overrideStore else {
+        throw OwnerRuntimeError.unavailable
+      }
+      try await overrideStore.clear()
+      self.model.clearManualOverride()
+      await self.restartHeartbeat()
+      await self.scheduler.requestImmediateSample()
     }
-    try await overrideStore.clear()
-    model.clearManualOverride()
-    await scheduler.requestImmediateSample()
   }
 
   func recoveryPhrase() throws -> String? {
@@ -498,7 +506,11 @@ final class OwnerRuntime {
     networkTask = nil
     networkMonitor.stop()
     await scheduler.stop()
+    await overrideStore?.stop()
+    overrideStore = nil
+    await overrideOperationQueue.cancel()
     await sync?.stop()
+    sync = nil
   }
 
   private func publishOverride(_ override: ManualOverride) async {
@@ -516,6 +528,9 @@ final class OwnerRuntime {
   }
 
   private func overrideDidChange(_ override: ManualOverride?) async {
+    if override == nil, let overrideStore, await overrideStore.current != nil {
+      return
+    }
     if let override {
       model.applyManualOverride(override)
     } else {
@@ -523,6 +538,12 @@ final class OwnerRuntime {
     }
     await restartHeartbeat()
     await scheduler.requestImmediateSample()
+  }
+
+  private func enqueueOverrideOperation<T: Sendable>(
+    _ operation: @escaping @MainActor @Sendable () async throws -> T
+  ) async throws -> T {
+    try await overrideOperationQueue.enqueue(operation)
   }
 
   private func restartHeartbeat() async {
@@ -685,7 +706,7 @@ final class OwnerAppModel {
         guard let runtime else {
           throw OwnerRuntimeError.unavailable
         }
-        try await runtime.setOverride(state: state, duration: duration)
+        _ = try await runtime.setOverride(state: state, duration: duration)
       } catch {
         connectionLine = MPString.error.unreachable
       }
@@ -860,6 +881,7 @@ final class AppLaunchCoordinator {
   private var instanceLock: SingleInstanceLock?
   private var permissionCoordinator: PermissionCoordinator?
   private var runtime: OwnerRuntime?
+  private var turnstileGate: TurnstileGate?
   private var permissionTask: Task<Void, Never>?
   private(set) var state: LaunchState = .starting
 
@@ -928,7 +950,11 @@ final class AppLaunchCoordinator {
       } else {
         provider = UnavailableTurnstileProvider()
       }
-      let gate = TurnstileGate(provider: provider)
+      let gate = TurnstileGate(provider: provider) { [weak store] in
+        store?.turnstileWebView = nil
+        store?.turnstilePresentation = .hidden
+      }
+      turnstileGate = gate
       let transport = SupabaseStatusTransport(
         configuration: configuration,
         turnstile: gate,
@@ -957,11 +983,14 @@ final class AppLaunchCoordinator {
       store?.launchAtLogin = model.launchAtLogin
       store?.turnstileWebView = nil
       store?.turnstilePresentation = .hidden
+      await turnstileGate?.shutdown()
+      turnstileGate = nil
       store?.setupFailure = nil
       store?.setupFailureHeadline = MPString.error.genericSetup
       NSLog("Meeting Pulse detection runtime started")
       state = installLocationIsValid ? .running : .wrongInstallLocation
     } catch let error as AppConfiguration.ConfigurationError {
+      await cleanupAfterFailedLaunch(model: model, store: store)
       NSLog("Meeting Pulse configuration error: %@", error.description)
       store?.turnstileWebView = nil
       store?.turnstilePresentation = .failed
@@ -969,6 +998,7 @@ final class AppLaunchCoordinator {
       store?.setupFailure = error.description
       state = .setupRequired(error.description)
     } catch {
+      await cleanupAfterFailedLaunch(model: model, store: store)
       let detail = Self.launchFailureDetail(for: error)
       NSLog("Meeting Pulse launch error: %@", detail)
       store?.turnstileWebView = nil
@@ -987,6 +1017,19 @@ final class AppLaunchCoordinator {
     guard case .setupRequired = state else {
       return
     }
+    await cleanupAfterFailedLaunch(model: model, store: store)
+    store?.turnstileWebView = nil
+    store?.turnstilePresentation = .hidden
+    store?.setupFailureHeadline = MPString.error.genericSetup
+    store?.setupFailure = nil
+    state = .starting
+    await start(model: model, store: store, openStation: openStation)
+  }
+
+  private func cleanupAfterFailedLaunch(
+    model: OwnerAppModel,
+    store: PulseStore?
+  ) async {
     permissionTask?.cancel()
     permissionTask = nil
     await permissionCoordinator?.stop()
@@ -996,11 +1039,8 @@ final class AppLaunchCoordinator {
     model.runtime = nil
     model.runtimeStore = store
     store?.turnstileWebView = nil
-    store?.turnstilePresentation = .hidden
-    store?.setupFailureHeadline = MPString.error.genericSetup
-    store?.setupFailure = nil
-    state = .starting
-    await start(model: model, store: store, openStation: openStation)
+    await turnstileGate?.shutdown()
+    turnstileGate = nil
   }
 
   private static func launchFailureDetail(for error: Error) -> String {

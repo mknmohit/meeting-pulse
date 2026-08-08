@@ -105,6 +105,9 @@ public actor ManualOverrideStore {
     state: State,
     duration: ManualOverride.Duration
   ) throws -> ManualOverride {
+    guard duration.isValid else {
+      throw ManualOverride.ValidationError.invalidDuration
+    }
     cancelExpiryTask()
     let createdAt = wallClock.now
     let seconds = duration.seconds
@@ -126,6 +129,10 @@ public actor ManualOverrideStore {
     cancelExpiryTask()
     try fileSystem.remove(fileURL)
     currentOverride = nil
+  }
+
+  public func stop() {
+    cancelExpiryTask()
   }
 
   public func rearmExpiry() {

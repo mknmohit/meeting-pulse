@@ -1,5 +1,6 @@
 import Foundation
 import MPCore
+import MPSupport
 import Testing
 @testable import MPUI
 
@@ -44,4 +45,13 @@ func durationValuesAreIdentifiableAndHashable() {
   let durations = Set(ManualOverride.Duration.allCases)
   #expect(durations.count == 7)
   #expect(ManualOverride.Duration.m30.id == .m30)
+}
+
+@Test
+func customDurationLabelsDescribeHoursAndMinutes() {
+  #expect(
+    MPString.mast.durationLabel(.custom(minutes: 90))
+      == "Custom (1 hour 30 minutes)"
+  )
+  #expect(MPString.mast.durationLabel(.custom(minutes: 0)) == "Custom...")
 }

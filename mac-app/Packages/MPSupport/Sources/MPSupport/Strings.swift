@@ -66,6 +66,20 @@ public enum MPString {
       case .h2: return "2 hours"
       case .h4: return "4 hours"
       case .untilCleared: return "Until I clear it"
+      case .custom(let minutes):
+        guard minutes > 0 else {
+          return "Custom..."
+        }
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+        if hours == 0 {
+          return "Custom (\(remainingMinutes) \(remainingMinutes == 1 ? "minute" : "minutes"))"
+        }
+        if remainingMinutes == 0 {
+          return "Custom (\(hours) \(hours == 1 ? "hour" : "hours"))"
+        }
+        return "Custom (\(hours) \(hours == 1 ? "hour" : "hours") " +
+          "\(remainingMinutes) \(remainingMinutes == 1 ? "minute" : "minutes"))"
       }
     }
 
@@ -105,6 +119,17 @@ public enum MPString {
     public static let privacy = "Privacy"
     public static let checkNow = "Check and publish now"
     public static let checkNowHelp = "Publish the current status now."
+    public static let status = "Status"
+    public static let statusDetail = "Set a temporary status or let Meeting Pulse watch automatically."
+    public static let updating = "Updating..."
+    public static let setBusy = MenuBar.setBusy
+    public static let setAvailable = MenuBar.setAvailable
+    public static let backToAutomatic = MenuBar.backToAutomatic
+    public static let customDuration = "Custom..."
+    public static let customDurationDetail = "Choose between 1 minute and 24 hours."
+    public static let hours = "Hours"
+    public static let minutes = "Minutes"
+    public static let invalidCustomDuration = "Choose between 1 minute and 24 hours."
     public static let permission = "Permission"
     public static let whatMacWatches = "What the Mac watches"
     public static let publishing = "Publishing"
@@ -300,6 +325,7 @@ public enum MPString {
     public static let invalidPhrase = "That phrase doesn't match. Check for typos."
     public static let loginItem = "macOS blocked this. Open Login Items in System Settings to allow it."
     public static let createLink = "Couldn't create the link. Try again."
+    public static let override = "Couldn't update your status. Try again."
     public static let viewers = "Can't load the list right now."
     public static let genericSetup = "Meeting Pulse isn't configured yet."
     public static let launchFailed = "Meeting Pulse couldn't start."

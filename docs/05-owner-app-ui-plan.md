@@ -141,9 +141,9 @@ never been exposed.
 |---|---|---|---|
 | Current state and reason | Menu text | Mast, always visible | Yes, header |
 | Publish freshness | Menu text | Mast rail + Watch | Yes, header |
-| Set busy, 7 durations | Menu submenu | Mast controls | Yes, submenu |
-| Set available, 7 durations | Menu submenu | Mast controls | Yes, submenu |
-| Clear override | Menu button | Mast, `Automatic` segment | Yes |
+| Set busy, 7 presets + Custom | Menu submenu | Watch status group | Yes, 7-preset submenu |
+| Set available, 7 presets + Custom | Menu submenu | Watch status group | Yes, 7-preset submenu |
+| Clear override | Menu button | Watch status group | Yes |
 | Calls are okay | Menu toggle | Mast toggle | Yes |
 | Check and publish now | Menu button | Window toolbar | No |
 | Accessibility permission | Onboarding window | Watch + onboarding | No |
@@ -224,10 +224,10 @@ that survives a long build.
 //
 //  FIRST VIEWPORT: A 288pt left column. Top two thirds is the enamel plate: the
 //  day-shape, the state word, the supporting line, exactly the viewer's board.
-//  Under it, a three-segment mode control and the calls-are-okay switch. Under
-//  that, four section rows. At the very bottom, one chalk line of publish
-//  freshness. Right column is the working area, a grouped Form. Primary action
-//  for a first run is "Create the viewer link" in Sharing.
+//  Under it, the calls-are-okay switch. Under that, four section rows. At the
+//  very bottom, one chalk line of publish freshness. Right column is the
+//  working area, a grouped Form. Primary action for a first run is "Create the
+//  viewer link" in Sharing. Manual status actions live in the Watch detail.
 //
 //  FORM: Live mast and ledger. Candidate 6 of 7 grounded structures for this
 //  task. Seed key 5f3f7af2.

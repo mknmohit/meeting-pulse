@@ -28,7 +28,6 @@ public struct MastView: View {
           .frame(maxWidth: MPShape.plateWidth)
       }
 
-      ModeControl(store: store, actions: actions)
       CallsOkaySwitch(store: store, actions: actions)
     }
     .padding(.horizontal, MPSpace.base)

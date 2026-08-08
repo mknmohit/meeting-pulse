@@ -59,6 +59,7 @@ public enum PulseError: Equatable, Sendable {
   case invalidPhrase
   case loginItemBlocked
   case supersededByAnother
+  case override
   case createLink
   case viewers
   case setup(String)

@@ -35,6 +35,7 @@ public final class PulseStore {
   public var mode: PulseMode = .automatic
   public var preferredDuration: ManualOverride.Duration = .m30
   public var overrideExpiry: Date?
+  public var isOverrideActionInFlight = false
 
   public var pairingCode: String?
   public var viewerLinks: [URL] = []

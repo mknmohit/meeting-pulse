@@ -14,23 +14,48 @@ public enum TurnstileError: Error, Equatable, Sendable {
 @MainActor
 public protocol TurnstileProvider: Sendable {
   func token(for reason: TurnstileReason) async throws -> String
+  func shutdown()
+}
+
+public extension TurnstileProvider {
+  func shutdown() {}
 }
 
 public actor TurnstileGate {
   private let provider: any TurnstileProvider
+  private let onTokenFinished: (@MainActor @Sendable () -> Void)?
 
-  public init(provider: any TurnstileProvider) {
+  public init(
+    provider: any TurnstileProvider,
+    onTokenFinished: (@MainActor @Sendable () -> Void)? = nil
+  ) {
     self.provider = provider
+    self.onTokenFinished = onTokenFinished
   }
 
   public func token(for reason: TurnstileReason) async throws -> String {
-    let token = try await provider.token(for: reason).trimmingCharacters(
-      in: .whitespacesAndNewlines
-    )
+    let rawToken: String
+    do {
+      rawToken = try await provider.token(for: reason)
+    } catch {
+      await finishTokenWork()
+      throw error
+    }
+    await finishTokenWork()
+    let token = rawToken.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !token.isEmpty else {
       throw TurnstileError.emptyToken
     }
     return token
+  }
+
+  public func shutdown() async {
+    await provider.shutdown()
+  }
+
+  private func finishTokenWork() async {
+    await provider.shutdown()
+    await onTokenFinished?()
   }
 }
 
@@ -48,14 +73,19 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
   WKNavigationDelegate,
   @unchecked Sendable
 {
+  private static let messageName = "meetingPulse"
   private let siteKey: String
-  private let webView: WKWebView
+  private var webView: WKWebView?
   private var continuation: CheckedContinuation<String, Error>?
   private var pageLoaded = false
   private var loadWaiters = [CheckedContinuation<Void, Error>]()
+  private var isShutdown = false
 
   public var view: WKWebView {
-    webView
+    guard let webView else {
+      fatalError("The Turnstile provider has been shut down.")
+    }
+    return webView
   }
 
   public init(siteKey: String, htmlURL: URL, baseURL: URL? = nil) {
@@ -63,9 +93,10 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     let configuration = WKWebViewConfiguration()
     let controller = WKUserContentController()
     configuration.userContentController = controller
-    webView = WKWebView(frame: .zero, configuration: configuration)
+    let webView = WKWebView(frame: .zero, configuration: configuration)
+    self.webView = webView
     super.init()
-    controller.add(self, name: "meetingPulse")
+    controller.add(WeakScriptMessageHandler(owner: self), name: Self.messageName)
     webView.navigationDelegate = self
     if let html = try? String(contentsOf: htmlURL, encoding: .utf8) {
       webView.loadHTMLString(html, baseURL: baseURL)
@@ -75,10 +106,13 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
   }
 
   public func token(for reason: TurnstileReason) async throws -> String {
-    guard continuation == nil else {
+    guard !isShutdown, continuation == nil else {
       throw TurnstileError.unavailable
     }
     try await waitForPage()
+    guard !isShutdown, let webView else {
+      throw TurnstileError.unavailable
+    }
     let encodedKey = try JSONSerialization.data(
       withJSONObject: siteKey,
       options: [.fragmentsAllowed]
@@ -99,10 +133,37 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     }
   }
 
+  public func shutdown() {
+    guard !isShutdown else {
+      return
+    }
+    isShutdown = true
+    resume(with: .failure(TurnstileError.unavailable))
+
+    let waiters = loadWaiters
+    loadWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume(throwing: TurnstileError.unavailable)
+    }
+
+    guard let webView else {
+      return
+    }
+    webView.stopLoading()
+    webView.navigationDelegate = nil
+    webView.configuration.userContentController.removeScriptMessageHandler(
+      forName: Self.messageName
+    )
+    self.webView = nil
+  }
+
   public func webView(
     _: WKWebView,
     didFinish navigation: WKNavigation!
   ) {
+    guard !isShutdown else {
+      return
+    }
     pageLoaded = true
     let waiters = loadWaiters
     loadWaiters.removeAll()
@@ -116,6 +177,9 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     didFail navigation: WKNavigation!,
     withError error: Error
   ) {
+    guard !isShutdown else {
+      return
+    }
     NSLog("Meeting Pulse Turnstile page failed: %@", error.localizedDescription)
     let waiters = loadWaiters
     loadWaiters.removeAll()
@@ -129,6 +193,9 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     didFailProvisionalNavigation navigation: WKNavigation!,
     withError error: Error
   ) {
+    guard !isShutdown else {
+      return
+    }
     NSLog("Meeting Pulse Turnstile navigation failed: %@", error.localizedDescription)
     let waiters = loadWaiters
     loadWaiters.removeAll()
@@ -162,11 +229,33 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
   }
 
   private func waitForPage() async throws {
+    guard !isShutdown else {
+      throw TurnstileError.unavailable
+    }
     if pageLoaded {
       return
     }
     try await withCheckedThrowingContinuation { continuation in
       loadWaiters.append(continuation)
     }
+  }
+}
+
+@MainActor
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+  weak var owner: WKTurnstileProvider?
+
+  init(owner: WKTurnstileProvider) {
+    self.owner = owner
+  }
+
+  func userContentController(
+    _ userContentController: WKUserContentController,
+    didReceive message: WKScriptMessage
+  ) {
+    owner?.userContentController(
+      userContentController,
+      didReceive: message
+    )
   }
 }

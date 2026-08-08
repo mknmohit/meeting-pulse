@@ -14,6 +14,16 @@ struct OverrideTests {
     #expect(ManualOverride.Duration.h2.seconds == 7_200)
     #expect(ManualOverride.Duration.h4.seconds == 14_400)
     #expect(ManualOverride.Duration.untilCleared.seconds == nil)
+    #expect(ManualOverride.Duration.allCases.count == 7)
+  }
+
+  @Test
+  func customDurationUsesMinuteBounds() {
+    #expect(ManualOverride.Duration.custom(minutes: 1).seconds == 60)
+    #expect(ManualOverride.Duration.custom(minutes: 1).isValid)
+    #expect(ManualOverride.Duration.custom(minutes: 1_440).isValid)
+    #expect(!ManualOverride.Duration.custom(minutes: 0).isValid)
+    #expect(!ManualOverride.Duration.custom(minutes: 1_441).isValid)
   }
 
   @Test

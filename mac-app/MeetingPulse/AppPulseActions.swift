@@ -12,6 +12,10 @@ final class AppPulseActions: PulseActions {
   private weak var model: OwnerAppModel?
   private var windowOpener: (@MainActor (String) -> Void)?
   private var launchRetrier: (@MainActor () async -> Void)?
+  private var overrideMutationGeneration = 0
+  private var overrideMutationActive = false
+  private var overrideMutationSnapshot: OverrideSnapshot?
+  private var latestOverrideIntent: OverrideIntent?
 
   /// Set by `quit()` so the app delegate can distinguish an explicit menu Quit
   /// from a Cmd+Q keypress. Cmd+Q should only close the station; the menu
@@ -42,27 +46,32 @@ final class AppPulseActions: PulseActions {
   }
 
   func setBusy(for duration: ManualOverride.Duration) async {
-    await setOverride(state: .busy, duration: duration)
+    let generation = beginOverrideMutation(mode: .busy, duration: duration)
+    await setOverride(state: .busy, duration: duration, generation: generation)
   }
 
   func setAvailable(for duration: ManualOverride.Duration) async {
-    await setOverride(state: .available, duration: duration)
+    let generation = beginOverrideMutation(mode: .available, duration: duration)
+    await setOverride(state: .available, duration: duration, generation: generation)
   }
 
   func clearOverride() async {
+    let generation = beginOverrideMutation(mode: .automatic, duration: nil)
     guard let runtime = model?.runtime else {
-      store.lastError = .network
+      failOverrideMutation(generation)
       return
     }
-    let previousState = store.effectiveState
     do {
       try await runtime.clearOverride()
+      guard generation == overrideMutationGeneration else {
+        reapplyLatestOverrideIntent()
+        return
+      }
       store.mode = .automatic
       store.overrideExpiry = nil
-      await runtime.refreshAndPublish()
+      completeOverrideMutation(generation)
     } catch {
-      store.effectiveState = previousState
-      store.lastError = .network
+      failOverrideMutation(generation)
     }
   }
 
@@ -331,24 +340,107 @@ final class AppPulseActions: PulseActions {
     NSApp.terminate(nil)
   }
 
-  private func setOverride(state: MPCore.State, duration: ManualOverride.Duration) async {
+  private func setOverride(
+    state: MPCore.State,
+    duration: ManualOverride.Duration,
+    generation: Int
+  ) async {
     guard let runtime = model?.runtime else {
-      store.lastError = .network
+      failOverrideMutation(generation)
       return
     }
-    let previousMode = store.mode
-    let previousExpiry = store.overrideExpiry
-    let previousState = store.effectiveState
-    store.mode = state == .busy ? .busy : .available
-    store.preferredDuration = duration
     do {
-      try await runtime.setOverride(state: state, duration: duration)
+      let override = try await runtime.setOverride(state: state, duration: duration)
+      guard generation == overrideMutationGeneration else {
+        reapplyLatestOverrideIntent()
+        return
+      }
+      store.setOverride(override)
+      completeOverrideMutation(generation)
     } catch {
-      store.mode = previousMode
-      store.overrideExpiry = previousExpiry
-      store.effectiveState = previousState
-      store.lastError = .network
+      failOverrideMutation(generation)
     }
+  }
+
+  private func beginOverrideMutation(
+    mode: PulseMode,
+    duration: ManualOverride.Duration?
+  ) -> Int {
+    if !overrideMutationActive {
+      overrideMutationSnapshot = OverrideSnapshot(
+        mode: store.mode,
+        expiry: store.overrideExpiry,
+        state: store.effectiveState,
+        duration: store.preferredDuration
+      )
+      overrideMutationActive = true
+    }
+
+    overrideMutationGeneration += 1
+    latestOverrideIntent = OverrideIntent(
+      mode: mode,
+      duration: duration
+    )
+    store.mode = mode
+    store.overrideExpiry = nil
+    if let duration {
+      store.preferredDuration = duration
+    }
+    store.isOverrideActionInFlight = true
+    store.lastError = nil
+    return overrideMutationGeneration
+  }
+
+  private func completeOverrideMutation(_ generation: Int) {
+    guard generation == overrideMutationGeneration else {
+      return
+    }
+    overrideMutationActive = false
+    overrideMutationSnapshot = nil
+    latestOverrideIntent = nil
+    store.isOverrideActionInFlight = false
+  }
+
+  private func failOverrideMutation(_ generation: Int) {
+    guard generation == overrideMutationGeneration else {
+      reapplyLatestOverrideIntent()
+      return
+    }
+    if let snapshot = overrideMutationSnapshot {
+      store.mode = snapshot.mode
+      store.overrideExpiry = snapshot.expiry
+      store.effectiveState = snapshot.state
+      store.preferredDuration = snapshot.duration
+    }
+    store.isOverrideActionInFlight = false
+    store.lastError = .override
+    overrideMutationActive = false
+    overrideMutationSnapshot = nil
+    latestOverrideIntent = nil
+  }
+
+  private func reapplyLatestOverrideIntent() {
+    guard let latestOverrideIntent else {
+      return
+    }
+    store.mode = latestOverrideIntent.mode
+    store.overrideExpiry = nil
+    if let duration = latestOverrideIntent.duration {
+      store.preferredDuration = duration
+    }
+    store.isOverrideActionInFlight = true
+  }
+
+  private struct OverrideSnapshot {
+    let mode: PulseMode
+    let expiry: Date?
+    let state: MPCore.State
+    let duration: ManualOverride.Duration
+  }
+
+  private struct OverrideIntent {
+    let mode: PulseMode
+    let duration: ManualOverride.Duration?
   }
 
   private enum AppPulseActionError: Error {

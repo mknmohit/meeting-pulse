@@ -3,9 +3,10 @@ import Foundation
 public struct ManualOverride: Codable, Equatable, Sendable {
   public enum ValidationError: Error, Equatable, Sendable {
     case unavailableState
+    case invalidDuration
   }
 
-  public enum Duration: CaseIterable, Equatable, Sendable {
+  public enum Duration: CaseIterable, Equatable, Hashable, Sendable {
     case m15
     case m30
     case m45
@@ -13,8 +14,15 @@ public struct ManualOverride: Codable, Equatable, Sendable {
     case h2
     case h4
     case untilCleared
+    case custom(minutes: Int)
 
     public static let `default`: Duration = .m30
+    public static let minimumCustomMinutes = 1
+    public static let maximumCustomMinutes = 24 * 60
+
+    public static var allCases: [Duration] {
+      [.m15, .m30, .m45, .h1, .h2, .h4, .untilCleared]
+    }
 
     public var seconds: TimeInterval? {
       switch self {
@@ -32,7 +40,25 @@ public struct ManualOverride: Codable, Equatable, Sendable {
         14_400
       case .untilCleared:
         nil
+      case .custom(let minutes):
+        TimeInterval(minutes) * 60
       }
+    }
+
+    public var isValid: Bool {
+      switch self {
+      case .custom(let minutes):
+        (Self.minimumCustomMinutes...Self.maximumCustomMinutes).contains(minutes)
+      default:
+        true
+      }
+    }
+
+    public var customMinutes: Int? {
+      guard case .custom(let minutes) = self else {
+        return nil
+      }
+      return minutes
     }
   }
 
@@ -91,7 +117,7 @@ public struct ManualOverride: Codable, Equatable, Sendable {
   }
 }
 
-extension ManualOverride.Duration: Identifiable, Hashable {
+extension ManualOverride.Duration: Identifiable {
   public var id: Self {
     self
   }

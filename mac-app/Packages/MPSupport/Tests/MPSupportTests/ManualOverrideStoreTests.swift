@@ -33,6 +33,51 @@ struct ManualOverrideStoreTests {
   }
 
   @Test
+  func customDurationPersistsItsCalculatedExpiry() async throws {
+    let fileSystem = InMemoryOverrideFileSystem()
+    let wallClock = MutableWallClock(now: Date(timeIntervalSince1970: 1_000))
+    let monotonic = NonExpiringMonotonicClock()
+    let store = ManualOverrideStore(
+      fileURL: URL(fileURLWithPath: "/tmp/override.json"),
+      wallClock: wallClock,
+      monotonic: monotonic,
+      fileSystem: fileSystem
+    )
+
+    let saved = try await store.set(
+      state: .available,
+      duration: .custom(minutes: 90)
+    )
+
+    #expect(saved.expiresAtWall == Date(timeIntervalSince1970: 6_400))
+    #expect(saved.state == .available)
+  }
+
+  @Test
+  func invalidCustomDurationDoesNotReplaceCurrentOverride() async throws {
+    let fileSystem = InMemoryOverrideFileSystem()
+    let store = ManualOverrideStore(
+      fileURL: URL(fileURLWithPath: "/tmp/override.json"),
+      wallClock: MutableWallClock(now: Date(timeIntervalSince1970: 1_000)),
+      monotonic: NonExpiringMonotonicClock(),
+      fileSystem: fileSystem
+    )
+    _ = try await store.set(state: .busy, duration: .m30)
+
+    do {
+      _ = try await store.set(
+        state: .available,
+        duration: .custom(minutes: 1_441)
+      )
+      Issue.record("Invalid custom duration was accepted")
+    } catch let error as ManualOverride.ValidationError {
+      #expect(error == .invalidDuration)
+    }
+
+    #expect((await store.current)?.state == .busy)
+  }
+
+  @Test
   func malformedFileIsDiscardedAndLogged() async {
     let fileSystem = InMemoryOverrideFileSystem(data: Data("{".utf8))
     let log = LogSink()
@@ -103,6 +148,28 @@ struct ManualOverrideStoreTests {
     let current = await store.current
     #expect(current == nil)
   }
+
+  @Test
+  func replacingAnOverridePreventsTheOldExpiryFromClearingIt() async throws {
+    let fileSystem = InMemoryOverrideFileSystem()
+    let publisher = PublishSink()
+    let store = ManualOverrideStore(
+      fileURL: URL(fileURLWithPath: "/tmp/override.json"),
+      wallClock: MutableWallClock(now: Date()),
+      monotonic: DelayedMonotonicClock(),
+      fileSystem: fileSystem,
+      publish: { value in publisher.values.append(value) }
+    )
+
+    _ = try await store.set(state: .busy, duration: .m15)
+    _ = try await store.set(state: .available, duration: .m30)
+    for _ in 0..<20 {
+      await Task.yield()
+    }
+
+    #expect((await store.current)?.state == .available)
+    #expect(publisher.values.isEmpty)
+  }
 }
 
 private final class MutableWallClock: WallClock, @unchecked Sendable {
@@ -147,6 +214,18 @@ private struct ImmediateMonotonicClock: Monotonic {
   }
 
   func sleep(until: ContinuousClock.Instant) async throws {}
+}
+
+private struct DelayedMonotonicClock: Monotonic {
+  let instant = ContinuousClock().now
+
+  func now() -> ContinuousClock.Instant {
+    instant
+  }
+
+  func sleep(until: ContinuousClock.Instant) async throws {
+    try await Task.sleep(for: .seconds(1))
+  }
 }
 
 private final class InMemoryOverrideFileSystem: OverrideFileSystem, @unchecked Sendable {

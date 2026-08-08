@@ -5,7 +5,6 @@ import MPSupport
 public struct WatchSection: View {
   private let store: PulseStore
   private let actions: any PulseActions
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   public init(store: PulseStore, actions: any PulseActions) {
     self.store = store
@@ -21,7 +20,6 @@ public struct WatchSection: View {
         if store.turnstilePresentation == .verifying,
            let turnstileWebView = store.turnstileWebView {
           MPTurnstileRail(webView: turnstileWebView)
-            .transition(.move(edge: .top).combined(with: .opacity))
         }
 
         if let setupFailure = store.setupFailure {
@@ -46,6 +44,8 @@ public struct WatchSection: View {
               actions.openStation(section: .sharing)
             }
           }
+
+          StatusControlSection(store: store, actions: actions)
 
           MPGroup(title: MPString.station.permission) {
             MPRow(
@@ -105,7 +105,6 @@ public struct WatchSection: View {
       .padding(.horizontal, MPSpace.open)
       .padding(.vertical, MPSpace.loose)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .animation(reduceMotion ? nil : MPMotion.quick, value: store.turnstilePresentation)
     }
   }
 

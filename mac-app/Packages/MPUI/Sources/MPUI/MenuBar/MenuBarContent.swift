@@ -35,8 +35,15 @@ public struct MenuBarContent: View {
       Text(MPString.menuBar.setBusy)
     }
 
-    Button {
-      Task { await actions.setAvailable(for: store.preferredDuration) }
+    Menu {
+      ForEach(ManualOverride.Duration.allCases) { duration in
+        Button {
+          Task { await actions.setAvailable(for: duration) }
+        } label: {
+          Image(systemName: "checkmark.circle")
+          Text(MPString.mast.durationLabel(duration))
+        }
+      }
     } label: {
       Image(systemName: "checkmark.circle")
       Text(MPString.menuBar.setAvailable)

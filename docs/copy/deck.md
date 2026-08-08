@@ -123,7 +123,23 @@ Full specification in `docs/05-owner-app-ui-plan.md`.
 
 #### The mast
 
-Mode control: `Busy` · `Automatic` · `Free`. Duration label: `Until`. Toggle: `Calls are okay`.
+Read-only status summary and reason line. Toggle: `Calls are okay`. Manual
+status actions live in the Watch section so there is one place to change them.
+
+#### Watch status controls
+
+Group title: `Status`
+
+Detail: `Set a temporary status or let Meeting Pulse watch automatically.`
+
+Actions: `Set busy` · `Set available` · `Back to automatic`
+
+Duration choices: `15 minutes` · `30 minutes` · `45 minutes` · `1 hour` ·
+`2 hours` · `4 hours` · `Until I clear it` · `Custom...`
+
+Custom detail: `Choose between 1 minute and 24 hours.`
+
+Custom fields: `Hours` · `Minutes`
 
 The plate mirrors the viewer's board exactly, so its headlines and supporting
 lines come from **The board** above, not from here.
@@ -137,9 +153,9 @@ Reason lines, in precedence order. The first one that applies is shown.
 | Another Mac took over | `Another Mac took over. This one has stopped.` |
 | Can't reach the server | `Can't reach the server. Retrying.` |
 | No viewer link yet | `No one is watching yet. Create a link.` |
-| Busy override, timed | `Busy for another {n} minutes` |
+| Busy override, timed | `Busy until {time} - {remaining} remaining` |
 | Busy override, no end | `Busy until you clear it` |
-| Available override, timed | `Available for another {n} minutes` |
+| Available override, timed | `Available until {time} - {remaining} remaining` |
 | Available override, no end | `Available until you clear it` |
 | A call was detected | `{Source} call detected` |
 | A window looked like a call | `A window looked like a call. Not sure enough.` |
@@ -241,7 +257,7 @@ Header, two lines: the plate headline, then the reason line.
 
 `Set busy` · `Set available` · `Back to automatic` · `Calls are okay` · `Open Meeting Pulse` · `Quit Meeting Pulse`
 
-Duration submenu, unchanged: `15 minutes` · `30 minutes` · `45 minutes` · `1 hour` · `2 hours` · `4 hours` · `Until I clear it`
+Duration submenus: `15 minutes` · `30 minutes` · `45 minutes` · `1 hour` · `2 hours` · `4 hours` · `Until I clear it`
 
 `Back to automatic` appears only while an override is running. A permanently
 greyed-out item teaches nothing.
