@@ -21,56 +21,71 @@ public struct WatchSection: View {
           MPBanner(tone: .alert, headline: MPString.error.genericSetup, detail: setupFailure)
         }
 
-        MPGroup(title: MPString.station.permission) {
-          MPRow(
-            label: MPString.station.accessibility,
-            detail: MPString.station.readsWindowTitles
-          ) {
-            Text(store.accessibilityGranted ? MPString.station.granted : MPString.station.notGranted)
-              .font(MPFont.rowValue)
-          }
-          if !store.accessibilityGranted {
+        if store.hasCompletedOnboarding || store.accessibilityGranted {
+          if !store.hasCompletedOnboarding {
             MPBanner(
-              tone: .caution,
-              headline: MPString.station.permissionHeadline,
-              detail: MPString.station.permissionBody,
-              actionTitle: MPString.station.openAccessibilitySettings
+              tone: .info,
+              headline: MPString.station.setupLinkHeadline,
+              detail: MPString.station.setupLinkBody,
+              actionTitle: MPString.station.setupOpenSharing
             ) {
-              _ = actions.openAccessibilitySettings()
+              actions.openStation(section: .sharing)
             }
           }
-        }
 
-        MPGroup(title: MPString.station.whatMacWatches) {
-          sourceRow(
-            title: MPString.station.googleMeet,
-            symbol: "video",
-            observation: store.meet,
-            seenAt: store.meetSeenAt
-          )
-          sourceRow(
-            title: MPString.station.slackHuddles,
-            symbol: "waveform",
-            observation: store.slack,
-            seenAt: store.slackSeenAt
-          )
-        }
-
-        MPGroup(title: MPString.station.publishing) {
-          MPRow(label: MPString.station.lastPublished, detail: MPRelativeTime.text(since: store.lastPublished))
-          MPRow(label: MPString.station.checksRun, detail: MPString.station.syncCadence)
-          MPRow(label: MPString.station.thisMacPublishing) {
-            Text(publishingValue)
-              .font(MPFont.rowValue)
+          MPGroup(title: MPString.station.permission) {
+            MPRow(
+              label: MPString.station.accessibility,
+              detail: MPString.station.readsWindowTitles
+            ) {
+              Text(store.accessibilityGranted ? MPString.station.granted : MPString.station.notGranted)
+                .font(MPFont.rowValue)
+            }
+            if !store.accessibilityGranted {
+              MPBanner(
+                tone: .caution,
+                headline: MPString.station.permissionHeadline,
+                detail: MPString.station.permissionBody,
+                actionTitle: MPString.station.openAccessibilitySettings
+              ) {
+                _ = actions.openAccessibilitySettings()
+              }
+            }
           }
-        }
 
-        if store.syncState == .superseded {
-          MPBanner(
-            tone: .alert,
-            headline: MPString.station.supersededHeadline,
-            detail: MPString.station.supersededBody
-          )
+          MPGroup(title: MPString.station.whatMacWatches) {
+            sourceRow(
+              title: MPString.station.googleMeet,
+              symbol: "video",
+              observation: store.meet,
+              seenAt: store.meetSeenAt
+            )
+            sourceRow(
+              title: MPString.station.slackHuddles,
+              symbol: "waveform",
+              observation: store.slack,
+              seenAt: store.slackSeenAt
+            )
+          }
+
+          MPGroup(title: MPString.station.publishing) {
+            MPRow(label: MPString.station.lastPublished, detail: MPRelativeTime.text(since: store.lastPublished))
+            MPRow(label: MPString.station.checksRun, detail: MPString.station.syncCadence)
+            MPRow(label: MPString.station.thisMacPublishing) {
+              Text(publishingValue)
+                .font(MPFont.rowValue)
+            }
+          }
+
+          if store.syncState == .superseded {
+            MPBanner(
+              tone: .alert,
+              headline: MPString.station.supersededHeadline,
+              detail: MPString.station.supersededBody
+            )
+          }
+        } else {
+          MPSetupChecklist(store: store, actions: actions)
         }
       }
       .padding(.horizontal, MPSpace.open)

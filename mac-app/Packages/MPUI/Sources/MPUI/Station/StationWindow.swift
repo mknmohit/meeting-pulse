@@ -87,7 +87,7 @@ private struct StationDetail: View {
           detail: MPString.thisMac.nothingLeft,
           actionTitle: MPString.thisMac.setUpAgain
         ) {
-          actions.showOnboarding()
+          actions.quit()
         }
       } else {
         switch store.section {

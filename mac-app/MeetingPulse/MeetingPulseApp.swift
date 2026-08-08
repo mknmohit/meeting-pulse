@@ -61,16 +61,6 @@ struct MeetingPulseApp: App {
       MPUI.StationCommands(actions: actions)
     }
 
-    Window(MPString.onboardingStep1.headline, id: "onboarding") {
-      if FeatureFlag.macNative {
-        MPUI.OnboardingWindow(store: store, actions: actions)
-      } else {
-        OnboardingWindow()
-      }
-    }
-    .defaultSize(width: 560, height: 480)
-    .windowResizability(.contentSize)
-
     Window(MPString.pairing, id: "pairing") {
       if FeatureFlag.macNative {
         MPUI.PairingWindow(store: store, actions: actions)
@@ -146,8 +136,8 @@ private struct NativeMenuBarLabel: View {
       }
       await start()
       if FeatureFlag.macNative,
-         !store.hasCompletedOnboarding || store.setupFailure != nil {
-        actions.showOnboarding()
+         !store.hasCompletedOnboarding || store.setupFailure != nil || !store.accessibilityGranted {
+        actions.openStation()
       }
     }
   }
@@ -804,9 +794,13 @@ final class AppLaunchCoordinator {
       await coordinator.start()
       if let store {
         let permissionChanges = await coordinator.changes
-        permissionTask = Task { [weak store] in
+        permissionTask = Task { [weak self, weak store] in
           for await granted in permissionChanges {
+            guard let self else {
+              return
+            }
             store?.accessibilityGranted = granted
+            await self.runtime?.refreshAndPublish()
           }
         }
       }

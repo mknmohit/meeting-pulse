@@ -60,7 +60,7 @@ struct MPUIVisualReviewApp: App {
     default:
       store = .preview()
     }
-    store.hasCompletedOnboarding = true
+    store.hasCompletedOnboarding = !CommandLine.arguments.contains("--setup")
     store.stationVisible = true
     switch sectionName {
     case "sharing":

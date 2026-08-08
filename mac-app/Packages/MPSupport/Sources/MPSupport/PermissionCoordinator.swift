@@ -4,12 +4,17 @@ import Foundation
 public actor PermissionCoordinator {
   public let changes: AsyncStream<Bool>
 
+  private let trustProvider: @Sendable () -> Bool
   private var pollInterval: Duration
   private var continuation: AsyncStream<Bool>.Continuation
   private var task: Task<Void, Never>?
   private var lastValue: Bool?
 
-  public init(pollInterval: Duration = .seconds(5)) {
+  public init(
+    pollInterval: Duration = .seconds(1),
+    trustProvider: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() }
+  ) {
+    self.trustProvider = trustProvider
     self.pollInterval = pollInterval
     var continuation: AsyncStream<Bool>.Continuation?
     changes = AsyncStream { continuation = $0 }
@@ -20,6 +25,7 @@ public actor PermissionCoordinator {
     guard task == nil else {
       return
     }
+    refresh()
     task = Task { [weak self] in
       while !Task.isCancelled {
         guard let self else {
@@ -53,6 +59,10 @@ public actor PermissionCoordinator {
     start()
   }
 
+  public func refresh() {
+    poll()
+  }
+
   public func promptIfRequested() -> Bool {
     AXIsProcessTrustedWithOptions(
       [
@@ -61,7 +71,7 @@ public actor PermissionCoordinator {
   }
 
   private func poll() {
-    let trusted = AXIsProcessTrusted()
+    let trusted = trustProvider()
     guard lastValue != trusted else {
       return
     }

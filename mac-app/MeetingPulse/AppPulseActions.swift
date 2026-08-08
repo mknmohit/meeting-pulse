@@ -90,11 +90,20 @@ final class AppPulseActions: PulseActions {
       store.lastError = .createLink
       return
     }
+    guard !store.isCreatingViewerLink else {
+      return
+    }
+    store.isCreatingViewerLink = true
+    store.lastError = nil
+    defer {
+      store.isCreatingViewerLink = false
+    }
     do {
       let result = try await runtime.createPairingCode()
       store.pairingCode = result.rawCode
       store.viewerLinks = try runtime.pairingLinks(for: result)
       store.viewers = .idle
+      completeOnboarding()
     } catch {
       store.lastError = .createLink
     }
@@ -202,6 +211,8 @@ final class AppPulseActions: PulseActions {
       store.mode = .automatic
       store.overrideExpiry = nil
       store.viewers = .idle
+      store.hasCompletedOnboarding = false
+      UserDefaults.standard.removeObject(forKey: "setup.completed")
     } catch {
       store.lastError = .network
     }
@@ -242,7 +253,7 @@ final class AppPulseActions: PulseActions {
   }
 
   func showOnboarding() {
-    windowOpener?("onboarding")
+    openStation()
   }
 
   func openPairing() {

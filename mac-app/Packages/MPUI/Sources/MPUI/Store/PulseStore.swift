@@ -38,6 +38,7 @@ public final class PulseStore {
   public var pairingCode: String?
   public var viewerLinks: [URL] = []
   public var viewers: Loadable<[ViewerSummary]> = .idle
+  public var isCreatingViewerLink = false
 
   public var launchAtLogin = false
   public var openWindowAtLogin = false
