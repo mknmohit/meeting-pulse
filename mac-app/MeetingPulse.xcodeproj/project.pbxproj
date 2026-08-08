@@ -8,12 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		A00000000000000000000030 /* MeetingPulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000010 /* MeetingPulseApp.swift */; };
+		A00000000000000000000033 /* AppPulseActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* AppPulseActions.swift */; };
 		A00000000000000000000031 /* turnstile.html in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* turnstile.html */; };
 		A00000000000000000000032 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* Assets.xcassets */; };
 		A00000000000000000000090 /* MPCore in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000080 /* MPCore */; };
 		A00000000000000000000091 /* MPSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000081 /* MPSupport */; };
 		A00000000000000000000092 /* MPDetection in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000082 /* MPDetection */; };
 		A00000000000000000000093 /* MPSync in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000083 /* MPSync */; };
+		A00000000000000000000094 /* MPUI in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000075 /* MPUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +26,7 @@
 		A00000000000000000000014 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		A00000000000000000000015 /* turnstile.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = turnstile.html; sourceTree = "<group>"; };
 		A00000000000000000000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A00000000000000000000017 /* AppPulseActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPulseActions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -35,6 +38,7 @@
 				A00000000000000000000091 /* MPSupport in Frameworks */,
 				A00000000000000000000092 /* MPDetection in Frameworks */,
 				A00000000000000000000093 /* MPSync in Frameworks */,
+				A00000000000000000000094 /* MPUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -54,6 +58,7 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000010 /* MeetingPulseApp.swift */,
+				A00000000000000000000017 /* AppPulseActions.swift */,
 				A00000000000000000000011 /* Info.plist */,
 				A00000000000000000000012 /* MeetingPulse.entitlements */,
 				A00000000000000000000016 /* Assets.xcassets */,
@@ -99,6 +104,7 @@
 				A00000000000000000000081 /* MPSupport */,
 				A00000000000000000000082 /* MPDetection */,
 				A00000000000000000000083 /* MPSync */,
+				A00000000000000000000075 /* MPUI */,
 			);
 			productName = "Meeting Pulse";
 			productReference = A00000000000000000000013 /* Meeting Pulse.app */;
@@ -133,6 +139,7 @@
 				A00000000000000000000071 /* XCLocalSwiftPackageReference "Packages/MPSupport" */,
 				A00000000000000000000072 /* XCLocalSwiftPackageReference "Packages/MPDetection" */,
 				A00000000000000000000073 /* XCLocalSwiftPackageReference "Packages/MPSync" */,
+				A00000000000000000000074 /* XCLocalSwiftPackageReference "Packages/MPUI" */,
 			);
 			productRefGroup = A00000000000000000000022 /* Products */;
 			projectDirPath = "";
@@ -161,6 +168,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000030 /* MeetingPulseApp.swift in Sources */,
+				A00000000000000000000033 /* AppPulseActions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,7 +285,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LSUIElement = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.techdevix.meetingpulse;
 				PRODUCT_NAME = "Meeting Pulse";
 				SUPPORTED_PLATFORMS = macosx;
@@ -298,7 +305,6 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LSUIElement = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.techdevix.meetingpulse;
 				PRODUCT_NAME = "Meeting Pulse";
 				SUPPORTED_PLATFORMS = macosx;
@@ -346,6 +352,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/MPSync;
 		};
+		A00000000000000000000074 /* XCLocalSwiftPackageReference "Packages/MPUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/MPUI;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -368,6 +378,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A00000000000000000000073 /* XCLocalSwiftPackageReference "Packages/MPSync" */;
 			productName = MPSync;
+		};
+		A00000000000000000000075 /* MPUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A00000000000000000000074 /* XCLocalSwiftPackageReference "Packages/MPUI" */;
+			productName = MPUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

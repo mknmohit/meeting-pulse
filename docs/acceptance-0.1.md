@@ -30,7 +30,7 @@ scenarios remain `NOT RUN`; they are never inferred from unit tests.
 | 18 | Pairing revoke and rotation | DATABASE PASS | pgTAP RPC and RLS coverage |
 | 19 | Viewer Check again | AUTOMATED PARTIAL | Viewer poller tests |
 | 20 | Hidden/unfocused polling pause | AUTOMATED PARTIAL | Viewer poller tests |
-| 21 | Recovery rebind after Keychain loss | NOT RUN | Requires two real Macs or a cleared Keychain |
+| 21 | Recovery rebind after local storage loss | NOT RUN | Requires two real Macs or a cleared local secrets file |
 | 22 | Phone clock six hours wrong | AUTOMATED PARTIAL | Server-time freshness tests |
 | 23 | Override expiry during sleep | UNIT PASS | Monotonic override expiry tests |
 | 24 | Graceful Quit | NOT RUN | Requires the finished owner app |

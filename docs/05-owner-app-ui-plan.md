@@ -96,10 +96,21 @@ heartbeat, a quiet owner goes stale after three minutes and the page reads
 starts as `"Can't reach the server. Retrying."` before any request is made, so
 the menu shows a network error at launch every time. Fix in T13.
 
-**D3. Every error collapses to one string.** Nine `catch` blocks assign the same
-`"Can't reach the server. Retrying."`, including keychain failures, invalid
-recovery phrases, and permission errors. The copy deck's rule is that every
-failure names what to do next. Fix in T13 and §12.4.
+**D3. Every error collapses to one string.** Seven `catch` blocks in
+`OwnerAppModel` assign the same `"Can't reach the server. Retrying."`, at lines
+354, 398, 414, 442, 457, 481, and 525. Every one of them covers work that can
+fail for reasons other than the network: creating a pairing code, rotating it,
+revoking a viewer, publishing, and deleting.
+
+The setup-time failures take a different path and are worth knowing about
+separately. `loadRecoveryPhrase()`, `loadStoredPairingCode()`, and
+`existingRegistration(from:)` all rethrow into `AppLaunchCoordinator`'s single
+generic catch, which sets `.setupRequired` with one message and renders nowhere
+(see D6 and W10). So a local storage failure and a bad recovery phrase are equally
+invisible, just invisible somewhere else.
+
+The copy deck's rule is that every failure names what to do next. Fix in T13 and
+§12.4, and cover both paths.
 
 **D4. `PairingWindow` is presented twice.** `createPairingCode()` builds a raw
 `NSPanel` in `showPairingWindow()`, and there is also a declared
@@ -112,7 +123,10 @@ copy deck and appears nowhere else. Fix in §12.
 **D6. Deleting everything leaves the runtime dead with no signal.**
 `deleteEverything()` calls `runtime.deleteEverything()`, which calls `stop()`,
 and the app then sits with a live menu bar icon and a scheduler that is not
-running. The UI must enter an explicit terminal state. Fix in T21.
+running. It does set `connectionLine = "Meeting Pulse was reset."`, so the
+signal is not quite zero, but that line lives in a menu the user has no reason
+to reopen and every other surface keeps rendering as though the app still
+works. The UI must enter an explicit terminal state. Fix in T25.
 
 ---
 
@@ -298,50 +312,54 @@ derived from them.
 
 `Theme/MPColor.swift`:
 
+**Every colour that changes with appearance is a colour set, and nothing
+branches in code.** There is no `@Environment(\.colorScheme)` anywhere in
+`MPUI`. Asset catalogue entries live in
+`Packages/MPUI/Sources/MPUI/Resources/Media.xcassets` and are reached with
+`Color("Name", bundle: .module)`.
+
 ```swift
 import SwiftUI
 
 public enum MPColor {
-  // Enamel plates. Three faces, matching the viewer's board exactly.
-  public static let plateStorm    = Color(hex: 0x8C2A22)  // busy
-  public static let plateStormRim = Color(hex: 0x5E1A14)
-  public static let plateAmber    = Color(hex: 0x9B5E18)  // busy, calls okay. See below
-  public static let plateAmberRim = Color(hex: 0x724512)
-  public static let plateBare     = Color(hex: 0x3A4247)  // everything else
-  public static let plateBareRim  = Color(hex: 0x272D31)
+  // Enamel plates. Three faces, matching the viewer's board.
+  public static let plateStorm    = Color("PlateStorm",    bundle: .module)
+  public static let plateStormRim = Color("PlateStormRim", bundle: .module)
+  public static let plateAmber    = Color("PlateAmber",    bundle: .module)
+  public static let plateAmberRim = Color("PlateAmberRim", bundle: .module)
+  public static let plateBare     = Color("PlateBare",     bundle: .module)
+  public static let plateBareRim  = Color("PlateBareRim",  bundle: .module)
 
   // NOT DECLARED, deliberately: --plate-clear (#10614A). It is dead paint in
   // the viewer and there is no owner-side state that may use it. See 3.2.
 
-  // Paint and chalk.
+  // Paint. Fixed: it is always read on a plate, which is always dark.
   public static let paintWhite = Color(hex: 0xF2EFE8)
-  public static let chalk      = Color(hex: 0xC8CDCB)
-  public static let brass      = Color(hex: 0xE8B23A)   // focus and the pennant
 
-  // Ground. Only these two follow the system appearance.
-  public static let ground     = Color("Ground", bundle: .module)
+  // Chalk and brass are read on the ground, so they follow the appearance.
+  public static let chalk = Color("Chalk", bundle: .module)
+  public static let brass = Color("Brass", bundle: .module)   // focus rings
+
+  // Ground.
+  public static let ground     = Color("Ground",     bundle: .module)
   public static let groundRail = Color("GroundRail", bundle: .module)
 }
 ```
 
-`Ground` and `GroundRail` are colour sets in
-`Packages/MPUI/Sources/MPUI/Resources/Media.xcassets`:
+The full catalogue:
 
-| Colour set | Any / dark appearance | Light appearance |
+| Colour set | Any / dark | Light |
 |---|---|---|
 | `Ground` | `#0C1418` | `#E7E3DA` |
 | `GroundRail` | `#070E11` | `#D6D1C6` |
-
-Light-appearance plate adjustments, matching the viewer's
-`prefers-color-scheme: light` block. Implement as a second pair of colour sets
-(`PlateStorm`, `PlateAmber`, `PlateBare`) rather than branching in code:
-
-| Colour set | Dark | Light |
-|---|---|---|
-| `PlateStorm` | `#8C2A22` | `#A8352B` |
-| `PlateAmber` | `#9B5E18` | `#8A5415` |
-| `PlateBare` | `#3A4247` | `#8A9094` |
+| `PlateStorm` | `#8C2A22` | `#9A3128` |
+| `PlateStormRim` | `#5C1C16` | `#66201A` |
+| `PlateAmber` | `#7D4C13` | `#7D4C13` |
+| `PlateAmberRim` | `#52320D` | `#52320D` |
+| `PlateBare` | `#3A4247` | `#55585B` |
+| `PlateBareRim` | `#262C2F` | `#383A3C` |
 | `Chalk` | `#C8CDCB` | `#3A403E` |
+| `Brass` | `#E8B23A` | `#937025` |
 
 Everything outside the plate uses AppKit semantic colours: `.primary`,
 `.secondary`, `Color(nsColor: .controlBackgroundColor)`,
@@ -349,39 +367,78 @@ Everything outside the plate uses AppKit semantic colours: `.primary`,
 
 #### Measured contrast
 
-Computed with the WCAG 2.2 relative-luminance formula. All pass AA. Re-run
-these after any colour change; do not assume.
+Computed with the WCAG 2.2 relative-luminance formula, **in both appearances**,
+and for supporting text at its actual composited opacity rather than at full
+strength. Re-run all of it after any colour change; do not assume, and do not
+measure dark mode only. The first draft of this plan did exactly that and
+shipped five failing pairs.
 
-| Foreground | Background | Ratio | Requirement | Result |
-|---|---|---|---|---|
-| `paintWhite` | `plateStorm` `#8C2A22` | 7.41:1 | 4.5:1 | Pass |
-| `paintWhite` | `plateBare` `#3A4247` | 8.92:1 | 4.5:1 | Pass |
-| `paintWhite` | `plateAmber` `#9B5E18` | 4.56:1 | 4.5:1 | Pass |
-| `chalk` | `plateBare` | 6.37:1 | 4.5:1 | Pass |
-| `chalk` | `groundRail` | 12.09:1 | 4.5:1 | Pass |
-| `brass` | `ground` | 9.62:1 | 3:1 | Pass |
+Headlines, `paintWhite` at full opacity:
 
-#### The amber plate is a live accessibility defect in the viewer
+| Background | Dark | Light | Requirement |
+|---|---|---|---|
+| `plateStorm` | 7.41:1 | 6.43:1 | 4.5:1 |
+| `plateAmber` | 6.27:1 | 6.27:1 | 4.5:1 |
+| `plateBare` | 8.92:1 | 6.23:1 | 4.5:1 |
 
-`plateAmber` above is **not** the viewer's current value. The viewer uses
-`--plate-amber: #c97a1f`, and `#F2EFE8` on it measures **2.91:1**. Its
-light-appearance variant `#d98a2a` measures **2.40:1**. Both fail WCAG AA for
-body text by a wide margin, and this is the face that carries the product's
+Supporting lines, `paintWhite.opacity(0.78)` composited onto the plate:
+
+| Background | Dark | Light | Requirement |
+|---|---|---|---|
+| `plateStorm` | 5.13:1 | 4.52:1 | 4.5:1 |
+| `plateAmber` | 4.52:1 | 4.52:1 | 4.5:1 |
+| `plateBare` | 6.18:1 | 4.54:1 | 4.5:1 |
+
+Off the plate:
+
+| Pair | Dark | Light | Requirement |
+|---|---|---|---|
+| `chalk` on `groundRail` | 12.08:1 | 6.96:1 | 4.5:1 |
+| `brass` on `ground` | 9.62:1 | 3.58:1 | 3:1 |
+
+The margins on the supporting lines are thin, four of them within 0.05 of the
+line. `0.78` is therefore a fixed constant, not a taste knob. Lowering it to
+`0.75` fails. If a designer wants the supporting line quieter, make it smaller
+or change the plate, and re-measure.
+
+#### The plate colours above are not the viewer's, and that is deliberate
+
+Four of the values in that catalogue diverge from `tokens.css`. Every divergence
+is a WCAG AA failure in the shipping viewer, found while writing this plan and
+verified by computing the ratios rather than by eye.
+
+| Token | Viewer today | Measured | Here |
+|---|---|---|---|
+| `--plate-amber` (dark) | `#c97a1f` | 2.91:1 | `#7D4C13` |
+| `--plate-amber` (light) | `#d98a2a` | 2.40:1 | `#7D4C13` |
+| `--plate-bare` (light) | `#8a9094` | 2.81:1 | `#55585B` |
+| `--plate-storm` (light) | `#a8352b` | 4.07:1 at 0.78 | `#9A3128` |
+
+The amber pair is the worst of them, and it is the face carrying the product's
 least obvious message: "he is busy, but ring anyway." If a reader cannot make
 out that sentence, the feature is worse than absent.
 
-`#9B5E18` is `#c97a1f` with the hue and saturation held and the value walked
-down until it passes: 4.56:1. It is visibly the same paint.
+Light-mode bare is the most common. `generic` is the face on screen whenever the
+owner is not in a meeting, which is most of the day, and at 2.81:1 its headline
+fails for anyone reading in a bright room.
+
+Every replacement was derived the same way: hold the HSV hue and saturation,
+walk the value down until the pair passes at the composited 0.78 opacity. They
+are visibly the same paint, a shade deeper.
 
 Two consequences for this build:
 
-1. The Mac app ships `#9B5E18`. Do not port the failing value for the sake of a
-   pixel match with a bug.
-2. File a companion one-line change to `viewer/src/styles/tokens.css` setting
-   `--plate-amber: #9b5e18` and `--plate-amber-rim: #724512`, with the light
-   variant at `#8a5415`. This is outside §2.3's scope boundary in spirit but it
-   is a two-token edit and the surfaces are supposed to be the same paint.
-   Raise it; do not fold it into this PR silently.
+1. The Mac app ships the corrected values. Do not port a failing colour for the
+   sake of a pixel match with a bug.
+2. File a companion change to `viewer/src/styles/tokens.css` applying the same
+   four values plus their rims. This is outside §2.3's scope boundary in spirit,
+   but it is a handful of tokens and the two surfaces are supposed to be the
+   same paint. Raise it as its own PR with the measurements attached; do not
+   fold it into this one silently.
+
+Write this up in `docs/decisions/` as part of T36. It is a defect found during
+planning, not during implementation, and the reasoning should outlive this
+document.
 
 State is never carried by colour alone anywhere in this app. Every plate face
 also has a distinct day-shape and a distinct word. Verify with a greyscale
@@ -610,6 +667,14 @@ them. Two screens that render the same idea differently is a defect.
 disabled, loading, error. A component with three states is not done. Assert this
 in review, not at the end.
 
+**Every `public` view needs an explicit `public init`.** A memberwise
+initialiser is internal even when the type is public, so
+`MenuBarIcon(face:label:isDimmed:)` called from the app target will not compile
+without one. This applies to `StationWindow`, `MenuBarContent`, `MenuBarIcon`,
+`OnboardingWindow`, and every component above. The code samples in this document
+omit the inits for brevity; do not read that as permission to omit them in the
+implementation.
+
 ---
 
 ## 5. Package and scene architecture
@@ -702,6 +767,7 @@ Packages/MPUI/
       PulseStore.swift       §11.1  @Observable, the single view state
       PulseActions.swift     §11.2  protocol the app target implements
       PulseSnapshot.swift    §11.3  value types the store publishes
+      ReasonLineBuilder.swift §11.1 pure function, unit-testable
       PreviewStore.swift     §11.5  fixtures for previews and tests
     Mast/
       MastView.swift         §6.1
@@ -715,6 +781,7 @@ Packages/MPUI/
       StationSidebar.swift   §5.6
       StationSection.swift   §5.6   the enum
       StationToolbar.swift   §5.7
+      StationCommands.swift  §13.4  the ⌘1-⌘4 menu commands
     Sections/
       WatchSection.swift     §7.1
       SourceRow.swift        §7.1.3
@@ -731,7 +798,7 @@ Packages/MPUI/
       PrivacySection.swift   §7.4
     Onboarding/
       OnboardingWindow.swift §8
-      OnboardingStep.swift   §8
+      OnboardingStep.swift   §8     the step enum and its content
       StepIndicator.swift    §8.5
     MenuBar/
       MenuBarContent.swift   §9
@@ -748,7 +815,11 @@ Packages/MPUI/
     Resources/
       Media.xcassets/        colour sets from §4.1
   Tests/MPUITests/
-    PulseSnapshotTests.swift
+    PlateFaceTests.swift
+    PlateFaceParityTests.swift
+    ReasonLineTests.swift
+    RelativeTimeTests.swift
+    SourceStateTests.swift
     ContrastTests.swift
     StringsCoverageTests.swift
 ```
@@ -761,12 +832,18 @@ runtime, and the `PulseActions` conformance. Everything else moves out.
 Before:
 
 ```swift
-MenuBarExtra { MenuBarView(...) } label: { ... }
-Window("Meeting Pulse", id: "onboarding")  { OnboardingWindow(...) }
-Window("Viewer link", id: "pairing")       { PairingWindow(...) }
-Window("Settings", id: "settings")         { SettingsWindow(...) }
-Window("Recovery phrase", id: "recovery")  { RecoveryWindow(...) }
-Window("Diagnostics", id: "diagnostics")   { DiagnosticsWindow(...) }
+MenuBarExtra { MenuBarView(...) } label: {
+  HeartThreadMenuIcon(state: model.state)
+    .task {                                    // the whole app starts here
+      await launchCoordinator.start(model: model)
+      appDelegate.terminationHandler = { await model.runtime?.gracefulQuit() }
+    }
+}
+Window("Welcome to Meeting Pulse", id: "onboarding") { OnboardingWindow(...) }
+Window("Pairing", id: "pairing")               { PairingWindow(...) }
+Window("Meeting Pulse Settings", id: "settings")   { SettingsWindow(...) }
+Window("Recovery", id: "recovery")             { RecoveryWindow(...) }
+Window("Diagnostics", id: "diagnostics")       { DiagnosticsWindow(...) }
 ```
 
 After:
@@ -779,6 +856,10 @@ var body: some Scene {
     MenuBarIcon(face: store.plateFace,
                 label: store.plateHeadline,
                 isDimmed: store.deleteCompleted)
+      .task {
+        await launchCoordinator.start(model: model)
+        appDelegate.terminationHandler = { await model.runtime?.gracefulQuit() }
+      }
   }
   .menuBarExtraStyle(.menu)
 
@@ -798,6 +879,14 @@ var body: some Scene {
   .windowResizability(.contentSize)
 }
 ```
+
+Keep the `.task`. It is not decoration on the icon: it is the only thing that
+starts the app. `AppLaunchCoordinator.start` builds the runtime, loads the
+local secret file, starts detection, and installs the termination handler, and it is
+attached to the `MenuBarExtra` label because that is the one view guaranteed to
+exist on every launch. The station window may never be opened. Dropping the
+`.task` ships a binary that renders a menu and does nothing else, and the
+failure is silent.
 
 Deleted scenes: `pairing`, `settings`, `recovery`, `diagnostics`. Delete the
 view types too; do not leave them orphaned. Also delete `showPairingWindow()`
@@ -856,12 +945,11 @@ public struct StationWindow: View {
 
   @Bindable var store: PulseStore
   let actions: any PulseActions
-  @State private var section: StationSection = .watch
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   public var body: some View {
     NavigationSplitView {
-      StationSidebar(store: store, actions: actions, section: $section)
+      StationSidebar(store: store, actions: actions, section: $store.section)
         .navigationSplitViewColumnWidth(288)
     } detail: {
       detail
@@ -871,13 +959,13 @@ public struct StationWindow: View {
     }
     .navigationSplitViewStyle(.balanced)
     .frame(minWidth: 860, minHeight: 560)
-    .navigationTitle(section.title)
+    .navigationTitle(store.section.title)
   }
 
   @ViewBuilder private var detail: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: MPSpace.loose) {
-        switch section {
+        switch store.section {
         case .watch:   WatchSection(store: store, actions: actions)
         case .sharing: SharingSection(store: store, actions: actions)
         case .thisMac: ThisMacSection(store: store, actions: actions)
@@ -888,9 +976,9 @@ public struct StationWindow: View {
       .padding(.vertical, MPSpace.loose)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .id(section)
+    .id(store.section)
     .transition(.opacity)
-    .animation(reduceMotion ? nil : MPMotion.leaf, value: section)
+    .animation(reduceMotion ? nil : MPMotion.leaf, value: store.section)
   }
 }
 ```
@@ -934,8 +1022,14 @@ public enum StationSection: String, CaseIterable, Identifiable, Sendable {
 1. `MastView` (§6). Padding: 16 horizontal, 20 top.
 2. `Spacer(minLength: MPSpace.loose)`.
 3. `Divider()`.
-4. The section `List`, `.listStyle(.sidebar)`, `selection: $section`. Each row
-   is `Label(section.title, systemImage: section.symbol)`.
+4. The section `List`, `.listStyle(.sidebar)`, `selection: $section` (bound
+   through from `$store.section`). Each row is
+   `Label(section.title, systemImage: section.symbol)`.
+
+   Selection lives on `PulseStore`, not in a `@State` on `StationWindow`. Two
+   things outside the view hierarchy set it: `StationCommands` (`⌘1`-`⌘4`, §13.4)
+   and `PulseActions.openStation(section:)`, which the menu bar calls to open
+   the window straight onto Sharing. Neither can reach a private `@State`.
 5. `Spacer()`.
 6. `Divider()`.
 7. `PublishRail` (§6.7). Padding: 16 horizontal, 12 vertical.
@@ -983,7 +1077,8 @@ The spin animation on this icon is specified in §10, item M16.
 ### 5.8 Opening and focusing the window
 
 The app runs `.accessory` (`NSApplication.shared.setActivationPolicy(.accessory)`
-in `init()`, and `LSUIElement`). An accessory app's windows do not come forward
+in `init()`, and `LSUIElement` once §14.2 is applied). An accessory app's
+windows do not come forward
 on `openWindow(id:)` alone; the app has to activate itself first.
 
 Put this in the app target, and route every window-opening path through it:
@@ -1043,13 +1138,24 @@ real. Build it first, get it right, then build the sections around it.
 │                        │   │
 │                        │   │  24pt bottom padding
 └────────────────────────┘  ─┘
-   232pt tall
+   232pt tall, at one headline line
 ```
+
+232 is a minimum, not a fixed height, and the code below uses `minHeight` for
+that reason. The paddings add up to 208 before either text is laid out, so a
+single headline line already brings it to roughly 244, and the named `callOkay`
+variant (`Mohit is in Meeting, but it's fine to ring through`) wraps to three
+lines at this width. Pinning the height would clip it.
+
+The plate growing is fine. It sits at the top of a 288pt column with a `Spacer`
+under it, so nothing below shifts in a way the eye tracks, and the growth is
+animated by the same `hoist` curve as the face change.
 
 ```swift
 struct MPPlate: View {
   let face: PlateFace          // .meeting, .callOkay, or .generic
   let ownerName: String?
+  let isOnline: Bool
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
@@ -1067,23 +1173,26 @@ struct MPPlate: View {
         .multilineTextAlignment(.center)
         .contentTransition(.opacity)
 
-      Text(face.supporting)
+      Text(face.supporting(isOnline: isOnline))
         .font(MPFont.plateSupporting)
         .foregroundStyle(MPColor.paintWhite.opacity(0.78))
         .padding(.top, MPSpace.tight)
         .padding(.bottom, MPSpace.loose)
     }
-    .frame(width: 256, height: 232)
+    .frame(width: 256, minHeight: 232, alignment: .top)
     .background(
       RoundedRectangle(cornerRadius: MPRadius.plate, style: .continuous)
         .fill(face.plate)
-        .stroke(face.rim, lineWidth: 2)
+        .overlay(
+          RoundedRectangle(cornerRadius: MPRadius.plate, style: .continuous)
+            .strokeBorder(face.rim, lineWidth: 2)
+        )
     )
     .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 8)
     .animation(reduceMotion ? nil : MPMotion.hoist, value: face)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(headline)
-    .accessibilityValue(face.supporting)
+    .accessibilityValue(face.supporting(isOnline: isOnline))
   }
 }
 ```
@@ -1129,15 +1238,24 @@ public enum PlateFace: Equatable, Sendable {
     }
   }
 
-  var supporting: String {
+  func supporting(isOnline: Bool) -> String {
     switch self {
     case .meeting:  Strings.Board.meetingSupporting   // "Better to wait."
     case .callOkay: Strings.Board.callOkaySupporting  // "He said to go ahead and interrupt."
-    case .generic:  Strings.Board.genericSupporting   // "Check again before you call."
+    case .generic:
+      isOnline
+        ? Strings.Board.genericSupporting             // "Check again before you call."
+        : Strings.Board.genericOfflineSupporting      // "Connect to the internet, then check again."
     }
   }
 }
 ```
+
+The offline variant completes the mirror. `COPY.board.generic` in the viewer has
+both a `supporting` and an `offlineSupporting`, and the board swaps to the
+second when the browser reports no connection. `PulseStore.isOnline` (W7) is the
+owner-side equivalent, so pass it in rather than letting the two surfaces say
+different things about the same condition.
 
 Headline, ported from `COPY.board` in `viewer/src/lib/copy.ts`. Note the
 asymmetry: `meeting` and `callOkay` each have a with-name variant, and
@@ -1170,25 +1288,15 @@ right and this document is stale.
 `DayShapeView.swift`. Ported from the authored SVG in
 `viewer/src/pages/index.astro`. viewBox is `0 0 120 180`; scale to the frame.
 
-```swift
-struct DayShapeView: View {
-  let shape: DayShape
-  let tint: Color                  // paintWhite on a plate, .primary in the menu bar
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+`DayShapeView(shape:tint:)` is specified once, in §10.3, together with its
+transition. Do not write a second version here.
 
-  var body: some View {
-    ZStack {
-      switch shape {
-      case .cone:    ConeShape().transition(hoistTransition)
-      case .pennant: PennantShape().transition(hoistTransition)
-      case .mast:    MastShape().transition(hoistTransition)
-      }
-    }
-    .animation(reduceMotion ? nil : MPMotion.hoist, value: shape)
-    .geometryGroup()
-  }
-}
-```
+`ConeShape`, `PennantShape`, and `MastShape` are **views, not `Shape`s**. Cone
+and pennant each need a filled path and a stroked path, and a single `Shape`
+returns one `Path` that is either filled or stroked, never both. Each is a small
+view composing two `Path`-backed shapes in a `ZStack`, taking `tint` and
+applying it to both. The mast has only a stroked path but follows the same
+pattern so the three are interchangeable.
 
 Or, preferred for animatability, build three `Shape` conformances and compose
 them with `ZStack`. `Canvas` cannot be transitioned; `Shape` can. Use `Shape`.
@@ -1199,12 +1307,17 @@ Path data, exact:
 cone, filled:   M60 18 28 74h64L60 18Z
 cone, stroked:  M60 74v102  M32 132h56
 mast, stroked:  M60 18v158  M24 64h72  M36 64v22  M84 64v22
-pennant, fill:  M62 26 104 40 62 54Z
+pennant, stroked: M60 18v158
+pennant, filled:  M60 30 100 50 60 70Z
 ```
 
 Stroke: `lineWidth: 3.7` at an 88pt render width (`5 × 88/120`), `lineCap:
-.round`, `lineJoin: .round`, colour `paintWhite`. Fills are `paintWhite`, except
-the pennant, which is `MPColor.brass`.
+.round`, `lineJoin: .round`, colour `paintWhite`. Fills are `paintWhite` too.
+Nothing in a day shape is brass, and nothing is tinted per face. The viewer sets
+`fill: var(--pennant)` and `--pennant` is `#f2efe8`, which is `paintWhite`, so
+the pennant flag is the same paint as the cone body. A brass pennant would also
+break §9.3, whose template-image argument depends on every shape being one
+colour.
 
 The cone-to-mast transition is the app's signature moment. See §10, item M02.
 
@@ -1306,6 +1419,23 @@ from the copy deck: `15 minutes`, `30 minutes`, `45 minutes`, `1 hour`,
 `2 hours`, `4 hours`, `Until I clear it`. Add `displayName` as an extension in
 `MPUI`, sourced from `Strings.Duration`, not as raw literals in the picker.
 
+`ManualOverride.Duration` is declared `CaseIterable, Equatable, Sendable` and
+nothing more, so `ForEach(ManualOverride.Duration.allCases)` and `.tag(d)` both
+fail to compile as written. Add the two missing conformances in the same MPUI
+extension:
+
+```swift
+extension ManualOverride.Duration: Identifiable, Hashable {
+  public var id: Self { self }
+  public var displayName: String { ... }   // from Strings.Duration
+}
+```
+
+Retroactive conformance on a type from another module warns under Swift 6. If
+the warning is treated as an error in this project, add `Hashable` and
+`Identifiable` to the declaration in `MPCore` instead. Either is fine; leaving
+it as it stands is not.
+
 Default duration is `.m30`. Persist the last chosen value in
 `PulseStore.preferredDuration` so a second override does not make him choose
 again.
@@ -1360,7 +1490,12 @@ Content, by `store.publishState`:
 | `.published(at:)` | `Published {relative} ago` |
 | `.publishing` | `Publishing...` |
 | `.retrying` | `Can't reach the server. Retrying.` |
+| `.offline` | `No network. Waiting.` |
 | `.superseded` | `Another Mac is publishing now` |
+
+`.offline` outranks `.retrying`. When `store.isOnline` is false, show the
+offline line even if a request is also failing, because "no network" is
+something he can act on and "retrying" is not.
 
 The relative time uses a coarse formatter, never seconds-precise past a minute:
 `just now` under 10s, `{n} seconds ago` under 60s, `{n} minutes ago` under 60m,
@@ -1393,16 +1528,16 @@ Watch
   What the Mac watches
   ┌──────────────────────────────────────────────────────┐
   │ 🎥 Google Meet             In a call    ●            │
-  │    Chrome, 4 seconds ago                             │
+  │    Checked 3 seconds ago                             │
   ├──────────────────────────────────────────────────────┤
   │ 〰 Slack huddles           No call                    │
-  │    Checked 4 seconds ago                             │
+  │    Checked 3 seconds ago                             │
   └──────────────────────────────────────────────────────┘
 
   Publishing
   ┌──────────────────────────────────────────────────────┐
   │ Last published            12 seconds ago             │
-  │ Checks run                Every 4 seconds            │
+  │ Checks run           Every 2s in a call, 15s idle    │
   │ This Mac                  Publishing                 │
   └──────────────────────────────────────────────────────┘
 ```
@@ -1443,8 +1578,14 @@ Subtitle, always: `Meeting Pulse reads window titles. It never reads what is
 inside them.`
 
 Bind to a live `PermissionCoordinator.changes` stream, not a value read at
-launch (§11.4). The row must flip within a second of the user granting
-permission in System Settings, without a relaunch. This is the single most
+launch (§11.4). The row must flip without a relaunch.
+
+`PermissionCoordinator(pollInterval:)` defaults to 5 seconds, which is too slow
+for a screen the user is staring at having just returned from System Settings.
+Construct it with `.seconds(1)` while onboarding is on screen or the Watch
+section is frontmost, and leave the default everywhere else. Do not change the
+default in `MPSupport`; a 1-second poll running forever is a battery cost for a
+value that almost never changes. This is the single most
 common first-run failure in accessibility-gated Mac apps and the reason the
 stream exists.
 
@@ -1457,7 +1598,7 @@ currently discarded (§1.2).
 struct SourceRow: View {
   let source: SourceID              // .googleMeet, .slackHuddle
   let observation: SourceObservation?
-  let health: DetectorHealth
+  let seenAt: Date?
 }
 ```
 
@@ -1467,12 +1608,26 @@ struct SourceRow: View {
 | Label | `Google Meet` / `Slack huddles` |
 | Value | `In a call` / `No call` / `Can't tell` |
 | Chip | `MPStateChip`, filled dot only when `In a call` |
-| Subtitle | `{App}, {relative} ago` or `Checked {relative} ago` |
+| Subtitle | `Checked {relative} ago`, from `seenAt` |
 
-`Can't tell` covers `DetectorHealth` failure and `unknown` observations. It
-never renders as `No call`. `PRODUCT.md`'s fail-closed rule is explicit that
+Map `SourceObservation` directly: `.active` is `In a call`, `.inactive` is `No
+call`, and both `.unknown` and `.sourceAbsent` are `Can't tell`. It never
+renders as `No call`. `PRODUCT.md`'s fail-closed rule is explicit that
 `unknown` must not be mapped to `inactive`, and the UI has to honour it as
 literally as the reducer does.
+
+Do not take a `DetectorHealth`. The enum exists in `MPCore`, but its cases are
+`ok`, `degraded(DiagnosticCode)`, `permissionDenied`, and `absent`, with no
+`unknown`, and more to the point `SchedulerReading` does not carry it. The
+reading has three fields: `meet`, `slack`, `accessibilityGranted`. Health never
+leaves the detector, so the UI cannot show it without an MPDetection change,
+which §2.3 puts out of scope. `SourceObservation` already distinguishes the case
+that matters to him, which is "we could not tell", and `.sourceAbsent` covers a
+missing app.
+
+`seenAt` is the timestamp the store records when it receives a reading, not a
+value from the scheduler. Set both `meetSeenAt` and `slackSeenAt` to `.now` in
+W1 each time a `SchedulerReading` arrives.
 
 Empty state, when a source has never reported: the row still renders, value
 `Not seen yet`, subtitle `Meeting Pulse will notice the next time you join.`
@@ -1485,11 +1640,21 @@ Do not hide the row. A missing row reads as a bug.
 | Label | Value | Source |
 |---|---|---|
 | `Last published` | relative time | `SyncCoordinator.lastSuccessfulSync` |
-| `Checks run` | `Every 4 seconds` | scheduler cadence, formatted |
+| `Checks run` | `Every {active}s in a call, {idle}s idle` | `DetectionTuning`, formatted |
 | `This Mac` | `Publishing` / `Retrying` / `Stopped` | `SyncCoordinator.currentState` |
 
-`Checks run` is a formatted value, not a literal. Read the cadence from the
-scheduler so the number cannot drift out of sync with the code.
+`Checks run` is a formatted value, not a literal, and there are two numbers
+rather than one. `DetectionTuning` has `activeSampleInterval` (default 2
+seconds) and `idleSampleInterval` (default 15 seconds), and the scheduler picks
+between them depending on whether anything is currently active. Earlier drafts
+of this plan said "Every 4 seconds", which is a number that appears nowhere in
+the code.
+
+`DetectionScheduler` exposes `updateTuning` but no getter, so the store cannot
+read the values back out. Hold the tuning where it is constructed, in
+`OwnerRuntime`, and push both intervals into `idleCheckInterval` and
+`activeCheckInterval` at the same moment you hand them to the scheduler. That
+keeps one construction site and no drift.
 
 ### 7.2 Sharing
 
@@ -1523,12 +1688,26 @@ Once a link exists, `ViewerLinkCard.swift` renders:
   │   │ 9  ││ R  ││ T  ││ 7  ││ B  │    │ ▓▓ ▓  ▓▓▓ │    │
   │   └────┘└────┘└────┘└────┘└────┘    │ ▓  ▓▓ ▓ ▓ │    │
   │                                     │ ▓▓ ▓  ▓▓▓ │    │
-  │   meetingpulse.app/v/k4m2p9rt7b     └───────────┘    │
+  │   meetingpulse.app/#code=K4M2P9RT7B  └───────────┘   │
   │                                                      │
   │   [Copy link]  [Copy code]  [Share]                  │
   │                                                      │
   └──────────────────────────────────────────────────────┘
 ```
+
+Two things about that URL. The code travels in the **fragment**, not the path:
+`PairingService.link` sets `components.fragment = "code=\(normalized)"`, which
+is what keeps the code out of server logs and referrer headers. And the code in
+the link is normalised to uppercase, while the display grouping adds the dash.
+Render the real URL; do not invent a prettier one.
+
+There may also be more than one. `AppConfiguration.viewerOrigins` is an array
+and `OwnerRuntime.pairingLinks(for:)` returns `[URL]`, one per origin, which is
+why `PulseStore` holds `viewerLinks: [URL]` rather than a single value. With one
+origin, render exactly what is drawn above. With more than one, keep the single
+card and turn `Copy link` into a `Menu` with one item per host, labelled
+`Copy {host} link`. Do not render a second card, and do not silently drop the
+extra origins the way an earlier draft of this plan did.
 
 #### 7.2.3 The pairing code
 
@@ -1539,10 +1718,19 @@ Once a link exists, `ViewerLinkCard.swift` renders:
 ```swift
 RoundedRectangle(cornerRadius: MPRadius.cell, style: .continuous)
   .fill(Color(nsColor: .controlBackgroundColor))
-  .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+  .overlay(
+    RoundedRectangle(cornerRadius: MPRadius.cell, style: .continuous)
+      .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+  )
   .overlay(Text(String(character)).font(MPFont.code))
   .frame(width: 28, height: 34)
 ```
+
+`.fill(_:)` returns a view, not a shape, so `.stroke` cannot be chained onto it.
+Use `.overlay` with a second copy of the shape, and prefer `strokeBorder` over
+`stroke` so the line sits inside the bounds instead of straddling them. The same
+pattern applies to the plate in §6.2 and anywhere else a filled shape needs a
+rim.
 
 Cells exist so he can read the code aloud over a phone without losing his place.
 That is the whole reason; do not decorate them further. `.textSelection(.enabled)`
@@ -1599,19 +1787,30 @@ and has never been called from the app.
 ```
   Who has the link
   ┌──────────────────────────────────────────────────────┐
-  │ 👤 Paired 3 days ago              Last seen 2h ago   │
-  │ 👤 Paired 3 days ago              Never opened       │
+  │ 👤 Paired 3 days ago                        Remove   │
+  │ 👤 Paired 2 weeks ago                       Remove   │
   └──────────────────────────────────────────────────────┘
 ```
 
-`ViewerRecord` carries no name, so do not invent one. Show what is true: when
-the pairing happened and when it was last used. Each row has a trailing
-`Remove` button in `.link` style with its own confirmation.
+Show only what is true, which here is less than you would like. `ViewerRecord`
+has exactly three fields, because `list_viewers()` returns exactly three
+columns: `viewer_user_id`, `created_at`, `revoked_at`. There is no name and
+there is no last-seen timestamp anywhere in the schema.
+
+So the row is one line: `Paired {relative} ago`, plus a trailing `Remove`
+button in `.link` style with its own confirmation. Do not render a second
+column. An earlier draft of this plan specified `Last seen 2h ago` and `Never
+opened`; that data does not exist, and adding it would mean a migration, which
+§2.3 puts out of scope. If you want it later, it is a schema change first and a
+UI change second.
+
+Filter the list to rows where `revokedAt == nil`. The RPC returns revoked
+viewers too, and a removed viewer must not reappear.
 
 Loading: three `MPSkeleton` rows, not a spinner. Failure: an inline
 `MPRow` reading `Can't load the list right now.` with a `Try again` button.
-Empty (a link exists, nobody has opened it): one row reading `Nobody has opened
-the link yet.`
+Empty (a link exists, nobody has used it): one row reading `Nobody has used the
+link yet.`
 
 ### 7.3 This Mac
 
@@ -1640,7 +1839,7 @@ This Mac
   If you lose this Mac
   ┌──────────────────────────────────────────────────────┐
   │ 🔑 Recovery phrase                     [ Show ]      │
-  │    Twelve words that let you take over from a new    │
+  │    A code that lets you take over from a new Mac.    │
   │    Mac. Write them down somewhere safe.              │
   └──────────────────────────────────────────────────────┘
 
@@ -1655,8 +1854,20 @@ This Mac
 #### 7.3.1 Install location banner
 
 Rendered when `store.installLocationIsValid == false`. `MPBanner(.caution)`.
-This currently sets `AppLaunchCoordinator.state = .wrongInstallLocation` and is
-never displayed anywhere. Making it observable is T12.
+
+Today this is not merely undisplayed, it is unreachable.
+`AppLaunchCoordinator.start` has `guard InstallLocation().isValid() else { state
+= .wrongInstallLocation; return }`, which aborts launch before the runtime, the
+store, or any window exists. There is nothing left to render a banner in.
+
+So T12 has two parts, and the first one is a behaviour change: make the guard
+non-fatal. Set `store.installLocationIsValid = false` and continue starting the
+app. Running from `~/Downloads` degrades the experience, because a translocated
+or moved bundle can lose its Accessibility grant, but it does not stop Meeting
+Pulse from working, and refusing to start with no visible explanation is worse
+than the problem it avoids.
+
+Keep the `NSLog`. Drop the early `return`.
 
 Headline: `Meeting Pulse is not in your Applications folder.`
 Body: `Move it to Applications so it keeps running after updates.`
@@ -1682,16 +1893,23 @@ same slot the field's help text occupies, then fade back.
 `RecoveryPhraseView.swift`. Hidden by default behind a `Show` button. Once
 shown:
 
-- Twelve words in a 3 × 4 grid, `MPFont.phrase`, each word numbered `1.`-`12.`
+- Six groups in a 3 × 2 grid, `MPFont.phrase`, each group numbered `1.`-`6.`
   in `.secondary` at 10pt.
 - `MPCopyButton` labelled `Copy the phrase`.
-- A caution line: `Anyone with these words can take over your status. Keep them
+- A caution line: `Anyone with this code can take over your status. Keep it
   somewhere only you can reach.`
 - Auto-hides after 60 seconds of the window being frontmost, with no warning
   needed. Reset the timer on any interaction inside the group.
 
 Use `PairingCodeFormat`'s companion `RecoveryPhraseFormat.display` for grouping;
 do not re-split the string yourself.
+
+The phrase is not words. `RecoveryPhraseFormat.length` is 26 and `display`
+groups Crockford Base32 characters in fives, so the value on screen reads
+`XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-X`: six groups, the last one a single character.
+Lay those six groups out in the grid. Earlier drafts of this plan and of the
+copy deck both said "twelve words", which was wrong, and any copy you write for
+this screen has to say `code` rather than `words`.
 
 #### 7.3.4 Startup
 
@@ -1707,6 +1925,23 @@ over a URL scheme).
 
 `Open the window at login` is new and defaults off. When off, launching at login
 shows only the menu bar icon, which is what almost everyone wants.
+
+It needs a mechanism, because nothing in the codebase provides one today:
+
+- Persist it in `UserDefaults` under `com.meetingpulse.openWindowAtLogin`. It is
+  a display preference, not a secret, so it does not belong in local secret storage
+  alongside the pairing material.
+- Read it in `AppLaunchCoordinator.start`, after onboarding has been determined
+  to be complete, and call `openStation()` only when it is true.
+- It has no effect on a manual launch. Opening the app from Finder or Spotlight
+  always shows the Station, whatever this toggle says, because the user just
+  asked for it. Distinguish the two with
+  `NSApplication.shared.isRunning`-adjacent state if you must, but the simpler
+  route is to have `AppLaunchCoordinator` only consult the toggle on its own
+  first pass and let `applicationShouldHandleReopen` handle the rest.
+
+`Open at login` being off makes this toggle meaningless. Disable it, do not hide
+it, and leave the label legible.
 
 #### 7.3.5 Danger zone
 
@@ -1747,44 +1982,66 @@ After deletion succeeds the app enters a terminal state (defect D6):
 
 ### 7.4 Privacy
 
-The only prose section. It is short, it is specific, and it earns the claim
-rather than asserting it. Two columns, side by side, so the contrast is
-structural rather than rhetorical.
+The only prose section, and the one that has to be exactly true. Read the source
+before you write a word of it:
+
+- `MPSync/StatusTransport.swift`, `StatusPayload`: what the Mac sends.
+- `supabase/migrations/20260807000600_viewer_rpc.sql`, `get_paired_status()`:
+  what a viewer can read.
+
+**These are two different lists, and the gap between them is the product's
+whole privacy argument.** The Mac sends five fields. The viewer's projection
+returns seven keys, and `supabase/tests/05_viewer_read.sql` asserts both the
+key count and that `override_mode` and `device_id` are absent. So the server
+holds a little more than the viewer can ever see, on purpose.
+
+Show all three columns. Two would let a reader assume the middle one does not
+exist, and the middle one is the interesting part.
 
 ```
 Privacy
 
-  What leaves this Mac                What never leaves this Mac
-  ┌──────────────────────────┐        ┌──────────────────────────┐
-  │ Whether you are in a     │        │ Window titles            │
-  │ meeting                  │        │ Meeting names            │
-  │                          │        │ Who you are meeting      │
-  │ Whether calls are okay   │        │ Calendar events          │
-  │                          │        │ Screen contents          │
-  │ The name you chose       │        │ Audio                    │
-  │                          │        │ Anything you type        │
-  │ The time it was sent     │        │                          │
-  └──────────────────────────┘        └──────────────────────────┘
+  What leaves this Mac            What she can see          What never leaves
+  ┌────────────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+  │ ↗ In a meeting, or not │      │ ↗ In a meeting,  │      │ ✕ Window titles  │
+  │ ↗ Whether calls are ok │      │   or not         │      │ ✕ Meeting names  │
+  │ ↗ Whether you set it   │      │ ↗ Whether calls  │      │ ✕ Who you are    │
+  │   by hand              │      │   are okay       │      │   meeting        │
+  │ ↗ When that runs out   │      │ ↗ The name you   │      │ ✕ Calendar       │
+  │ ↗ The name you chose   │      │   chose          │      │ ✕ Screen         │
+  │                        │      │ ↗ When it was    │      │   contents       │
+  │                        │      │   last sent      │      │ ✕ Audio          │
+  │                        │      │                  │      │ ✕ Anything you   │
+  │                        │      │                  │      │   type           │
+  └────────────────────────┘      └──────────────────┘      └──────────────────┘
 
-  Meeting Pulse reads the titles of windows that are already open to
-  work out whether you are in a call. The titles stay on this Mac.
-  Only the four things on the left are sent.
+  Meeting Pulse reads the titles of windows that are already open to work
+  out whether you are in a call. The titles stay on this Mac.
 
-  [ Read how this works ]
+  The server knows whether you set your status by hand and when that runs
+  out. She cannot. The page she loads is not allowed to ask for those.
 ```
 
-Left column rows get a small `arrow.up.right` in `.secondary`. Right column
-rows get `xmark` in `.secondary`. No red, no green. Colour would turn a factual
-list into a scare graphic.
+Three columns at 940pt is tight. Below 1100pt window width, stack them
+vertically as three `MPGroup`s rather than squeezing. Use a `ViewThatFits`.
 
-The four items on the left must match `StatusPayload`'s fields exactly. If
-someone adds a field to the payload without adding a row here, that is a privacy
-regression and the test in §16.3 will catch it.
+Left and middle rows get `arrow.up.right` in `.secondary`. Right rows get
+`xmark` in `.secondary`. No red, no green. Colour would turn a factual list
+into a scare graphic, and the middle column would have no honest colour anyway.
 
-`Read how this works` opens the public privacy page if one exists; if not, omit
-the button rather than linking to a placeholder.
+Two notes on accuracy:
 
----
+- `StatusPayload.screenSharing` exists, is accepted by the RPC, and is `nil`
+  at every one of the three call sites in `MeetingPulseApp.swift`. Do not list
+  it. Listing a field the app never populates would be the one kind of error
+  this section cannot afford. If someone starts populating it, §16.3's parity
+  test fails and forces this copy to be updated.
+- `displayName` does not travel in `StatusPayload`. It is set on the device
+  record separately and the viewer RPC joins it in. It still leaves the Mac, so
+  it belongs in the left column.
+
+`Read how this works` opens the public privacy page if one exists. If it does
+not, omit the button rather than linking to a placeholder.
 
 ## 8. Onboarding
 
@@ -2073,9 +2330,24 @@ responds to what he does. It is never decoration, and it never delays him.
    Station is a working surface, not a presentation. The only entrance
    animations in the app are M09 and M18, both of which mark a thing the user
    just caused.
-4. Every animation is gated on `accessibilityReduceMotion` through
-   `EnvironmentValues.motion(_:)`. With Reduce Motion on, every state change
-   still happens, instantly.
+4. Every animation is gated on `accessibilityReduceMotion`. With Reduce Motion
+   on, every state change still happens, instantly.
+
+   The code samples throughout this document write the gate out longhand as
+   `reduceMotion ? nil : MPMotion.hoist`, because it is clearer to read in
+   isolation. In the implementation, wrap it once:
+
+   ```swift
+   extension View {
+     func mpAnimation<V: Equatable>(_ a: Animation, value: V) -> some View {
+       modifier(MPAnimationModifier(animation: a, value: value))
+     }
+   }
+   ```
+
+   The modifier reads `\.accessibilityReduceMotion` itself and passes `nil`
+   when it is on. One place to get it right, and a grep for
+   `accessibilityReduceMotion` outside `Theme/` becomes a review signal.
 5. Hover feedback is `MPMotion.quick` (150ms) or faster. Anything slower feels
    like lag.
 6. `.geometryGroup()` on any container whose children animate position, so
@@ -2098,7 +2370,7 @@ Twenty interactions. Each is a build item; §15 references them by ID.
 | M09 | **Code landing** | Pairing code first appears | Ten cells scale 0.86 → 1.0 and fade in, 28ms stagger by index. Total 252ms + 220ms = under 500ms | `land` |
 | M10 | **Source pulse** | A source observation flips | The row's `MPStateChip` dot scales to 1.25 and back once. `.symbolEffect(.bounce, value:)` on the leading symbol | `settle` |
 | M11 | **Row hover** | Pointer enters an `MPRow` | Background fills to `.quaternary`. `.onHover` + `withAnimation`. `.hoverEffect` does not exist on macOS | `quick` |
-| M12 | **Section switch** | Sidebar selection changes | Detail content cross-fades via `.id(section)` + `.transition(.opacity)`. No slide; a slide implies spatial order the sections do not have | `leaf` |
+| M12 | **Section switch** | Sidebar selection changes | Detail content cross-fades via `.id(store.section)` + `.transition(.opacity)`. No slide; a slide implies spatial order the sections do not have | `leaf` |
 | M13 | **Banner arrival** | A banner condition becomes true | `.push(from: .top).combined(with: .opacity)`, and `.geometryGroup()` on the parent so the content below slides rather than jumps | `settle` |
 | M14 | **Danger arming** | Confirmation field reaches `delete` | Delete button's tint animates from `.secondary` to `.red` and it becomes enabled. The colour change *is* the feedback | `chalk` |
 | M15 | **Terminal dim** | Deletion completes | Whole window content fades to 40% over 400ms, then the empty state fades in. The one place a longer duration is right: it marks an ending | custom 0.4s, `.easeOut` |
@@ -2186,10 +2458,11 @@ public final class PulseStore {
   public var accessibilityGranted: Bool = false
   public var meet: SourceObservation?
   public var slack: SourceObservation?
-  public var meetHealth: DetectorHealth = .unknown
-  public var slackHealth: DetectorHealth = .unknown
+  public var meetSeenAt: Date?
+  public var slackSeenAt: Date?
   public var statusReason: StatusReason?
-  public var checkInterval: TimeInterval = 4
+  public var idleCheckInterval: Duration = .seconds(15)
+  public var activeCheckInterval: Duration = .seconds(2)
 
   // Publishing
   public var publishState: PublishState = .never
@@ -2200,7 +2473,7 @@ public final class PulseStore {
 
   // Sharing
   public var pairingCode: String?
-  public var viewerLink: URL?
+  public var viewerLinks: [URL] = []
   public var viewers: Loadable<[ViewerSummary]> = .idle
 
   // This Mac
@@ -2210,15 +2483,26 @@ public final class PulseStore {
   public var installLocationIsValid: Bool = true
 
   // Lifecycle
+  public var section: StationSection = .watch
+  public var setupFailure: String?
   public var hasCompletedOnboarding: Bool = false
   public var deleteCompleted: Bool = false
   public var lastError: PulseError?
 
   // Derived
-  public var hasViewerLink: Bool { viewerLink != nil }
+  public var hasViewerLink: Bool { !viewerLinks.isEmpty }
+  public var primaryViewerLink: URL? { viewerLinks.first }
   public var hasOverride: Bool { mode != .automatic }
+
+  /// The freshness gate the viewer applies, mirrored exactly.
+  /// `STALE_AFTER_SECONDS` in `viewer/src/lib/freshness.ts` is 180.
+  public var isFresh: Bool {
+    guard let lastPublished else { return false }
+    return Date.now.timeIntervalSince(lastPublished) <= 180
+  }
+
   public var needsAttention: Bool {
-    !accessibilityGranted || !installLocationIsValid
+    setupFailure != nil || !accessibilityGranted || !installLocationIsValid
       || syncState == .retrying || syncState == .superseded
   }
 }
@@ -2254,7 +2538,7 @@ public protocol PulseActions: AnyObject {
   func rotateViewerLink() async
   func revokeViewerAccess() async
   func loadViewers() async
-  func removeViewer(id: String) async
+  func removeViewer(id: UUID) async     // ViewerSummary.id, passed to revokeViewer(_:)
 
   func setLaunchAtLogin(_ on: Bool) throws
   func setOpenWindowAtLogin(_ on: Bool)
@@ -2286,10 +2570,12 @@ Two rules for the conformance in the app target:
 `Store/PulseSnapshot.swift`:
 
 ```swift
+public enum PulseMode: Hashable, Sendable { case busy, automatic, free }
+
 public enum PublishState: Equatable, Sendable {
   case never, publishing
   case published(at: Date)
-  case retrying, superseded
+  case retrying, offline, superseded
 }
 
 public enum SyncState: Equatable, Sendable { case idle, retrying, superseded }
@@ -2302,14 +2588,13 @@ public enum Loadable<T: Sendable>: Sendable {
 }
 
 public struct ViewerSummary: Identifiable, Sendable {
-  public let id: String
+  public let id: UUID          // ViewerRecord.viewerUserID
   public let pairedAt: Date
-  public let lastSeenAt: Date?
 }
 
 public enum PulseError: Equatable, Sendable {
   case network            // "Can't reach the server. Retrying."
-  case keychain           // "This Mac won't let Meeting Pulse save your keys."
+  case localStorage       // "Meeting Pulse couldn't access its local data."
   case permissionDenied   // "Meeting Pulse can't see your windows yet."
   case invalidPhrase      // "That phrase doesn't match. Check for typos."
   case loginItemBlocked   // "macOS blocked this. Open Login Items to allow it."
@@ -2324,16 +2609,16 @@ numbers.
 
 | # | What | Where | How |
 |---|---|---|---|
-| W1 | `SchedulerReading` → store | `OwnerRuntime.start()` | The reading is already in hand; assign `meet`, `slack`, `accessibilityGranted`, and the two `DetectorHealth` values instead of discarding it |
+| W1 | `SchedulerReading` → store | `OwnerRuntime.start()` | The reading is already in hand; assign `meet`, `slack`, and `accessibilityGranted` instead of discarding it, and stamp `meetSeenAt`/`slackSeenAt` with `.now`. The reading has no health and no timestamps of its own |
 | W2 | `EffectiveStatus.reason` → store | same call site | Assign `store.statusReason`. Drives §6.4 rows 10 and 11 |
-| W3 | Heartbeat | `OwnerRuntime.start()` | Call `SyncCoordinator.startHeartbeat(interval: 60, payload:)`. It has never been called. Defect D1 |
-| W4 | `SyncCoordinator.currentState` | `OwnerRuntime` | Observe and map to `store.syncState`. Drives the rail and the superseded banner |
+| W3 | Heartbeat | `OwnerRuntime.start()` | Call `SyncCoordinator.startHeartbeat(interval: .seconds(60), payload:)`. It has never been called. Defect D1. Note the parameter is a `Duration`, so `interval: 60` will not compile, and 60 is the default anyway. Also note `submit()` awaits the current drain, so a heartbeat tick can block through a full retry backoff: update `store.publishState` before awaiting, per §11.2 |
+| W4 | `SyncCoordinator.currentState` | `OwnerRuntime` | Map to `store.syncState`. Drives the rail and the superseded banner. `SyncCoordinator` is an `actor` and `currentState` is a plain property with no stream, so read it right after every `submit()` and every heartbeat tick rather than trying to observe it. Do not add a polling loop |
 | W5 | `lastSuccessfulSync` | `OwnerRuntime` | Assign to `store.lastPublished` after every publish |
 | W6 | `PermissionCoordinator.changes` | `OwnerRuntime.start()` | Consume the stream in a `Task`. Drives §7.1.2 and onboarding auto-advance |
 | W7 | `NetworkMonitor` | `OwnerRuntime.start()` | Instantiate and consume. Sets `store.isOnline`. When offline, the rail says `No network. Waiting.` rather than `Retrying` |
 | W8 | `listViewers()` | `PulseActions.loadViewers()` | Call on Sharing appear. First UI this method has ever had |
 | W9 | `InstallLocation.isValid()` | `AppLaunchCoordinator` | Assign to `store.installLocationIsValid`. Currently the result is dropped |
-| W10 | `AppLaunchCoordinator` observable | app target | Add `@Observable`. Its `LaunchState` currently cannot reach any view |
+| W10 | `AppLaunchCoordinator` observable | app target | Add `@Observable`. Its `LaunchState` currently cannot reach any view. Map `.wrongInstallLocation` to `store.installLocationIsValid` and `.setupRequired(message)` to `store.setupFailure`, which §7.1 renders as an `MPBanner(.alert)` at the top of Watch with the deck's Setup errors copy. Without this, a local storage or recovery failure at launch is completely silent |
 
 W3 is the one to check first. Without it, the freshness UI is describing a
 heartbeat that is not running, and the Watch section would confidently report
@@ -2384,7 +2669,8 @@ public enum Strings {
   public enum Mast { ... }       // mode control, duration, calls okay
   public enum Duration { ... }   // the seven labels
   public enum Menu { ... }       // menu bar items
-  public enum Station { ... }    // section titles, toolbar
+  public enum Station { ... }    // section titles, toolbar, the rail
+  public enum Duration { ... }   // the seven override durations
   public enum Watch { ... }
   public enum Sharing { ... }
   public enum ThisMac { ... }
@@ -2398,14 +2684,23 @@ public enum Strings {
 Values that interpolate are functions, not format strings:
 
 ```swift
-public static func busyNamed(_ name: String) -> String { "\(name) is in a meeting" }
+public static func meetingNamed(_ name: String) -> String { "\(name) is in a meeting" }
 ```
 
 ### 12.3 New strings
 
-Add all of these to `docs/copy/deck.md` under a new `## Owner app` section,
-then mirror them into `Strings.swift`. The deck is the source; the Swift file
+Mirror all of these into `Strings.swift`. The deck is the source; the Swift file
 is the port.
+
+`docs/copy/deck.md` already has a `## Owner app` section carrying most of what
+follows, added alongside this plan, so T03 is a reconcile rather than a create.
+Three of its older subsections are marked superseded and still hold copy that
+contradicts this document: `### Menu` (the thirteen-item menu), `### Pairing
+window` (the standalone window), and `### Setup errors` (`Move and reopen` /
+`Not now`, where §7.3.1 now says `Show me in Finder`). Delete the superseded
+text as part of T03 rather than leaving two answers in the binding document. Do
+not delete `### Recovery phrase` or `### Delete everything`; reconcile their
+wording against §7.3.3 and §7.3.5 instead.
 
 **The plate**, mirrored from `viewer/src/lib/copy.ts`. Verify each against the
 viewer before shipping; if they have drifted, the viewer is right.
@@ -2420,6 +2715,7 @@ viewer before shipping; if they have drifted, the viewer is right.
 | `Board.callOkaySupporting` | `He said to go ahead and interrupt.` | `.supporting` |
 | `Board.generic` | `Meeting status unavailable` | `COPY.board.generic.headline` |
 | `Board.genericSupporting` | `Check again before you call.` | `.supporting` |
+| `Board.genericOfflineSupporting` | `Connect to the internet, then check again.` | `.offlineSupporting` |
 
 There is no `genericNamed`. The viewer does not have one. Do not add one.
 
@@ -2467,6 +2763,7 @@ no deck and reads like a database column. It is replaced by
 | `Station.railNever` | `Nothing published yet` |
 | `Station.railPublished` | `Published {relative} ago` |
 | `Station.railPublishing` | `Publishing...` |
+| `Station.railRetrying` | `Can't reach the server. Retrying.` |
 | `Station.railOffline` | `No network. Waiting.` |
 | `Station.railSuperseded` | `Another Mac is publishing now` |
 
@@ -2520,7 +2817,7 @@ no deck and reads like a database column. It is replaced by
 | `Watch.publishingHeader` | `Publishing` |
 | `Watch.lastPublished` | `Last published` |
 | `Watch.checksRun` | `Checks run` |
-| `Watch.checksEvery` | `Every {n} seconds` |
+| `Watch.checksEvery` | `Every {active}s in a call, {idle}s idle` |
 | `Watch.thisMac` | `This Mac` |
 | `Watch.thisMacPublishing` | `Publishing` |
 | `Watch.thisMacRetrying` | `Retrying` |
@@ -2537,6 +2834,7 @@ no deck and reads like a database column. It is replaced by
 | `Sharing.createLink` | `Create the viewer link` |
 | `Sharing.linkHeader` | `The link` |
 | `Sharing.copyLink` | `Copy link` |
+| `Sharing.copyHostLink` | `Copy {host} link` |
 | `Sharing.copyCode` | `Copy code` |
 | `Sharing.copied` | `Copied` |
 | `Sharing.share` | `Share` |
@@ -2548,12 +2846,22 @@ no deck and reads like a database column. It is replaced by
 | `Sharing.revokeConfirmBody` | `The link stops working right away. No one will be able to see your status.` |
 | `Sharing.viewersHeader` | `Who has the link` |
 | `Sharing.viewerPaired` | `Paired {relative} ago` |
-| `Sharing.viewerLastSeen` | `Last seen {relative} ago` |
-| `Sharing.viewerNeverOpened` | `Never opened` |
-| `Sharing.viewersEmpty` | `Nobody has opened the link yet.` |
+| `Sharing.viewersEmpty` | `Nobody has used the link yet.` |
 | `Sharing.viewersFailed` | `Can't load the list right now.` |
 | `Sharing.tryAgain` | `Try again` |
 | `Sharing.removeViewer` | `Remove` |
+
+**Durations**, used by the picker in §6.5.2 and the menu bar submenus in §9.2
+
+| Key | String |
+|---|---|
+| `Duration.m15` | `15 minutes` |
+| `Duration.m30` | `30 minutes` |
+| `Duration.m45` | `45 minutes` |
+| `Duration.h1` | `1 hour` |
+| `Duration.h2` | `2 hours` |
+| `Duration.h4` | `4 hours` |
+| `Duration.untilCleared` | `Until I clear it` |
 
 **This Mac**
 
@@ -2568,11 +2876,11 @@ no deck and reads like a database column. It is replaced by
 | `ThisMac.openWindowAtLogin` | `Open the window at login` |
 | `ThisMac.recoveryHeader` | `If you lose this Mac` |
 | `ThisMac.recoveryLabel` | `Recovery phrase` |
-| `ThisMac.recoveryDetail` | `Twelve words that let you take over from a new Mac. Write them down somewhere safe.` |
+| `ThisMac.recoveryDetail` | `A code that lets you take over from a new Mac. Write it down somewhere safe.` |
 | `ThisMac.recoveryShow` | `Show` |
 | `ThisMac.recoveryHide` | `Hide` |
 | `ThisMac.recoveryCopy` | `Copy the phrase` |
-| `ThisMac.recoveryWarning` | `Anyone with these words can take over your status. Keep them somewhere only you can reach.` |
+| `ThisMac.recoveryWarning` | `Anyone with this code can take over your status. Keep it somewhere only you can reach.` |
 | `ThisMac.installTitle` | `Meeting Pulse is not in your Applications folder.` |
 | `ThisMac.installBody` | `Move it to Applications so it keeps running after updates.` |
 | `ThisMac.installAction` | `Show me in Finder` |
@@ -2591,11 +2899,17 @@ no deck and reads like a database column. It is replaced by
 | Key | Copy |
 |---|---|
 | `Privacy.leavesHeader` | `What leaves this Mac` |
+| `Privacy.seesHeader` | `What she can see` |
 | `Privacy.staysHeader` | `What never leaves this Mac` |
-| `Privacy.leaves1` | `Whether you are in a meeting` |
+| `Privacy.leaves1` | `In a meeting, or not` |
 | `Privacy.leaves2` | `Whether calls are okay` |
-| `Privacy.leaves3` | `The name you chose` |
-| `Privacy.leaves4` | `The time it was sent` |
+| `Privacy.leaves3` | `Whether you set it by hand` |
+| `Privacy.leaves4` | `When that runs out` |
+| `Privacy.leaves5` | `The name you chose` |
+| `Privacy.sees1` | `In a meeting, or not` |
+| `Privacy.sees2` | `Whether calls are okay` |
+| `Privacy.sees3` | `The name you chose` |
+| `Privacy.sees4` | `When it was last sent` |
 | `Privacy.stays1` | `Window titles` |
 | `Privacy.stays2` | `Meeting names` |
 | `Privacy.stays3` | `Who you are meeting` |
@@ -2603,7 +2917,17 @@ no deck and reads like a database column. It is replaced by
 | `Privacy.stays5` | `Screen contents` |
 | `Privacy.stays6` | `Audio` |
 | `Privacy.stays7` | `Anything you type` |
-| `Privacy.explanation` | `Meeting Pulse reads the titles of windows that are already open to work out whether you are in a call. The titles stay on this Mac. Only the four things on the left are sent.` |
+| `Privacy.explanation` | `Meeting Pulse reads the titles of windows that are already open to work out whether you are in a call. The titles stay on this Mac.` |
+| `Privacy.boundary` | `The server knows whether you set your status by hand and when that runs out. She cannot. The page she loads is not allowed to ask for those.` |
+
+**VoiceOver only.** These are never drawn. See §13.3.
+
+| Key | String |
+|---|---|
+| `A11y.modeControl` | `Status mode` |
+| `A11y.pairingCode` | `Pairing code, {spelled} ` |
+| `A11y.plate` | `{headline}. {supporting}` |
+| `A11y.rail` | `Publishing status` |
 
 **Onboarding**
 
@@ -2632,7 +2956,7 @@ string; that ends here (defect D3).
 |---|---|
 | `Errors.network` | `Can't reach the server. Retrying.` |
 | `Errors.offline` | `No network. Waiting.` |
-| `Errors.keychain` | `This Mac won't let Meeting Pulse save your keys. Check Keychain Access.` |
+| `Errors.localStorage` | `Meeting Pulse couldn't access its local data. Try again.` |
 | `Errors.permissionDenied` | `Meeting Pulse can't see your windows yet.` |
 | `Errors.invalidPhrase` | `That phrase doesn't match. Check for typos.` |
 | `Errors.loginItemBlocked` | `macOS blocked this. Open Login Items in System Settings to allow it.` |
@@ -2662,12 +2986,17 @@ with the underscores taken out.
 
 ### 13.1 Contrast
 
-Every pair in §4.1 is measured and passes. Two rules that are easy to break:
+Every pair in §4.1 is measured in both appearances and passes. Three rules that
+are easy to break:
 
-- The `paintWhite.opacity(0.78)` supporting text on `plateStorm` computes to
-  5.1:1. Do not lower the opacity further.
-- `MPColor.chalk` on `MPColor.ground` (not `groundRail`) is 11.2:1. Both are
-  fine, but do not put `chalk` on a plate other than `plateBare`.
+- `0.78` is the supporting-text opacity and it is not adjustable. Four of the
+  six composited pairs clear 4.5:1 by less than 0.05. Lowering it to `0.75`
+  fails in light mode on all three plates.
+- Measure light mode. The failures this plan corrects were all invisible to a
+  dark-mode-only check, and the worst of them was on the plate face that is on
+  screen most of the day.
+- Do not put `chalk` on a plate. It is a ground colour, and its light variant
+  `#3A403E` is nearly the same value as `plateBare` dark.
 
 Re-measure after any colour change. Do not assume a small tweak is safe.
 
@@ -2699,7 +3028,7 @@ The plate is one element, not five:
 ```swift
 .accessibilityElement(children: .ignore)
 .accessibilityLabel(headline)            // "Mohit is in a meeting"
-.accessibilityValue(face.supporting)     // "Better to wait."
+.accessibilityValue(face.supporting(isOnline: isOnline))  // "Better to wait."
 .accessibilityHint(reasonLine)           // "Busy for another 12 minutes"
 ```
 
@@ -2715,7 +3044,7 @@ Source rows combine into one element per row:
 ```swift
 .accessibilityElement(children: .combine)
 .accessibilityLabel("Google Meet")
-.accessibilityValue("In a call. Chrome, 4 seconds ago.")
+.accessibilityValue("In a call. Checked 3 seconds ago.")
 ```
 
 The pairing code must not be read character by character with cell boundaries
@@ -2759,6 +3088,35 @@ Shortcuts, all registered through `.commands`:
 | `Esc` | Dismiss a sheet or popover |
 
 `⌘W` must not quit. It is an accessory app; closing the window is normal.
+
+`StationCommands` is a `Commands` value in
+`Station/StationCommands.swift`, attached with `.commands` on the Station's
+`Window` scene (§5.4). It holds a reference to `PulseStore` and `PulseActions`
+and does two things:
+
+```swift
+public struct StationCommands: Commands {
+  let store: PulseStore
+  let actions: any PulseActions
+
+  public var body: some Commands {
+    CommandGroup(after: .toolbar) {
+      Button(Strings.Station.checkNow) { Task { await actions.checkNow() } }
+        .keyboardShortcut("r")
+      Divider()
+      ForEach(StationSection.allCases) { section in
+        Button(section.title) { store.section = section }
+          .keyboardShortcut(section.shortcut)   // "1" ... "4"
+      }
+    }
+  }
+}
+```
+
+This is why §11.1 holds `section` on the store rather than in a `@State` on
+`StationWindow`: a `Commands` value is outside the view hierarchy and cannot
+reach view-private state. `StationSection` therefore needs `CaseIterable` and
+`Identifiable` alongside its `title` and `symbol`.
 
 Do not build a custom focus ring. Use the system one and tint the container
 `MPColor.brass` (M19).
@@ -2819,19 +3177,30 @@ fails in a way that looks like a Swift error and will cost an hour.
 
 ### 14.2 Fix the LSUIElement inconsistency
 
-`project.pbxproj` sets `INFOPLIST_KEY_LSUIElement = YES` in both build
-configurations. `MeetingPulse/Info.plist` sets `<key>LSUIElement</key><false/>`.
-These contradict each other, and which wins depends on whether the Info.plist is
-generated or copied.
+`project.pbxproj` sets a bare `LSUIElement = YES` in both build configurations
+(lines 280 and 301). `MeetingPulse/Info.plist` sets
+`<key>LSUIElement</key><false/>`.
 
-Resolve it: `LSUIElement` should be `true`. The app is an accessory app; it
-calls `setActivationPolicy(.accessory)` in `init()`. Set `<true/>` in
-`Info.plist` so the two agree, and keep the build setting.
+There is no ambiguity about which wins, though it looks like there is. The build
+setting is a plain user-defined setting, not `INFOPLIST_KEY_LSUIElement`, and
+`GENERATE_INFOPLIST_FILE = NO` with an explicit `INFOPLIST_FILE`, so nothing
+merges the setting into the plist. The plist wins outright: **`LSUIElement` is
+false today**, and the app is only accessory because `init()` calls
+`setActivationPolicy(.accessory)` at runtime.
 
-Consequence to verify: with `LSUIElement` true, the Station window opening needs
-`NSApp.activate()` first, which §5.8 already specifies. Confirm the window
-actually takes focus, including on a fresh launch where the app has never been
-frontmost.
+That has a visible cost. The app launches with a Dock icon and a menu bar entry
+for the moment before `init()` runs, which is the flicker on cold launch.
+
+Resolve it: set `<true/>` in `Info.plist`. Either promote the build setting to
+`INFOPLIST_KEY_LSUIElement` or delete it, but do not leave a dead setting that
+reads as if it were doing something.
+
+Consequence to verify: with `LSUIElement` genuinely true for the first time, the
+Station window opening needs `NSApp.activate()` first, which §5.8 already
+specifies. This matters more than it did before, because until now the app was
+launching as a regular app and demoting itself, and it may have been getting
+focus for free. Confirm the window actually takes focus, including on a fresh
+launch where the app has never been frontmost. This is V5 in §16.1.
 
 ### 14.3 No new resources in the app target
 
@@ -2855,7 +3224,7 @@ whose dependencies are unfinished.
 |---|---|---|---|
 | T01 | Create `Packages/MPUI` and register it in the pbxproj (§14.1) | | `xcodebuild -list` succeeds and a trivial `MPUI` symbol compiles into the app target |
 | T02 | Create `MPSupport/Sources/MPSupport/Strings.swift` with every key in §12 | | Every string in §12.3 and §12.4 exists; a test asserts none is empty |
-| T03 | Add the `## Owner app` section to `docs/copy/deck.md` with all of §12.3 | | The deck and `Strings.swift` agree key for key; §16.3 test passes |
+| T03 | Reconcile `docs/copy/deck.md`'s `## Owner app` section with §12.3, deleting the three superseded subsections | | The deck and `Strings.swift` agree key for key; no superseded copy remains; §16.3 test passes |
 | T04 | Build `Theme/` (§4.1-4.6): colours, asset catalogue, fonts, spacing, radii, motion, `DayShape` | T01 | All six motion tokens exist; contrast test (§16.3) passes; a preview renders all three day shapes |
 | T05 | Delete the `pairing`, `settings`, `recovery`, `diagnostics` scenes and their views; delete `showPairingWindow()` and its `NSPanel` (defect D4) | | The app builds; the menu items that opened them are gone or stubbed |
 
@@ -2864,14 +3233,14 @@ whose dependencies are unfinished.
 | ID | Task | Depends | Done when |
 |---|---|---|---|
 | T06 | `PulseStore`, `PulseSnapshot`, `PulseActions`, `PreviewStore` (§11.1-11.3, 11.5) | T01, T04 | Seven preview fixtures exist and compile inside the package alone |
-| T07 | `ReasonLineBuilder` implementing §6.4's precedence table | T06 | All twelve rows covered by tests (§16.2) |
+| T07 | `ReasonLineBuilder` implementing §6.4's precedence table | T06 | All thirteen rows covered by tests (§16.2), row 12a included |
 | T08 | Conform the app target to `PulseActions` over `OwnerRuntime` | T06 | Every method routes to real work; none is a stub |
 | T09 | W1, W2: surface `SchedulerReading` and `EffectiveStatus.reason` on the store | T08 | `store.meet`, `.slack`, `.accessibilityGranted`, `.statusReason` update every scheduler tick |
-| T10 | W6: consume `PermissionCoordinator.changes` | T08 | Granting Accessibility in System Settings flips the store within 1s with no relaunch |
+| T10 | W6: consume `PermissionCoordinator.changes`, and drop `pollInterval` to `.seconds(1)` while onboarding or Watch is frontmost | T08 | Granting Accessibility in System Settings flips the store within ~1s with no relaunch; the poll returns to 5s when neither is frontmost |
 | T11 | W4, W5, W7: `SyncCoordinator` state and `NetworkMonitor` | T08 | Pulling the network makes the rail read `No network. Waiting.` within 5s |
 | T12 | W9, W10: make `AppLaunchCoordinator` `@Observable`; surface `installLocationIsValid` | T08 | Running from `~/Downloads` shows the banner in This Mac |
-| T13 | Defects D2, D3, D5: remove the pessimistic `connectionLine` default, split the nine `catch` blocks into the §12.4 cases, replace `"Available override"` | T02, T06 | No two `catch` blocks assign the same string; launch shows no error |
-| T14 | Defect D1: call `SyncCoordinator.startHeartbeat(interval: 60, payload:)` | T08 | A quiet Mac stays fresh past 5 minutes; the viewer does not go stale |
+| T13 | Defects D2, D3, D5: remove the pessimistic `connectionLine` default, split the seven `catch` blocks and `AppLaunchCoordinator`'s generic catch into the §12.4 cases, replace `"Available override"` at both lines 372 and 379 | T02, T06 | No two `catch` blocks assign the same string; launch shows no error |
+| T14 | Defect D1: call `SyncCoordinator.startHeartbeat(payload:)` (the 60s default is correct) | T08 | A quiet Mac stays fresh past 5 minutes; the viewer does not go stale |
 
 ### Phase 3: the mast
 
@@ -2893,7 +3262,7 @@ whose dependencies are unfinished.
 | T23 | `SharingSection`: empty state, code, QR, actions, viewer list (§7.2) | T21 | `listViewers()` is called; loading uses skeletons; both confirmations work |
 | T24 | `ThisMacSection`: name, startup, recovery, install banner, danger zone (§7.3) | T21, T12 | Delete requires typing `delete`; login-item failure shows the specific message |
 | T25 | Defect D6: the terminal state after deletion (§7.3.5) | T24 | Sections are replaced, the mast reads the deleted line, the menu bar icon dims |
-| T26 | `PrivacySection` (§7.4) | T21 | The left column matches `StatusPayload` field for field |
+| T26 | `PrivacySection`, three columns (§7.4) | T21 | Columns are five, four, and seven rows per §16.3; no row names `screenSharing`; stacks below 1100pt |
 | T27 | Motion M08, M09, M10, M11, M12, M13, M14, M15, M16, M17, M20 | T22-T26 | Each behaves as §10.2 describes; each is instant with Reduce Motion on |
 
 ### Phase 5: menu bar and onboarding
@@ -2945,10 +3314,10 @@ record the result, and write a decision record for any that fails.
 - `PlateFaceParityTests`: a table-driven test whose expected values are
   transcribed from `effectiveDisplayState` in `viewer/src/lib/freshness.ts`. If
   the viewer's logic changes, this is what fails.
-- `ReasonLineTests`: all twelve rows of §6.4, in precedence order, including the
+- `ReasonLineTests`: all thirteen rows of §6.4, in precedence order, including the
   cases where two conditions are true at once and the earlier row must win.
 - `RelativeTimeTests`: the boundaries at 10s, 60s, and 60m.
-- `SourceStateTests`: `unknown` and `DetectorHealth` failure both map to
+- `SourceStateTests`: `unknown` and `sourceAbsent` both map to
   `Can't tell`, never to `No call`. Fail-closed, asserted.
 
 ### 16.3 Automated checks
@@ -2966,13 +3335,31 @@ Add to CI:
 - **Contrast.** Compute the WCAG ratio for each pair in §4.1's table and assert
   it meets the stated minimum. This catches a colour tweak that a human would
   wave through.
-- **Payload parity.** Assert `StatusPayload` has exactly four encodable
-  properties and that the Privacy section's left column has exactly four rows.
-  A new payload field must fail this test and force a conversation.
+- **Payload parity.** Assert that `StatusPayload` has exactly five encodable
+  properties and that `get_paired_status()` returns exactly seven keys.
+
+  Then assert the Privacy section's columns are **five, four, and seven** rows.
+  The counts deliberately do not line up with the two numbers above, so read
+  them carefully before changing anything. The left column is five because it
+  covers the payload's five fields, except that `screenSharing` is always `nil`
+  and is not listed, and the display name is listed even though it travels on
+  the device record rather than in the payload. The middle column is four
+  because three of the RPC's seven keys (`paired`, `server_now`,
+  `schema_version`) are plumbing the reader has no use for. The right column is
+  seven things that never leave the Mac and correspond to no field anywhere.
+
+  Any new payload field or projection key fails this test and
+  forces a conversation before it can ship. The Supabase side of this already
+  exists in `supabase/tests/05_viewer_read.sql`; extend it rather than writing a
+  second assertion.
+- **`screenSharing` stays nil.** Assert that every `StatusPayload` constructed
+  in the app target passes `screenSharing: nil`. The field is plumbed all the
+  way to the database and populating it would silently widen the boundary that
+  §7.4 describes.
 
 ### 16.4 By hand, before you call it done
 
-1. Fresh install, no keychain entries. Onboarding through to a working link.
+1. Fresh install, no local secret file. Onboarding through to a working link.
 2. Deny Accessibility, then grant it while the app is running. The banner and
    the row must both resolve without a relaunch.
 3. Join a Google Meet. The plate hoists a cone within one check interval.
@@ -3111,7 +3498,7 @@ Not done until every line is true.
 - [ ] The menu bar has exactly six items plus two submenus.
 - [ ] All ten wirings in §11.4 are live, W3's heartbeat included.
 - [ ] All six defects in §1.3 are fixed.
-- [ ] `StatusPayload` is byte-identical to `main`.
+- [ ] `StatusPayload` is byte-identical to `main`, `screenSharing` included.
 
 **Craft**
 

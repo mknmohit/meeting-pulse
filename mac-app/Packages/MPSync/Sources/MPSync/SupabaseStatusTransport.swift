@@ -15,9 +15,10 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
 
   public init(
     configuration: AppConfiguration,
-    turnstile: TurnstileGate
+    turnstile: TurnstileGate,
+    secrets: any SecretStore = LocalSecretStore()
   ) {
-    let storage = KeychainLocalStorage(service: "com.techdevix.meetingpulse.auth")
+    let storage = MeetingPulseAuthStorage(secrets: secrets)
     let options = SupabaseClientOptions(
       auth: .init(storage: storage, storageKey: "meetingpulse.auth")
     )
@@ -29,7 +30,11 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
     self.turnstile = turnstile
   }
 
-  public init(client: SupabaseClient, turnstile: TurnstileGate) {
+  public init(
+    client: SupabaseClient,
+    turnstile: TurnstileGate,
+    secrets: any SecretStore = LocalSecretStore()
+  ) {
     self.client = client
     self.turnstile = turnstile
   }
@@ -49,6 +54,7 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
         throw TransportError.identityLost
       }
     }
+
   }
 
   public func registerDevice(recoveryHash: String) async throws -> DeviceRegistration {
@@ -145,6 +151,33 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return formatter.string(from: date)
   }
+}
+
+private struct MeetingPulseAuthStorage: AuthLocalStorage {
+  let secrets: any SecretStore
+
+  func store(key _: String, value: Data) throws {
+    try secrets.save(value, for: .supabaseRefreshToken)
+  }
+
+  func retrieve(key _: String) throws -> Data? {
+    switch try secrets.read(.supabaseRefreshToken) {
+    case .present(let data):
+      return data
+    case .missing:
+      return nil
+    case .temporarilyUnavailable:
+      throw AuthStorageError.temporarilyUnavailable
+    }
+  }
+
+  func remove(key _: String) throws {
+    try secrets.delete(.supabaseRefreshToken)
+  }
+}
+
+private enum AuthStorageError: Error {
+  case temporarilyUnavailable
 }
 
 private struct RegisterResponse: Decodable {

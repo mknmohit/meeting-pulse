@@ -4,6 +4,12 @@
 **Supersedes:** plan v1.0, which had 40 defects (8 blocking). All are resolved here. Traceability: `04-plan-audit-and-resolutions.md`.
 **Companions:** `01-spec-audit-report.md` (why the original spec changed) · `02-meetingpulse-spec.md` (the specification) · `PRODUCT.md` (product truth) · `04-plan-audit-and-resolutions.md` (why this plan changed)
 
+> **Storage amendment (2026-08-08).** The Keychain-based owner-secret portions
+> of this plan are superseded by
+> `docs/superpowers/specs/2026-08-08-no-keychain-storage-design.md`. The current
+> app uses the owner-only Application Support file and one-time legacy cleanup
+> described there.
+
 > **Amendments to the specification.** This plan amends `02-meetingpulse-spec.md` v2.0 in eight places, listed in §14.1. Where this plan and the spec disagree, **this plan wins**, and §14.1 is the record of that.
 
 ---

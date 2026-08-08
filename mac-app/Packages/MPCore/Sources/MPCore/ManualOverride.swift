@@ -90,3 +90,9 @@ public struct ManualOverride: Codable, Equatable, Sendable {
     try container.encodeIfPresent(expiresAtWall, forKey: .expiresAtWall)
   }
 }
+
+extension ManualOverride.Duration: Identifiable, Hashable {
+  public var id: Self {
+    self
+  }
+}

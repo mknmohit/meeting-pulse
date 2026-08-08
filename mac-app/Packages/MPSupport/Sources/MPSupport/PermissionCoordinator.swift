@@ -4,7 +4,7 @@ import Foundation
 public actor PermissionCoordinator {
   public let changes: AsyncStream<Bool>
 
-  private let pollInterval: Duration
+  private var pollInterval: Duration
   private var continuation: AsyncStream<Bool>.Continuation
   private var task: Task<Void, Never>?
   private var lastValue: Bool?
@@ -38,6 +38,19 @@ public actor PermissionCoordinator {
   public func stop() {
     task?.cancel()
     task = nil
+  }
+
+  public func updatePollInterval(_ interval: Duration) {
+    guard pollInterval != interval else {
+      return
+    }
+    pollInterval = interval
+    guard task != nil else {
+      return
+    }
+    task?.cancel()
+    task = nil
+    start()
   }
 
   public func promptIfRequested() -> Bool {

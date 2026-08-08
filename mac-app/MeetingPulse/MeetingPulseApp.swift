@@ -3,6 +3,7 @@ import MPCore
 import MPDetection
 import MPSupport
 import MPSync
+import MPUI
 import Observation
 import SwiftUI
 import WebKit
@@ -11,55 +12,144 @@ typealias MeetingPulseState = MPCore.State
 
 @main
 struct MeetingPulseApp: App {
-  @SwiftUI.State private var model = OwnerAppModel()
-  @SwiftUI.State private var launchCoordinator = AppLaunchCoordinator()
+  @SwiftUI.State private var model: OwnerAppModel
+  @SwiftUI.State private var launchCoordinator: AppLaunchCoordinator
+  @SwiftUI.State private var store: PulseStore
+  @SwiftUI.State private var actions: AppPulseActions
   @NSApplicationDelegateAdaptor(MeetingPulseAppDelegate.self)
   private var appDelegate
 
   init() {
-    if !NSApplication.shared.setActivationPolicy(.accessory) {
-      NSLog("Meeting Pulse: failed to hide the Dock icon.")
+    let model = OwnerAppModel()
+    let store = PulseStore()
+    _model = SwiftUI.State(initialValue: model)
+    _launchCoordinator = SwiftUI.State(initialValue: AppLaunchCoordinator())
+    _store = SwiftUI.State(initialValue: store)
+    _actions = SwiftUI.State(initialValue: AppPulseActions(store: store, model: model))
+    if !NSApplication.shared.setActivationPolicy(.regular) {
+      NSLog("Meeting Pulse: failed to show the Dock icon.")
     }
   }
 
+  @SceneBuilder
   var body: some Scene {
     MenuBarExtra {
-      MenuBarView(model: model)
+      if FeatureFlag.macNative {
+        MPUI.MenuBarContent(store: store, actions: actions)
+      } else {
+        MenuBarView(model: model)
+      }
     } label: {
-      HeartThreadMenuIcon(state: model.state)
-        .task {
-          await launchCoordinator.start(model: model)
-          appDelegate.terminationHandler = {
-            await model.runtime?.gracefulQuit()
-          }
+      NativeMenuBarLabel(store: store, model: model, actions: actions) {
+        await launchCoordinator.start(
+          model: model,
+          store: FeatureFlag.macNative ? store : nil
+        )
+        appDelegate.terminationHandler = {
+          await model.runtime?.gracefulQuit()
         }
+      }
     }
     .menuBarExtraStyle(.menu)
 
-    Window("Welcome to Meeting Pulse", id: "onboarding") {
-      OnboardingWindow()
+    Window(MPString.station.windowTitle, id: "station") {
+      MPUI.StationWindow(store: store, actions: actions)
+    }
+    .defaultSize(width: 940, height: 620)
+    .windowResizability(.contentMinSize)
+    .commands {
+      MPUI.StationCommands(actions: actions)
+    }
+
+    Window(MPString.onboardingStep1.headline, id: "onboarding") {
+      if FeatureFlag.macNative {
+        MPUI.OnboardingWindow(store: store, actions: actions)
+      } else {
+        OnboardingWindow()
+      }
+    }
+    .defaultSize(width: 560, height: 480)
+    .windowResizability(.contentSize)
+
+    Window(MPString.pairing, id: "pairing") {
+      if FeatureFlag.macNative {
+        MPUI.PairingWindow(store: store, actions: actions)
+      } else {
+        PairingWindow(model: model)
+      }
     }
     .windowResizability(.contentSize)
 
-    Window("Pairing", id: "pairing") {
-      PairingWindow(model: model)
+    Window(MPString.settings, id: "settings") {
+      if FeatureFlag.macNative {
+        MPUI.SettingsWindow(store: store, actions: actions)
+      } else {
+        SettingsWindow(model: model)
+      }
+    }
+    .windowResizability(.contentMinSize)
+
+    Window(MPString.recovery, id: "recovery") {
+      if FeatureFlag.macNative {
+        MPUI.RecoveryWindow(store: store, actions: actions)
+      } else {
+        RecoveryWindow(model: model)
+      }
     }
     .windowResizability(.contentSize)
 
-    Window("Meeting Pulse Settings", id: "settings") {
-      SettingsWindow(model: model)
+    Window(MPString.diagnostics.headline, id: "diagnostics") {
+      if FeatureFlag.macNative {
+        MPUI.DiagnosticsWindow(store: store)
+      } else {
+        DiagnosticsWindow(model: model)
+      }
     }
     .windowResizability(.contentSize)
+  }
+}
 
-    Window("Recovery", id: "recovery") {
-      RecoveryWindow(model: model)
-    }
-    .windowResizability(.contentSize)
+private struct NativeMenuBarLabel: View {
+  let store: PulseStore
+  let model: OwnerAppModel
+  let actions: AppPulseActions
+  let start: @MainActor () async -> Void
+  @Environment(\.openWindow) private var openWindow
 
-    Window("Diagnostics", id: "diagnostics") {
-      DiagnosticsWindow(model: model)
+  init(
+    store: PulseStore,
+    model: OwnerAppModel,
+    actions: AppPulseActions,
+    start: @escaping @MainActor () async -> Void
+  ) {
+    self.store = store
+    self.model = model
+    self.actions = actions
+    self.start = start
+  }
+
+  private var menuBarState: MeetingPulseState {
+    FeatureFlag.macNative ? store.effectiveState : model.state
+  }
+
+  var body: some View {
+    Group {
+      HeartThreadMenuIcon(state: menuBarState)
+        .opacity(FeatureFlag.macNative && store.deleteCompleted ? 0.4 : 1)
     }
-    .windowResizability(.contentSize)
+    .task {
+      if FeatureFlag.macNative {
+        actions.configure(openWindow: { id in
+          NSApp.activate()
+          openWindow(id: id)
+        })
+      }
+      await start()
+      if FeatureFlag.macNative,
+         !store.hasCompletedOnboarding || store.setupFailure != nil {
+        actions.showOnboarding()
+      }
+    }
   }
 }
 
@@ -86,6 +176,7 @@ final class MeetingPulseAppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 final class OwnerRuntime {
   private let model: OwnerAppModel
+  private let store: PulseStore?
   private let scheduler: DetectionScheduler
   private let transport: any StatusTransport
   private let recovery: RecoveryService
@@ -93,12 +184,15 @@ final class OwnerRuntime {
   private let existingRegistration: DeviceRegistration?
   private let pairing: PairingService
   private let viewerOrigins: [URL]
+  private let networkMonitor: NetworkMonitor
   private var task: Task<Void, Never>?
+  private var networkTask: Task<Void, Never>?
   private var sync: SyncCoordinator?
   private var overrideStore: ManualOverrideStore?
 
   init(
     model: OwnerAppModel,
+    store: PulseStore? = nil,
     transport: any StatusTransport,
     recovery: RecoveryService,
     secrets: any SecretStore,
@@ -106,11 +200,13 @@ final class OwnerRuntime {
     viewerOrigins: [URL]
   ) {
     self.model = model
+    self.store = store
     self.transport = transport
     self.recovery = recovery
     self.secrets = secrets
     self.existingRegistration = existingRegistration
     self.viewerOrigins = viewerOrigins
+    networkMonitor = NetworkMonitor()
     pairing = PairingService(transport: transport, secrets: secrets)
     let meet = GoogleMeetDetector()
     let slack = SlackHuddleDetector()
@@ -132,6 +228,20 @@ final class OwnerRuntime {
     )
     let savedOverride = await overrideStore?.load()
     model.applyLoadedOverride(savedOverride)
+    await restartHeartbeat()
+    networkMonitor.start()
+    let networkChanges = networkMonitor.changes
+    networkTask = Task { [weak self] in
+      for await online in networkChanges {
+        guard let self else {
+          return
+        }
+        self.store?.isOnline = online
+        if !online {
+          self.store?.publishState = .offline
+        }
+      }
+    }
     let stream = await scheduler.readings
     task = Task { [weak self] in
       guard let self else {
@@ -157,7 +267,13 @@ final class OwnerRuntime {
           )
         )
         self.model.applyAutomatic(status)
+        let readingSnapshot = SchedulerReadingSnapshot(
+          meet: reading.meet,
+          slack: reading.slack,
+          accessibilityGranted: reading.accessibilityGranted
+        )
         if let sync = self.sync {
+          self.store?.publishState = .publishing
           await sync.submit(
             StatusPayload(
               state: status.state,
@@ -166,10 +282,22 @@ final class OwnerRuntime {
               overrideExpiresAt: self.model.manualOverride?.expiresAtWall
             )
           )
-          if await sync.currentState == .idle {
-            self.model.connectionLine = "Last published just now"
+          let syncState = await sync.currentState
+          self.store?.syncState = Self.mapSyncState(syncState)
+          self.store?.lastPublished = await sync.lastSuccessfulSync
+          self.store?.publishState = Self.mapPublishState(
+            syncState: syncState,
+            lastPublished: await sync.lastSuccessfulSync
+          )
+          if syncState == .idle {
+            self.model.connectionLine = MPString.mast.lastPublishedJustNow
           }
         }
+        self.store?.apply(
+          status: status,
+          reading: readingSnapshot,
+          publishedAt: await self.sync?.lastSuccessfulSync
+        )
       }
     }
   }
@@ -203,6 +331,14 @@ final class OwnerRuntime {
   func revokePairingCode() async throws {
     _ = try await transport.rotatePairingCodes()
     try pairing.deleteStoredCode()
+  }
+
+  func listViewers() async throws -> [ViewerRecord] {
+    try await transport.listViewers()
+  }
+
+  func revokeViewer(_ id: UUID) async throws {
+    try await transport.revokeViewer(id)
   }
 
   func refreshAndPublish() async {
@@ -288,6 +424,9 @@ final class OwnerRuntime {
   func stop() async {
     task?.cancel()
     task = nil
+    networkTask?.cancel()
+    networkTask = nil
+    networkMonitor.stop()
     await scheduler.stop()
     await sync?.stop()
   }
@@ -312,7 +451,70 @@ final class OwnerRuntime {
     } else {
       model.clearManualOverride()
     }
+    await restartHeartbeat()
     await scheduler.requestImmediateSample()
+  }
+
+  private func restartHeartbeat() async {
+    guard let sync else {
+      return
+    }
+    let interval: Duration
+    if store?.mode != .automatic {
+      interval = .seconds(30)
+    } else if store?.stationVisible == false {
+      interval = .seconds(300)
+    } else {
+      interval = .seconds(60)
+    }
+    await sync.startHeartbeat(interval: interval) { [weak self] in
+      guard let self else {
+        return StatusPayload(
+          state: .unavailable,
+          callOkay: false,
+          overrideMode: nil,
+          overrideExpiresAt: nil
+        )
+      }
+      return await self.currentPayload()
+    }
+  }
+
+  private func currentPayload() -> StatusPayload {
+    StatusPayload(
+      state: store?.effectiveState ?? model.state,
+      callOkay: store?.callsOkay ?? model.callOkay,
+      overrideMode: store?.mode == .automatic ? nil : (store?.effectiveState ?? model.manualOverrideState),
+      overrideExpiresAt: store?.overrideExpiry ?? model.manualOverride?.expiresAtWall
+    )
+  }
+
+  private static func mapSyncState(_ state: SyncCoordinator.State) -> SyncState {
+    switch state {
+    case .idle:
+      return .idle
+    case .retrying:
+      return .retrying
+    case .superseded:
+      return .superseded
+    }
+  }
+
+  private static func mapPublishState(
+    syncState: SyncCoordinator.State,
+    lastPublished: Date?
+  ) -> PublishState {
+    switch syncState {
+    case .idle:
+      if let lastPublished {
+        return .published(at: lastPublished)
+      }
+      return .never
+    case .retrying:
+      return .retrying
+    case .superseded:
+      return .superseded
+    }
   }
 }
 
@@ -321,8 +523,8 @@ final class OwnerRuntime {
 final class OwnerAppModel {
   var state: MeetingPulseState = .unavailable
   var callOkay = false
-  var statusLine = "Status unavailable"
-  var connectionLine = "Can't reach the server. Retrying."
+  var statusLine = MPString.board.genericHeadline
+  var connectionLine = MPString.error.unreachable
   var displayName = ""
   var launchAtLogin = false
   var recoveryPhrase: String?
@@ -332,8 +534,8 @@ final class OwnerAppModel {
   var showingRevokeConfirmation = false
   var showingDeleteConfirmation = false
   var runtime: OwnerRuntime?
+  var runtimeStore: PulseStore?
   var manualOverride: ManualOverride?
-  private var pairingWindow: NSWindow?
 
   func setBusy(duration: ManualOverride.Duration = .m30) {
     requestOverride(state: .busy, duration: duration)
@@ -351,7 +553,7 @@ final class OwnerAppModel {
         }
         try await runtime.clearOverride()
       } catch {
-        connectionLine = "Can't reach the server. Retrying."
+        connectionLine = MPString.error.unreachable
       }
     }
   }
@@ -367,21 +569,28 @@ final class OwnerAppModel {
 
   func applyLoadedOverride(_ override: ManualOverride?) {
     manualOverride = override
+    runtimeStore?.setOverride(override)
     if let override {
       state = override.state
-      statusLine = override.state == .busy ? "Busy" : "Available override"
+      statusLine = override.state == .busy
+        ? MPString.mast.modeBusy
+        : MPString.menuBar.availableOverride
     }
   }
 
   func applyManualOverride(_ override: ManualOverride) {
     manualOverride = override
+    runtimeStore?.setOverride(override)
     state = override.state
-    statusLine = override.state == .busy ? "Busy" : "Available override"
+    statusLine = override.state == .busy
+      ? MPString.mast.modeBusy
+      : MPString.menuBar.availableOverride
   }
 
   func clearManualOverride() {
     manualOverride = nil
-    statusLine = "Watching automatically"
+    runtimeStore?.setOverride(nil)
+    statusLine = MPString.mast.reasonAutomatic
   }
 
   private func requestOverride(
@@ -395,13 +604,12 @@ final class OwnerAppModel {
         }
         try await runtime.setOverride(state: state, duration: duration)
       } catch {
-        connectionLine = "Can't reach the server. Retrying."
+        connectionLine = MPString.error.unreachable
       }
     }
   }
 
   func createPairingCode() {
-    showPairingWindow()
     Task { @MainActor in
       do {
         guard let runtime else {
@@ -411,7 +619,7 @@ final class OwnerAppModel {
         pairingCode = result
         pairingLinks = try runtime.pairingLinks(for: result)
       } catch {
-        connectionLine = "Can't reach the server. Retrying."
+        connectionLine = MPString.error.unreachable
       }
     }
   }
@@ -439,7 +647,7 @@ final class OwnerAppModel {
         pairingCode = code
         pairingLinks = try runtime.pairingLinks(for: code)
       } catch {
-        connectionLine = "Can't reach the server. Retrying."
+        connectionLine = MPString.error.unreachable
       }
     }
   }
@@ -454,7 +662,7 @@ final class OwnerAppModel {
         pairingCode = nil
         pairingLinks = []
       } catch {
-        connectionLine = "Can't reach the server. Retrying."
+        connectionLine = MPString.error.unreachable
       }
     }
   }
@@ -462,7 +670,7 @@ final class OwnerAppModel {
   func refreshAndPublish() {
     Task { @MainActor in
       guard let runtime else {
-        connectionLine = "Meeting Pulse is still starting."
+        connectionLine = MPString.error.starting
         return
       }
       await runtime.refreshAndPublish()
@@ -478,7 +686,7 @@ final class OwnerAppModel {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         try await runtime.updateDisplayName(trimmed.isEmpty ? nil : trimmed)
       } catch {
-        connectionLine = "Can't reach the server. Retrying."
+        connectionLine = MPString.error.unreachable
       }
     }
   }
@@ -495,7 +703,7 @@ final class OwnerAppModel {
       try runtime.updateLoginItem(enabled)
       launchAtLogin = enabled
     } catch {
-      connectionLine = "Meeting Pulse couldn't update launch at login."
+      connectionLine = MPString.error.loginItem
     }
   }
 
@@ -514,41 +722,17 @@ final class OwnerAppModel {
         }
         try await runtime.deleteEverything()
         state = .unavailable
-        statusLine = "Status unavailable"
-        connectionLine = "Meeting Pulse was reset."
+        statusLine = MPString.board.genericHeadline
+        connectionLine = MPString.mast.resetComplete
         displayName = ""
         launchAtLogin = false
         recoveryPhrase = nil
         pairingCode = nil
         pairingLinks = []
       } catch {
-        connectionLine = "Can't reach the server. Retrying."
+        connectionLine = MPString.error.unreachable
       }
     }
-  }
-
-  private func showPairingWindow() {
-    if let pairingWindow {
-      pairingWindow.makeKeyAndOrderFront(nil)
-      NSApp.activate(ignoringOtherApps: true)
-      return
-    }
-    let window = NSPanel(
-      contentRect: NSRect(x: 0, y: 0, width: 460, height: 460),
-      styleMask: [.titled, .closable, .utilityWindow],
-      backing: .buffered,
-      defer: false
-    )
-    window.title = "Pairing"
-    window.isReleasedWhenClosed = false
-    window.hidesOnDeactivate = false
-    window.contentViewController = NSHostingController(
-      rootView: PairingWindow(model: self)
-    )
-    window.center()
-    window.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
-    pairingWindow = window
   }
 
   func applyAutomatic(_ status: EffectiveStatus) {
@@ -562,14 +746,15 @@ final class OwnerAppModel {
     )
     state = status.state
     callOkay = status.callOkay
+    runtimeStore?.apply(status: status)
     statusLine =
       switch status.state {
       case .available:
-        "Watching automatically"
+        MPString.mast.reasonAutomatic
       case .busy:
-        "Busy"
+        MPString.mast.modeBusy
       case .unavailable:
-        "Status unavailable"
+        MPString.board.genericHeadline
       }
   }
 
@@ -581,6 +766,7 @@ private enum OwnerRuntimeError: Error {
 }
 
 @MainActor
+@Observable
 final class AppLaunchCoordinator {
   enum LaunchState: Equatable {
     case starting
@@ -593,10 +779,14 @@ final class AppLaunchCoordinator {
   private var permissionCoordinator: PermissionCoordinator?
   private var runtime: OwnerRuntime?
   private var turnstilePanel: NSPanel?
+  private var permissionTask: Task<Void, Never>?
   private(set) var state: LaunchState = .starting
 
-  func start(model: OwnerAppModel) async {
+  func start(model: OwnerAppModel, store: PulseStore? = nil) async {
     NSLog("Meeting Pulse launch sequence started")
+    let migratedDisplayName = UserDefaults.standard.string(forKey: "owner.displayName") ?? ""
+    store?.displayName = migratedDisplayName
+    model.displayName = migratedDisplayName
     guard state == .starting else {
       return
     }
@@ -604,16 +794,26 @@ final class AppLaunchCoordinator {
       instanceLock = try SingleInstanceLock()
       let configuration = try AppConfiguration.load()
       NSLog("Meeting Pulse configuration loaded")
-      guard InstallLocation().isValid() else {
+      let installLocationIsValid = InstallLocation().isValid()
+      if !installLocationIsValid {
         NSLog("Meeting Pulse install location is invalid")
-        state = .wrongInstallLocation
-        return
+        store?.installLocationIsValid = false
       }
       let coordinator = PermissionCoordinator()
       permissionCoordinator = coordinator
       await coordinator.start()
+      if let store {
+        let permissionChanges = await coordinator.changes
+        permissionTask = Task { [weak store] in
+          for await granted in permissionChanges {
+            store?.accessibilityGranted = granted
+          }
+        }
+      }
       NSLog("Meeting Pulse permission coordinator started")
-      let secrets = KeychainStore()
+      try LegacyStorageReset().resetIfNeeded()
+      store?.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "setup.completed")
+      let secrets = LocalSecretStore()
       let existingRegistration = try existingRegistration(from: secrets)
       let provider: any TurnstileProvider
       if existingRegistration == nil {
@@ -638,11 +838,13 @@ final class AppLaunchCoordinator {
       let gate = TurnstileGate(provider: provider)
       let transport = SupabaseStatusTransport(
         configuration: configuration,
-        turnstile: gate
+        turnstile: gate,
+        secrets: secrets
       )
       let recovery = RecoveryService(transport: transport, secrets: secrets)
       let runtime = OwnerRuntime(
         model: model,
+        store: store,
         transport: transport,
         recovery: recovery,
         secrets: secrets,
@@ -651,26 +853,33 @@ final class AppLaunchCoordinator {
       )
       self.runtime = runtime
       model.runtime = runtime
+      model.runtimeStore = store
       model.loadLaunchAtLogin()
       try await runtime.start()
       try model.loadStoredPairingCode()
       try model.loadRecoveryPhrase()
+      store?.pairingCode = model.pairingCode?.rawCode
+      store?.viewerLinks = model.pairingLinks
+      store?.recoveryPhrase = model.recoveryPhrase
+      store?.launchAtLogin = model.launchAtLogin
       turnstilePanel?.close()
       turnstilePanel = nil
       NSLog("Meeting Pulse detection runtime started")
-      state = .running
+      state = installLocationIsValid ? .running : .wrongInstallLocation
     } catch let error as AppConfiguration.ConfigurationError {
       NSLog("Meeting Pulse configuration error: %@", error.description)
+      store?.setupFailure = error.description
       state = .setupRequired(error.description)
     } catch {
       NSLog("Meeting Pulse launch error: %@", String(describing: error))
-      state = .setupRequired("Meeting Pulse is not configured yet.")
+      store?.setupFailure = MPString.error.genericSetup
+      state = .setupRequired(MPString.error.genericSetup)
     }
   }
 
   private enum LaunchError: Error {
     case turnstileResourceMissing
-    case keychainLocked
+    case localStorageUnavailable
     case invalidDeviceIdentity
   }
 
@@ -695,7 +904,7 @@ final class AppLaunchCoordinator {
       }
       return DeviceRegistration(deviceID: device, instanceNonce: instanceNonce)
     case (.temporarilyUnavailable, _), (_, .temporarilyUnavailable):
-      throw LaunchError.keychainLocked
+      throw LaunchError.localStorageUnavailable
     default:
       throw LaunchError.invalidDeviceIdentity
     }
@@ -708,7 +917,7 @@ final class AppLaunchCoordinator {
       backing: .buffered,
       defer: false
     )
-    panel.title = "Meeting Pulse"
+    panel.title = MPString.station.windowTitle
     webView.frame = NSRect(origin: .zero, size: NSSize(width: 420, height: 260))
     webView.autoresizingMask = [.width, .height]
     panel.contentView = webView
@@ -726,66 +935,67 @@ struct MenuBarView: View {
   var body: some View {
     Text(model.statusLine)
       .confirmationDialog(
-        "Delete everything?",
+        MPString.thisMac.deleteTitle,
         isPresented: $model.showingDeleteConfirmation,
         titleVisibility: .visible
       ) {
-        Button("Delete everything", role: .destructive) {
+        Button(MPString.thisMac.deleteEverything, role: .destructive) {
           model.deleteEverything()
         }
-        Button("Cancel", role: .cancel) {}
+        Button(MPString.cancel, role: .cancel) {}
       } message: {
-        Text("This removes the status, viewer access, and recovery data from this Mac.")
+        Text(MPString.thisMac.deleteBody)
       }
     Text(model.connectionLine)
     Divider()
-    Menu("Set busy…") {
-      Button("15 minutes") { model.setBusy(duration: .m15) }
-      Button("30 minutes") { model.setBusy(duration: .m30) }
-      Button("45 minutes") { model.setBusy(duration: .m45) }
-      Button("1 hour") { model.setBusy(duration: .h1) }
-      Button("2 hours") { model.setBusy(duration: .h2) }
-      Button("4 hours") { model.setBusy(duration: .h4) }
-      Button("Until I clear it") { model.setBusy(duration: .untilCleared) }
+    Menu(MPString.menuBar.setBusy) {
+      Button(MPString.mast.durationLabel(.m15)) { model.setBusy(duration: .m15) }
+      Button(MPString.mast.durationLabel(.m30)) { model.setBusy(duration: .m30) }
+      Button(MPString.mast.durationLabel(.m45)) { model.setBusy(duration: .m45) }
+      Button(MPString.mast.durationLabel(.h1)) { model.setBusy(duration: .h1) }
+      Button(MPString.mast.durationLabel(.h2)) { model.setBusy(duration: .h2) }
+      Button(MPString.mast.durationLabel(.h4)) { model.setBusy(duration: .h4) }
+      Button(MPString.mast.durationLabel(.untilCleared)) { model.setBusy(duration: .untilCleared) }
     }
-    Menu("Set available…") {
-      Button("15 minutes") { model.setAvailable(duration: .m15) }
-      Button("30 minutes") { model.setAvailable(duration: .m30) }
-      Button("45 minutes") { model.setAvailable(duration: .m45) }
-      Button("1 hour") { model.setAvailable(duration: .h1) }
-      Button("2 hours") { model.setAvailable(duration: .h2) }
-      Button("4 hours") { model.setAvailable(duration: .h4) }
-      Button("Until I clear it") { model.setAvailable(duration: .untilCleared) }
+    Menu(MPString.menuBar.setAvailable) {
+      Button(MPString.mast.durationLabel(.m15)) { model.setAvailable(duration: .m15) }
+      Button(MPString.mast.durationLabel(.m30)) { model.setAvailable(duration: .m30) }
+      Button(MPString.mast.durationLabel(.m45)) { model.setAvailable(duration: .m45) }
+      Button(MPString.mast.durationLabel(.h1)) { model.setAvailable(duration: .h1) }
+      Button(MPString.mast.durationLabel(.h2)) { model.setAvailable(duration: .h2) }
+      Button(MPString.mast.durationLabel(.h4)) { model.setAvailable(duration: .h4) }
+      Button(MPString.mast.durationLabel(.untilCleared)) { model.setAvailable(duration: .untilCleared) }
     }
-    Button("Clear override") { model.clearOverride() }
+    Button(MPString.menuBar.backToAutomatic) { model.clearOverride() }
     Toggle(
-      "Calls are okay",
+      MPString.menuBar.callsAreOkay,
       isOn: Binding(
         get: { model.callOkay },
         set: { model.setCallOkay($0) }
       )
     )
-    Button("Check and publish now") { model.refreshAndPublish() }
+    Button(MPString.station.checkNow) { model.refreshAndPublish() }
     Divider()
-    Button("Display name…") { openWindow(id: "settings") }
-    Button("Create viewer link…") {
+    Button(MPString.thisMac.name) { openWindow(id: "settings") }
+    Button(MPString.sharing.createLink) {
       model.createPairingCode()
+      openWindow(id: "pairing")
     }
-    Button("Rotate viewer link…") {
+    Button(MPString.sharing.createNewLink) {
       model.showingRotateConfirmation = true
     }
     .disabled(model.pairingCode == nil)
-    Button("Revoke viewer access…") {
+    Button(MPString.sharing.stopSharing) {
       model.showingRevokeConfirmation = true
     }
     .disabled(model.pairingCode == nil)
-    Button("Show recovery phrase…") { openWindow(id: "recovery") }
-    Button("Diagnostics…") { openWindow(id: "diagnostics") }
-    Button("Delete everything…") {
+    Button(MPString.thisMac.showRecoveryPhrase) { openWindow(id: "recovery") }
+    Button(MPString.diagnostics.headline) { openWindow(id: "diagnostics") }
+    Button(MPString.thisMac.deleteEverything) {
       model.showingDeleteConfirmation = true
     }
     Divider()
-    Button("Quit Meeting Pulse") {
+    Button(MPString.menuBar.quit) {
       NSApplication.shared.terminate(nil)
     }
   }
@@ -919,11 +1129,11 @@ struct HeartThreadMenuIcon: View {
   private var statusAccessibilityLabel: String {
     switch state {
     case .busy:
-      return "Meeting Pulse, meeting active"
+      return MPString.board.busyHeadline
     case .available:
-      return "Meeting Pulse, no active meeting"
+      return MPString.mast.reasonAutomatic
     case .unavailable:
-      return "Meeting Pulse, status unavailable"
+      return MPString.board.genericHeadline
     }
   }
 }
@@ -931,18 +1141,11 @@ struct HeartThreadMenuIcon: View {
 struct OnboardingWindow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("Meeting Pulse needs to see your windows")
+      Text(MPString.onboardingStep2.headline)
         .font(.title2.weight(.semibold))
-      Text(
-        "macOS calls this Accessibility. Meeting Pulse uses it to check two things: whether Chrome has a Google Meet call open, and whether Slack has a huddle running."
-      )
-      Text(
-        "It does not read page contents, meeting names, links, or anything you type. It never asks for screen recording, and it never touches your screen, microphone, or camera."
-      )
-      Text(
-        "Three things leave this Mac: one word (free, on a call, or no signal), whether calls are okay right now, and the name you choose to show."
-      )
-      Button("Open Accessibility settings") {
+      Text(MPString.onboardingStep2.body)
+      Text(MPString.station.readsWindowTitles)
+      Button(MPString.onboardingStep2.cta) {
         if let url = URL(
           string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
         ) {
@@ -960,16 +1163,14 @@ struct PairingWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("Share the viewer link")
+      Text(MPString.sharing.headline)
         .font(.title2.weight(.semibold))
-      Text(
-        "The link stays active until you rotate or revoke it. Anyone who has it can view the status."
-      )
+      Text(MPString.sharing.body)
       if let pairingCode = model.pairingCode {
         Text(pairingCode.displayCode)
           .font(.system(.title, design: .monospaced))
         HStack {
-          Button("Copy code") {
+          Button(MPString.sharing.copyCode) {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(
               pairingCode.displayCode,
@@ -983,7 +1184,7 @@ struct PairingWindow: View {
               .font(.caption)
               .textSelection(.enabled)
               .foregroundStyle(.secondary)
-            Button("Copy \(pairingLink.host ?? "viewer") link") {
+            Button(MPString.sharing.copyHostLink(pairingLink.host ?? MPString.sharing.unnamedOwner)) {
               NSPasteboard.general.clearContents()
               NSPasteboard.general.setString(
                 pairingLink.absoluteString,
@@ -993,43 +1194,43 @@ struct PairingWindow: View {
           }
         }
         HStack {
-          Button("Rotate viewer link…") {
+          Button(MPString.sharing.createNewLink) {
             model.showingRotateConfirmation = true
           }
-          Button("Revoke access…", role: .destructive) {
+          Button(MPString.sharing.stopSharing, role: .destructive) {
             model.showingRevokeConfirmation = true
           }
         }
       } else {
-        Text("Create a viewer link from the menu bar to share it.")
+        Text(MPString.sharing.emptyBody)
           .foregroundStyle(.secondary)
       }
     }
     .padding(24)
     .frame(width: 460)
     .confirmationDialog(
-      "Rotate viewer link?",
+      MPString.sharing.createNewLinkTitle,
       isPresented: $model.showingRotateConfirmation,
       titleVisibility: .visible
     ) {
-      Button("Rotate link", role: .destructive) {
+      Button(MPString.sharing.createNewLink, role: .destructive) {
         model.rotatePairingCode()
       }
-      Button("Cancel", role: .cancel) {}
+      Button(MPString.cancel, role: .cancel) {}
     } message: {
-      Text("The current link and viewer session will stop working.")
+      Text(MPString.sharing.createNewLinkBody)
     }
     .confirmationDialog(
-      "Revoke viewer access?",
+      MPString.sharing.stopSharingTitle,
       isPresented: $model.showingRevokeConfirmation,
       titleVisibility: .visible
     ) {
-      Button("Revoke access", role: .destructive) {
+      Button(MPString.sharing.stopSharing, role: .destructive) {
         model.revokePairingCode()
       }
-      Button("Cancel", role: .cancel) {}
+      Button(MPString.cancel, role: .cancel) {}
     } message: {
-      Text("The current link will stop working. You can create a new one later.")
+      Text(MPString.sharing.stopSharingBody)
     }
   }
 }
@@ -1039,21 +1240,21 @@ struct SettingsWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("Display name")
+      Text(MPString.thisMac.headline)
         .font(.title2.weight(.semibold))
-      TextField("Optional name", text: $model.displayName)
+      TextField(MPString.thisMac.optionalName, text: $model.displayName)
         .textFieldStyle(.roundedBorder)
-      Button("Save name") {
+      Button(MPString.thisMac.saveName) {
         model.saveDisplayName()
       }
       Toggle(
-        "Launch at login",
+        MPString.thisMac.openAtLogin,
         isOn: Binding(
           get: { model.launchAtLogin },
           set: { model.setLaunchAtLogin($0) }
         )
       )
-      Text("The name appears above the meeting status on the viewer.")
+      Text(MPString.thisMac.viewerNameDetail)
         .font(.caption)
         .foregroundStyle(.secondary)
     }
@@ -1067,21 +1268,19 @@ struct RecoveryWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text("Save this phrase")
+      Text(MPString.thisMac.recoveryPhrase)
         .font(.title2.weight(.semibold))
-      Text(
-        "If this Mac is wiped or replaced, this phrase is the only way to keep your connection without asking her to pair again. Anyone who has it can take over publishing your status, so store it where you keep passwords."
-      )
+      Text(MPString.thisMac.recoveryDetail)
       if let recoveryPhrase = model.recoveryPhrase {
         Text(recoveryPhrase)
           .font(.system(.body, design: .monospaced))
           .textSelection(.enabled)
-        Button("Copy phrase") {
+        Button(MPString.thisMac.copyPhrase) {
           NSPasteboard.general.clearContents()
           NSPasteboard.general.setString(recoveryPhrase, forType: .string)
         }
       } else {
-        Text("The recovery phrase is not available.")
+        Text(MPString.thisMac.recoveryUnavailable)
           .foregroundStyle(.secondary)
       }
     }
@@ -1095,14 +1294,11 @@ struct DiagnosticsWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Diagnostics")
+      Text(MPString.diagnostics.headline)
         .font(.title2.weight(.semibold))
-      LabeledContent("State", value: model.state.rawValue)
-      LabeledContent("Status", value: model.statusLine)
-      LabeledContent("Connection", value: model.connectionLine)
-      Text(
-        "Meeting Pulse never records meeting titles, links, participants, audio, video, or screen contents."
-      )
+      LabeledContent(MPString.diagnostics.state, value: model.statusLine)
+      LabeledContent(MPString.diagnostics.connection, value: model.connectionLine)
+      Text(MPString.diagnostics.privacy)
       .font(.caption)
       .foregroundStyle(.secondary)
     }

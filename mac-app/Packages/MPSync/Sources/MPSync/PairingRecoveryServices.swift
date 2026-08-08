@@ -16,7 +16,7 @@ public struct PairingCodeResult: Equatable, Sendable {
 
 public enum PairingServiceError: Error, Equatable, Sendable {
   case invalidStoredCode
-  case keychainUnavailable
+  case secretStoreUnavailable
   case invalidViewerOrigin
 }
 
@@ -55,7 +55,7 @@ public struct PairingService: Sendable {
     case .missing:
       return nil
     case .temporarilyUnavailable:
-      throw PairingServiceError.keychainUnavailable
+      throw PairingServiceError.secretStoreUnavailable
     case .present(let data):
       guard
         let value = String(data: data, encoding: .utf8),

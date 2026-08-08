@@ -8,6 +8,10 @@
 **Companion documents:** `01-spec-audit-report.md` (what changed and why), `03-implementation-plan.md` (how to build it)
 
 > **Rule of precedence.** This document is authoritative over v1. Where this document is silent, v1 applies. Any change to §3 (goals), §4 (state model), §6 (privacy boundary), the no-extension requirement, or the non-realtime sync model requires revisiting this specification.
+>
+> **Storage amendment (2026-08-08).** The local secret-storage portions of this
+> document are superseded by
+> `docs/superpowers/specs/2026-08-08-no-keychain-storage-design.md`.
 
 ---
 

@@ -88,7 +88,7 @@ The hardest phase. `AXRunLoopHost` (§8.2) is the piece most likely to be got wr
 **Give:** the four core files, plus `04-plan-audit-and-resolutions.md`.
 **Blocked by:** Gate G3.
 **Scope:** plan §9.
-**Done when:** the coalescing test, the redaction test, and the three-state Keychain tests pass.
+**Done when:** the coalescing test, the redaction test, and the local secret storage tests pass.
 
 ### Agent 7 — Viewer (Phase 6) ⛔ Gate G4
 

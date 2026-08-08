@@ -42,9 +42,6 @@ function normalizeStatus(raw: RawPairedStatus): PairedStatus {
     };
   }
   if (
-    (raw.state !== 'available' &&
-      raw.state !== 'busy' &&
-      raw.state !== 'unavailable') ||
     typeof raw.call_okay !== 'boolean' ||
     typeof raw.last_seen_at !== 'string' ||
     typeof raw.server_now !== 'string' ||
@@ -55,10 +52,21 @@ function normalizeStatus(raw: RawPairedStatus): PairedStatus {
   return {
     paired: true,
     displayName: raw.display_name?.trim() || null,
-    state: raw.state,
+    state: normalizeState(raw.state),
     callOkay: raw.call_okay,
     lastSeenAt: raw.last_seen_at,
     serverNow: raw.server_now,
     schemaVersion: raw.schema_version,
   };
+}
+
+function normalizeState(rawState: string | undefined): State {
+  if (
+    rawState === 'available' ||
+    rawState === 'busy' ||
+    rawState === 'unavailable'
+  ) {
+    return rawState;
+  }
+  return 'unavailable';
 }

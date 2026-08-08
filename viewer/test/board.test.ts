@@ -201,4 +201,28 @@ describe('viewer initial hydration', () => {
     expect(element('[data-headline]').textContent).toBe('Alex is in a meeting');
     expect(element('[data-supporting]').textContent).toBe('Better to wait.');
   });
+
+  it.each(['available', 'unavailable'] as const)(
+    'shows the neutral view for %s',
+    async (state) => {
+      mocks.getSession.mockResolvedValue({ data: { session: {} } });
+      mocks.fetchPairedStatus.mockResolvedValue({
+        paired: true,
+        displayName: 'Alex',
+        state,
+        callOkay: true,
+        lastSeenAt: '2026-08-08T05:00:00.000Z',
+        serverNow: '2026-08-08T05:00:01.000Z',
+        schemaVersion: 1,
+      });
+
+      boot();
+      await readOnce();
+
+      expect(element('[data-plate]').dataset.state).toBe('generic');
+      expect(element('[data-headline]').textContent).toBe(
+        'Meeting status unavailable',
+      );
+    },
+  );
 });

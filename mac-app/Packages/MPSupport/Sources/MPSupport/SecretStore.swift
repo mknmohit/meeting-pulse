@@ -6,6 +6,8 @@ public enum CredentialState<Value: Sendable>: Sendable {
   case temporarilyUnavailable
 }
 
+extension CredentialState: Equatable where Value: Equatable {}
+
 public enum SecretKey: String, CaseIterable, Sendable {
   case supabaseRefreshToken
   case deviceRecoveryPhrase

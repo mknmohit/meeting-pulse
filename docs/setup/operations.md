@@ -8,7 +8,6 @@
 4. Drag the app to the Trash.
 5. Remove `~/Library/Application Support/MeetingPulse`.
 6. Remove `~/Library/Logs/MeetingPulse`.
-7. Remove the Keychain items under service `com.techdevix.meetingpulse.auth`.
 
 Deleting local files without deleting remote data leaves the device and viewer
 pairing on the server.
