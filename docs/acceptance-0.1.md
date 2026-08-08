@@ -43,3 +43,9 @@ scenarios remain `NOT RUN`; they are never inferred from unit tests.
 
 The release cannot be called accepted while any required real-device row is
 `NOT RUN`.
+
+Latest automation note: the owner performance script reached the memory
+measurement but macOS refused `footprint` without root privileges. The
+performance row remains `NOT RUN` until that measurement is run with the
+required privilege. The unsigned Release build completed, and the remote
+Supabase migration list includes the persistent-pairing migration.

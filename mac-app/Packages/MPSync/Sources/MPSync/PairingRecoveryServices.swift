@@ -5,13 +5,19 @@ import MPSupport
 public struct PairingCodeResult: Equatable, Sendable {
   public let rawCode: String
   public let displayCode: String
-  public let remoteCodeID: UUID
+  public let remoteCodeID: UUID?
 
-  public init(rawCode: String, remoteCodeID: UUID) {
+  public init(rawCode: String, remoteCodeID: UUID? = nil) {
     self.rawCode = rawCode
     displayCode = PairingCodeFormat.display(rawCode)
     self.remoteCodeID = remoteCodeID
   }
+}
+
+public enum PairingServiceError: Error, Equatable, Sendable {
+  case invalidStoredCode
+  case keychainUnavailable
+  case invalidViewerOrigin
 }
 
 public struct RecoveryRegistration: Equatable, Sendable {
@@ -26,16 +32,62 @@ public struct RecoveryRegistration: Equatable, Sendable {
 
 public struct PairingService: Sendable {
   private let transport: any StatusTransport
+  private let secrets: any SecretStore
 
-  public init(transport: any StatusTransport) {
+  public init(
+    transport: any StatusTransport,
+    secrets: any SecretStore
+  ) {
     self.transport = transport
+    self.secrets = secrets
   }
 
   public func createCode() async throws -> PairingCodeResult {
     let raw = CrockfordBase32.generate(characters: PairingCodeFormat.length)
     let hash = CrockfordBase32.sha256Hex(CrockfordBase32.normalize(raw))
     let remoteID = try await transport.createPairingCode(hash: hash)
+    try secrets.save(Data(raw.utf8), for: .pairingCode)
     return PairingCodeResult(rawCode: raw, remoteCodeID: remoteID)
+  }
+
+  public func storedCode() throws -> PairingCodeResult? {
+    switch try secrets.read(.pairingCode) {
+    case .missing:
+      return nil
+    case .temporarilyUnavailable:
+      throw PairingServiceError.keychainUnavailable
+    case .present(let data):
+      guard
+        let value = String(data: data, encoding: .utf8),
+        CrockfordBase32.normalize(value).count == PairingCodeFormat.length
+      else {
+        throw PairingServiceError.invalidStoredCode
+      }
+      return PairingCodeResult(rawCode: CrockfordBase32.normalize(value))
+    }
+  }
+
+  public func deleteStoredCode() throws {
+    try secrets.delete(.pairingCode)
+  }
+
+  public func link(
+    for code: PairingCodeResult,
+    viewerOrigin: URL
+  ) throws -> URL {
+    guard
+      var components = URLComponents(
+        url: viewerOrigin,
+        resolvingAgainstBaseURL: false
+      )
+    else {
+      throw PairingServiceError.invalidViewerOrigin
+    }
+    components.fragment = "code=\(CrockfordBase32.normalize(code.rawCode))"
+    guard let link = components.url else {
+      throw PairingServiceError.invalidViewerOrigin
+    }
+    return link
   }
 }
 

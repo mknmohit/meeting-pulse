@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isPairingCode, normalizePairingCode } from '../src/lib/pairingCode';
+import {
+  isPairingCode,
+  normalizePairingCode,
+  pairingCodeFromHash,
+} from '../src/lib/pairingCode';
 
 describe('pairing code normalization', () => {
   it('maps confusables before stripping', () => {
@@ -10,5 +14,11 @@ describe('pairing code normalization', () => {
   it('accepts exactly ten canonical characters', () => {
     expect(isPairingCode(['12345', '67890'].join('-'))).toBe(true);
     expect(isPairingCode('1234')).toBe(false);
+  });
+
+  it('reads a valid code from a URL fragment', () => {
+    expect(pairingCodeFromHash('#code=abcde-fghjk')).toBe('ABCDEFGHJK');
+    expect(pairingCodeFromHash('#other=value')).toBeNull();
+    expect(pairingCodeFromHash('#code=1234')).toBeNull();
   });
 });

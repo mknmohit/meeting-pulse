@@ -1,33 +1,24 @@
 export const COPY = {
   board: {
-    available: {
-      headlineWithName: (name: string) => `${name} is free`,
-      headline: 'Free',
-      supporting: 'Go ahead.',
-    },
-    busy: {
-      headlineWithName: (name: string) => `${name} is on a call`,
-      headline: 'On a call',
+    meeting: {
+      headlineWithName: (name: string) => `${name} is in a meeting`,
+      headline: 'In a meeting',
       supporting: 'Better to wait.',
     },
-    callOkay: "He said it's fine to interrupt.",
-    unavailable: {
-      headline: 'No signal',
-      supporting:
-        'His Mac stopped reporting a few minutes ago. This could be wrong either way, so assume he might be busy.',
+    callOkay: {
+      headlineWithName: (name: string) =>
+        `${name} is in Meeting, but it's fine to ring through`,
+      headline: "In Meeting, but it's fine to ring through",
+      supporting: "He said to go ahead and interrupt.",
+    },
+    generic: {
+      headline: 'Meeting status unavailable',
+      supporting: 'Check again before you call.',
+      offlineSupporting: 'Connect to the internet, then check again.',
     },
     unpaired: {
       headline: 'Not connected',
-      supporting: 'Ask him for a code and enter it below.',
-    },
-    offline: {
-      headline: 'No signal',
-      supporting: 'Your phone is offline. This is the last thing we heard.',
-    },
-    schemaTooNew: {
-      headline: 'No signal',
-      supporting:
-        "This page is out of date and can't read the latest status. Reload it.",
+      supporting: 'Open the viewer link or enter the code he shared.',
     },
   },
   rail: {
@@ -42,7 +33,7 @@ export const COPY = {
   },
   pairing: {
     heading: 'Enter the code',
-    lede: 'Ask him for a code from the menu bar. It works once and expires in ten minutes.',
+    lede: 'Ask him for the viewer link or code. The link keeps working until he rotates it.',
     fieldLabel: 'Code',
     button: 'Connect',
     invalid: "That code didn't work. Ask for a fresh one.",

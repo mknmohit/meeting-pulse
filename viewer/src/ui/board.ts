@@ -1,4 +1,4 @@
-import { CONFIG, SUPPORTED_SCHEMA_VERSION } from '../config';
+import { CONFIG } from '../config';
 import { ensureSession } from '../lib/auth';
 import { COPY } from '../lib/copy';
 import {
@@ -8,7 +8,11 @@ import {
   type DisplayState,
   type Reading,
 } from '../lib/freshness';
-import { isPairingCode, normalizePairingCode } from '../lib/pairingCode';
+import {
+  isPairingCode,
+  normalizePairingCode,
+  pairingCodeFromHash,
+} from '../lib/pairingCode';
 import { startPoller } from '../lib/poller';
 import { fetchPairedStatus } from '../lib/status';
 import { supabase } from '../lib/supabase';
@@ -37,13 +41,25 @@ export function boot(): void {
   let lastFetchFailed = false;
   let pairingMessage = '';
   let turnstilePromise: Promise<string> | undefined;
+  let fragmentPairingStarted = false;
+  let initialHydrationComplete = false;
+  let pairingStatus: 'unknown' | 'paired' | 'unpaired' = 'unknown';
 
   const render = (): void => {
+    if (!initialHydrationComplete) {
+      elements.loading.hidden = false;
+      elements.board.hidden = true;
+      elements.pairing.hidden = true;
+      return;
+    }
     const now = performance.now();
-    const display = reading ? effectiveDisplayState(reading, now) : 'unpaired';
+    const display = reading
+      ? effectiveDisplayState(reading, now)
+      : pairingStatus === 'unpaired'
+        ? 'unpaired'
+        : 'generic';
     const status = reading?.status;
-    const offline = !navigator.onLine || lastFetchFailed;
-    elements.offline.hidden = !offline;
+    elements.loading.hidden = true;
     elements.pairing.hidden = display !== 'unpaired';
     elements.board.hidden = display === 'unpaired';
     elements.pairingMessage.textContent = pairingMessage;
@@ -59,9 +75,7 @@ export function boot(): void {
     now: number,
   ): void => {
     const offline = !navigator.onLine || lastFetchFailed;
-    const isSchemaTooNew =
-      status && status.schemaVersion > SUPPORTED_SCHEMA_VERSION;
-    const effective = isSchemaTooNew ? 'unavailable' : display;
+    const effective = display;
     const previous = elements.plate.dataset.state;
     elements.plate.dataset.state = effective;
     if (previous && previous !== effective) {
@@ -70,34 +84,28 @@ export function boot(): void {
       elements.plate.classList.add('is-changing');
     }
     for (const shape of elements.shapes) {
-      shape.hidden =
-        shape.dataset.shape !== shapeFor(effective, status?.callOkay === true);
+      shape.hidden = shape.dataset.shape !== shapeFor(effective);
       shape.style.display = shape.hidden ? 'none' : 'block';
     }
     const name = status?.displayName ?? '';
     elements.name.textContent = name;
     elements.name.hidden = !name;
     elements.plate.dataset.hasName = String(Boolean(name));
-    if (isSchemaTooNew) {
-      elements.headline.textContent = COPY.board.schemaTooNew.headline;
-      elements.supporting.textContent = COPY.board.schemaTooNew.supporting;
-    } else if (effective === 'available') {
+    if (effective === 'meeting') {
       elements.headline.textContent = name
-        ? COPY.board.available.headlineWithName(name)
-        : COPY.board.available.headline;
-      elements.supporting.textContent = COPY.board.available.supporting;
-    } else if (effective === 'busy') {
+        ? COPY.board.meeting.headlineWithName(name)
+        : COPY.board.meeting.headline;
+      elements.supporting.textContent = COPY.board.meeting.supporting;
+    } else if (effective === 'callOkay') {
       elements.headline.textContent = name
-        ? COPY.board.busy.headlineWithName(name)
-        : COPY.board.busy.headline;
-      elements.supporting.textContent = status?.callOkay
-        ? COPY.board.callOkay
-        : COPY.board.busy.supporting;
+        ? COPY.board.callOkay.headlineWithName(name)
+        : COPY.board.callOkay.headline;
+      elements.supporting.textContent = COPY.board.callOkay.supporting;
     } else {
-      elements.headline.textContent = COPY.board.unavailable.headline;
+      elements.headline.textContent = COPY.board.generic.headline;
       elements.supporting.textContent = offline
-        ? COPY.board.offline.supporting
-        : COPY.board.unavailable.supporting;
+        ? COPY.board.generic.offlineSupporting
+        : COPY.board.generic.supporting;
     }
     elements.stateRegion.setAttribute(
       'aria-label',
@@ -113,6 +121,7 @@ export function boot(): void {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) {
+        pairingStatus = 'unpaired';
         reading = null;
         render();
         return;
@@ -120,14 +129,21 @@ export function boot(): void {
       const status = await fetchPairedStatus();
       lastFetchMonotonic = performance.now();
       if (!status.paired) {
+        pairingStatus = 'unpaired';
         reading = null;
       } else {
+        pairingStatus = 'paired';
         reading = readingFromStatus(status, lastFetchMonotonic);
       }
       render();
     } catch {
       lastFetchFailed = true;
       render();
+    } finally {
+      if (!initialHydrationComplete) {
+        initialHydrationComplete = true;
+        render();
+      }
     }
   };
 
@@ -143,10 +159,7 @@ export function boot(): void {
     });
   });
 
-  elements.form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    pairingMessage = '';
-    const raw = elements.code.value;
+  const submitPairing = (raw: string, clearFragment: boolean): void => {
     if (!isPairingCode(raw)) {
       pairingMessage = COPY.pairing.invalid;
       render();
@@ -156,6 +169,9 @@ export function boot(): void {
     elements.submit.textContent = COPY.rail.checking;
     void connect(raw)
       .then(() => {
+        if (clearFragment) {
+          clearPairingFragment();
+        }
         elements.pairingMessage.textContent = '';
         void read();
       })
@@ -172,6 +188,12 @@ export function boot(): void {
         elements.submit.disabled = false;
         elements.submit.textContent = COPY.pairing.button;
       });
+  };
+
+  elements.form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    pairingMessage = '';
+    submitPairing(elements.code.value, false);
   });
 
   const ticker = window.setInterval(render, 1_000);
@@ -181,8 +203,13 @@ export function boot(): void {
   });
 
   async function connect(rawCode: string): Promise<void> {
-    const token = await getTurnstileToken();
-    await ensureSession(token);
+    const { data: session } = await supabase.auth.getSession();
+    if (session.session) {
+      await ensureSession();
+    } else {
+      const token = await getTurnstileToken();
+      await ensureSession(token);
+    }
     const { data, error } = await supabase.rpc('claim_pairing_code', {
       p_code: normalizePairingCode(rawCode),
     });
@@ -207,6 +234,8 @@ export function boot(): void {
 
   async function loadTurnstile(): Promise<string> {
     const holder = elements.turnstile;
+    elements.pairingMessage.textContent = COPY.rail.checking;
+    holder.hidden = false;
     const script = document.createElement('script');
     script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
     script.async = true;
@@ -239,20 +268,45 @@ export function boot(): void {
     });
   }
 
+  const submitFragmentPairing = (): void => {
+    if (fragmentPairingStarted) {
+      return;
+    }
+    const fragmentCode = pairingCodeFromHash(window.location.hash);
+    if (!fragmentCode) {
+      return;
+    }
+    fragmentPairingStarted = true;
+    elements.code.value = fragmentCode;
+    submitPairing(fragmentCode, true);
+  };
+
+  window.addEventListener('hashchange', submitFragmentPairing);
   render();
+  submitFragmentPairing();
 }
 
 class RateLimitedError extends Error {}
 
-function shapeFor(state: DisplayState, callOkay: boolean): string {
-  if (state === 'available') return 'disc';
-  if (state === 'busy' && callOkay) return 'pennant';
-  if (state === 'busy') return 'cone';
+function shapeFor(state: DisplayState): string {
+  if (state === 'meeting') {
+    return 'cone';
+  }
+  if (state === 'callOkay') {
+    return 'pennant';
+  }
   return 'mast';
+}
+
+function clearPairingFragment(): void {
+  const url = new URL(window.location.href);
+  url.hash = '';
+  window.history.replaceState(null, '', url);
 }
 
 function getElements() {
   const root = document.querySelector<HTMLElement>('[data-viewer]');
+  const loading = document.querySelector<HTMLElement>('[data-loading]');
   const board = document.querySelector<HTMLElement>('[data-board]');
   const pairing = document.querySelector<HTMLElement>('[data-pairing]');
   const plate = document.querySelector<HTMLElement>('[data-plate]');
@@ -264,7 +318,6 @@ function getElements() {
   const supporting = document.querySelector<HTMLElement>('[data-supporting]');
   const checked = document.querySelector<HTMLElement>('[data-checked]');
   const refresh = document.querySelector<HTMLButtonElement>('[data-refresh]');
-  const offline = document.querySelector<HTMLElement>('[data-offline]');
   const form = document.querySelector<HTMLFormElement>('[data-pairing-form]');
   const code = document.querySelector<HTMLInputElement>('[data-code]');
   const submit = document.querySelector<HTMLButtonElement>('[data-connect]');
@@ -275,6 +328,7 @@ function getElements() {
   const shapes = [...document.querySelectorAll<HTMLElement>('[data-shape]')];
   if (
     !root ||
+    !loading ||
     !board ||
     !pairing ||
     !plate ||
@@ -284,7 +338,6 @@ function getElements() {
     !supporting ||
     !checked ||
     !refresh ||
-    !offline ||
     !form ||
     !code ||
     !submit ||
@@ -295,6 +348,7 @@ function getElements() {
   }
   return {
     root,
+    loading,
     board,
     pairing,
     plate,
@@ -304,7 +358,6 @@ function getElements() {
     supporting,
     checked,
     refresh,
-    offline,
     form,
     code,
     submit,

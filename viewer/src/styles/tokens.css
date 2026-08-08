@@ -5,6 +5,8 @@
   --plate-clear-rim: #0a4534;
   --plate-storm: #8c2a22;
   --plate-storm-rim: #5e1a14;
+  --plate-amber: #c97a1f;
+  --plate-amber-rim: #7d4a14;
   --plate-bare: #3a4247;
   --plate-bare-rim: #272d31;
   --paint-white: #f2efe8;
@@ -19,7 +21,9 @@
   --type-lede: 1.125rem;
   --type-body: 1rem;
   --type-chalk: 0.875rem;
+  --type-name: clamp(0.8125rem, 2.4cqw, 1.0625rem);
   --track-state: -0.03em;
+  --track-name: 0.22em;
 }
 
 @media (prefers-color-scheme: light) {
@@ -28,6 +32,7 @@
     --ground-rail: #d6d1c6;
     --plate-clear: #14785a;
     --plate-storm: #a8352b;
+    --plate-amber: #d98a2a;
     --plate-bare: #8a9094;
     --chalk: #3a403e;
   }

@@ -16,3 +16,14 @@ export function normalizePairingCode(value: string): string {
 export function isPairingCode(value: string): boolean {
   return normalizePairingCode(value).length === 10;
 }
+
+export function pairingCodeFromHash(hash: string): string | null {
+  if (!hash.startsWith('#')) {
+    return null;
+  }
+  const value = new URLSearchParams(hash.slice(1)).get('code');
+  if (!value || !isPairingCode(value)) {
+    return null;
+  }
+  return normalizePairingCode(value);
+}

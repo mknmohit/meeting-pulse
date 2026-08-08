@@ -9,7 +9,9 @@ struct AppConfigurationTests {
       try AppConfiguration(
         supabaseHost: nil,
         supabaseAnonKey: "one.two.three",
-        turnstileSiteKey: "site-key"
+        turnstileSiteKey: "site-key",
+        viewerScheme: "https",
+        viewerHosts: "viewer.example.com"
       )
     }
   }
@@ -20,7 +22,9 @@ struct AppConfigurationTests {
       try AppConfiguration(
         supabaseHost: "   ",
         supabaseAnonKey: "one.two.three",
-        turnstileSiteKey: "site-key"
+        turnstileSiteKey: "site-key",
+        viewerScheme: "https",
+        viewerHosts: "viewer.example.com"
       )
     }
   }
@@ -31,7 +35,9 @@ struct AppConfigurationTests {
       try AppConfiguration(
         supabaseHost: "YOUR_PROJECT_REF.supabase.co",
         supabaseAnonKey: "one.two.three",
-        turnstileSiteKey: "site-key"
+        turnstileSiteKey: "site-key",
+        viewerScheme: "https",
+        viewerHosts: "viewer.example.com"
       )
     }
   }
@@ -47,7 +53,9 @@ struct AppConfigurationTests {
       try AppConfiguration(
         supabaseHost: "http://not-supabase.test",
         supabaseAnonKey: "one.two.three",
-        turnstileSiteKey: "site-key"
+        turnstileSiteKey: "site-key",
+        viewerScheme: "https",
+        viewerHosts: "viewer.example.com"
       )
     }
   }
@@ -63,7 +71,9 @@ struct AppConfigurationTests {
       try AppConfiguration(
         supabaseHost: "project123456.supabase.co",
         supabaseAnonKey: "not-a-jwt",
-        turnstileSiteKey: "site-key"
+        turnstileSiteKey: "site-key",
+        viewerScheme: "https",
+        viewerHosts: "viewer.example.com"
       )
     }
   }
@@ -73,9 +83,63 @@ struct AppConfigurationTests {
     let configuration = try AppConfiguration(
       supabaseHost: "project123456.supabase.co",
       supabaseAnonKey: "one.two.three",
-      turnstileSiteKey: "site-key"
+      turnstileSiteKey: "site-key",
+      viewerScheme: "https",
+      viewerHosts: "viewer.example.com"
     )
     #expect(configuration.supabaseURL.absoluteString == "https://project123456.supabase.co")
+  }
+
+  @Test
+  func viewerOriginsUseConfiguredSchemeAndHosts() throws {
+    let configuration = try AppConfiguration(
+      supabaseHost: "project123456.supabase.co",
+      supabaseAnonKey: "one.two.three",
+      turnstileSiteKey: "site-key",
+      viewerScheme: "http",
+      viewerHosts: "127.0.0.1:4321, viewer.example.com"
+    )
+    #expect(
+      configuration.viewerOrigins.map(\.absoluteString)
+        == ["http://127.0.0.1:4321", "http://viewer.example.com"]
+    )
+  }
+
+  @Test
+  func viewerHostsRejectQueryStrings() {
+    #expect(
+      throws: AppConfiguration.ConfigurationError.malformed(
+        key: "MP_VIEWER_HOSTS",
+        expected: "comma-separated hosts without schemes, queries, or fragments"
+      )
+    ) {
+      try AppConfiguration(
+        supabaseHost: "project123456.supabase.co",
+        supabaseAnonKey: "one.two.three",
+        turnstileSiteKey: "site-key",
+        viewerScheme: "https",
+        viewerHosts: "viewer.example.com?code=secret"
+      )
+    }
+
+  }
+
+  @Test
+  func duplicateViewerHostsFailClosed() {
+    #expect(
+      throws: AppConfiguration.ConfigurationError.malformed(
+        key: "MP_VIEWER_HOSTS",
+        expected: "unique viewer hosts"
+      )
+    ) {
+      try AppConfiguration(
+        supabaseHost: "project123456.supabase.co",
+        supabaseAnonKey: "one.two.three",
+        turnstileSiteKey: "site-key",
+        viewerScheme: "https",
+        viewerHosts: "viewer.example.com,viewer.example.com"
+      )
+    }
   }
 
   @Test
@@ -83,7 +147,9 @@ struct AppConfigurationTests {
     _ = try AppConfiguration(
       supabaseHost: "project123456.supabase.co",
       supabaseAnonKey: "sb_publishable_ci_key",
-      turnstileSiteKey: "site-key"
+      turnstileSiteKey: "site-key",
+      viewerScheme: "https",
+      viewerHosts: "viewer.example.com"
     )
   }
 }

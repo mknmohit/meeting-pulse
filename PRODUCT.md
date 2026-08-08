@@ -82,7 +82,7 @@ Fixed vocabulary. The same word means the same thing in the app, the page, the d
 | Available / Busy / Status unavailable | The only three states the viewer ever sees |
 | Call okay | The owner's flag that calling is fine despite being busy |
 | Override | A manual Busy or Available set by the owner, with an expiry |
-| Pairing code | The 10-character code that links one viewer to one owner, once |
+| Pairing code | The 10-character code that links one viewer to one owner until the owner rotates or revokes it |
 | Recovery phrase | The 26-character secret that reattaches a device after local identity loss |
 | Stale | Last heartbeat older than three minutes, which renders as Status unavailable |
 

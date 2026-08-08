@@ -9,7 +9,8 @@ struct PairingRecoveryTests {
   @Test
   func pairingServiceHashesOnlyTheNormalizedCode() async throws {
     let transport = FakeTransport()
-    let service = PairingService(transport: transport)
+    let secrets = InMemorySecrets()
+    let service = PairingService(transport: transport, secrets: secrets)
     let result = try await service.createCode()
 
     #expect(result.rawCode.count == PairingCodeFormat.length)
@@ -19,6 +20,23 @@ struct PairingRecoveryTests {
         == CrockfordBase32.sha256Hex(
           CrockfordBase32.normalize(result.rawCode)
         ))
+    #expect(try service.storedCode()?.rawCode == result.rawCode)
+    #expect(try service.storedCode()?.displayCode == result.displayCode)
+  }
+
+  @Test
+  func pairingServiceBuildsFragmentLink() async throws {
+    let transport = FakeTransport()
+    let secrets = InMemorySecrets()
+    let service = PairingService(transport: transport, secrets: secrets)
+    let result = try await service.createCode()
+
+    let link = try service.link(
+      for: result,
+      viewerOrigin: URL(string: "https://viewer.example.com/")!
+    )
+
+    #expect(link.fragment == "code=\(result.rawCode)")
   }
 
   @Test

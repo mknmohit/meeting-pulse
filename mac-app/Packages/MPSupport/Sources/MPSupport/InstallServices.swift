@@ -21,6 +21,10 @@ public struct InstallLocation: Sendable {
 public struct LoginItem: Sendable {
   public init() {}
 
+  public var isEnabled: Bool {
+    SMAppService.mainApp.status == .enabled
+  }
+
   @discardableResult
   public func register() throws -> SMAppService.Status {
     let service = SMAppService.mainApp

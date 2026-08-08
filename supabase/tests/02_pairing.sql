@@ -1,6 +1,6 @@
 begin;
 
-select plan(6);
+select plan(9);
 
 create temporary table fixture (
   owner_id uuid,
@@ -27,12 +27,32 @@ select tests.become((select viewer_id from fixture));
 select is(
   public.claim_pairing_code(concat('123', '45', '678', '90')),
   '{"ok": true}'::jsonb,
-  'valid code claims exactly once'
+  'valid persistent code claims'
 );
 select is(
   public.claim_pairing_code(concat('123', '45', '678', '90')),
+  '{"ok": true}'::jsonb,
+  'persistent code can be reused'
+);
+select is(
+  (tests.code_expiry(
+    'c775e7b757ede630cd0aa1113bd102661ab38829ca52a6422ab782862f268646'
+  ) is null),
+  true,
+  'persistent code has no expiry'
+);
+
+select tests.become((select owner_id from fixture));
+select is(
+  public.rotate_pairing_codes(),
+  1,
+  'rotation revokes the active code'
+);
+select tests.become((select viewer_id from fixture));
+select is(
+  public.claim_pairing_code(concat('123', '45', '678', '90')),
   '{"ok": false, "reason": "invalid_code"}'::jsonb,
-  'already claimed code is generic'
+  'rotated code is generic'
 );
 
 select tests.become((select owner_id from fixture));
@@ -63,6 +83,7 @@ select is(
   'expired code is generic'
 );
 
+select tests.advance_user_window((select viewer_id from fixture));
 select is(
   public.claim_pairing_code(concat('not', 'a-code')),
   '{"ok": false, "reason": "invalid_code"}'::jsonb,

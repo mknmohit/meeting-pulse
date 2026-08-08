@@ -9,30 +9,34 @@ import '../styles/board.css';
 
 <Base>
   <main class="station" data-viewer>
+    <section class="loading" data-loading role="status" aria-live="polite">
+      <div class="loading__content" aria-hidden="true">
+        <div class="loading__shape"></div>
+        <div class="loading__headline"></div>
+        <div class="loading__supporting"></div>
+      </div>
+      <p class="visually-hidden">Checking connection.</p>
+    </section>
+
     <section class="board" data-board hidden>
-      <div class="plate" data-plate data-state="unavailable">
+      <div class="plate" data-plate data-state="generic">
         <div class="plate__content" data-state-region aria-live="polite">
           <p class="plate__name" data-name></p>
           <div class="plate__shape" aria-hidden="true">
-            <svg data-shape="disc" viewBox="0 0 120 180">
-              <path d="M60 176V52" />
-              <circle cx="60" cy="34" r="24" />
-            </svg>
             <svg data-shape="cone" viewBox="0 0 120 180">
               <path d="M60 18 28 74h64L60 18Z" />
               <path d="M60 74v102M32 132h56" />
             </svg>
-            <svg data-shape="pennant" viewBox="0 0 120 180">
-              <path d="M60 18 28 74h64L60 18Z" />
-              <path d="M60 74v76M32 116h56" />
-              <path d="M60 150h34l-17 14-17-14Z" />
-            </svg>
             <svg data-shape="mast" viewBox="0 0 120 180">
               <path d="M60 18v158M24 64h72M36 64v22M84 64v22" />
             </svg>
+            <svg data-shape="pennant" viewBox="0 0 120 180">
+              <path d="M60 18v158" />
+              <path d="M60 30 100 50 60 70Z" />
+            </svg>
           </div>
-          <h1 class="plate__headline" data-headline>{COPY.board.unavailable.headline}</h1>
-          <p class="plate__supporting" data-supporting>{COPY.board.unavailable.supporting}</p>
+          <h1 class="plate__headline" data-headline>{COPY.board.generic.headline}</h1>
+          <p class="plate__supporting" data-supporting>{COPY.board.generic.supporting}</p>
         </div>
       </div>
       <div class="rail">
@@ -41,7 +45,7 @@ import '../styles/board.css';
       </div>
     </section>
 
-    <section class="pairing" data-pairing>
+    <section class="pairing" data-pairing hidden>
       <div class="pairing__content">
         <h1>{COPY.pairing.heading}</h1>
         <p>{COPY.pairing.lede}</p>
@@ -61,10 +65,9 @@ import '../styles/board.css';
           <button class="pairing__button" type="submit" data-connect>{COPY.pairing.button}</button>
           <p class="pairing__message" data-pairing-message aria-live="polite"></p>
         </form>
-        <div class="visually-hidden" data-turnstile aria-hidden="true"></div>
+        <div class="turnstile-holder" data-turnstile></div>
       </div>
     </section>
-    <p class="offline" data-offline hidden>{COPY.pairing.offline}</p>
   </main>
   <script>
     import { boot } from '../ui/board';

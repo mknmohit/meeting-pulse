@@ -130,8 +130,16 @@ private func makeNode(
     throw AXSnapshotError.treeTooLarge
   }
   elementCount += 1
-  let role = attribute(element, kAXRoleAttribute as String, scanCompleted: &scanCompleted)
-  let subrole = attribute(element, kAXSubroleAttribute as String, scanCompleted: &scanCompleted)
+  let role = attribute(
+    element,
+    kAXRoleAttribute as String,
+    scanCompleted: &scanCompleted
+  )
+  let subrole = attribute(
+    element,
+    kAXSubroleAttribute as String,
+    scanCompleted: &scanCompleted
+  )
   let roleDescription = attribute(
     element,
     kAXRoleDescriptionAttribute as String,
@@ -142,14 +150,26 @@ private func makeNode(
     kAXIdentifierAttribute as String,
     scanCompleted: &scanCompleted
   )
-  let title = attribute(element, kAXTitleAttribute as String, scanCompleted: &scanCompleted)
+  let title = attribute(
+    element,
+    kAXTitleAttribute as String,
+    scanCompleted: &scanCompleted
+  )
   let description = attribute(
     element,
     kAXDescriptionAttribute as String,
     scanCompleted: &scanCompleted
   )
-  let value = attribute(element, kAXValueAttribute as String, scanCompleted: &scanCompleted)
-  let help = attribute(element, kAXHelpAttribute as String, scanCompleted: &scanCompleted)
+  let value = attribute(
+    element,
+    kAXValueAttribute as String,
+    scanCompleted: &scanCompleted
+  )
+  let help = attribute(
+    element,
+    kAXHelpAttribute as String,
+    scanCompleted: &scanCompleted
+  )
   let enabled = boolAttribute(
     element,
     kAXEnabledAttribute as String,
@@ -161,7 +181,11 @@ private func makeNode(
     scanCompleted: &scanCompleted
   )
   let childrenResult = copyAttribute(element, kAXChildrenAttribute as String)
-  if childrenResult.0 != .success {
+  if childrenResult.0 != .success
+    && childrenResult.0 != .noValue
+    && childrenResult.0 != .attributeUnsupported
+    && !benignChildrenFailure(role: stringValue(role), error: childrenResult.0)
+  {
     scanCompleted = false
   }
   let childElements = (childrenResult.1 as? [AXUIElement]) ?? []
@@ -226,6 +250,19 @@ private func boolAttribute(
   scanCompleted: inout Bool
 ) -> Bool? {
   (attribute(element, key, scanCompleted: &scanCompleted) as? NSNumber)?.boolValue
+}
+
+private func benignChildrenFailure(role: String?, error: AXError) -> Bool {
+  guard error == .failure else {
+    return false
+  }
+  // Chrome exposes these leaf roles without a readable AXChildren value.
+  switch role {
+  case "AXButton", "AXColumn", "AXTextField":
+    return true
+  default:
+    return false
+  }
 }
 
 private func stringValue(_ value: CFTypeRef?) -> String? {

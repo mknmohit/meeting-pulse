@@ -24,17 +24,42 @@ function reading(
 }
 
 describe('server-time freshness', () => {
+  it('shows the meeting state only for a fresh busy reading', () => {
+    expect(effectiveDisplayState(reading({ state: 'busy' }), 1_000)).toBe(
+      'meeting',
+    );
+    expect(effectiveDisplayState(reading(), 1_000)).toBe('generic');
+    expect(
+      effectiveDisplayState(reading({ state: 'unavailable' }), 1_000),
+    ).toBe('generic');
+  });
+
+  it('shows the call-okay state when busy and call_okay is true', () => {
+    expect(
+      effectiveDisplayState(
+        reading({ state: 'busy', callOkay: true }),
+        1_000,
+      ),
+    ).toBe('callOkay');
+    expect(
+      effectiveDisplayState(
+        reading({ state: 'busy', callOkay: false }),
+        1_000,
+      ),
+    ).toBe('meeting');
+  });
+
   it('ignores the browser wall clock', () => {
     const value = reading();
-    expect(effectiveDisplayState(value, 1_000)).toBe('available');
-    expect(effectiveDisplayState(value, 121_001)).toBe('unavailable');
+    expect(effectiveDisplayState(value, 1_000)).toBe('generic');
+    expect(effectiveDisplayState(value, 121_001)).toBe('generic');
   });
 
   it('ages while later fetches fail', () => {
     const value = reading();
     expect(currentAgeSeconds(value, 2_000)).toBe(61);
-    expect(effectiveDisplayState(value, 121_000)).toBe('available');
-    expect(effectiveDisplayState(value, 122_000)).toBe('unavailable');
+    expect(effectiveDisplayState(value, 121_000)).toBe('generic');
+    expect(effectiveDisplayState(value, 122_000)).toBe('generic');
   });
 
   it('fails closed on malformed or negative age', () => {
@@ -45,7 +70,7 @@ describe('server-time freshness', () => {
         }),
         1_000,
       ),
-    ).toBe('unavailable');
+    ).toBe('generic');
     expect(
       effectiveDisplayState(
         reading({
@@ -53,14 +78,14 @@ describe('server-time freshness', () => {
         }),
         1_000,
       ),
-    ).toBe('unavailable');
+    ).toBe('generic');
   });
 
   it('fails closed on a newer schema and stale boundary', () => {
     expect(effectiveDisplayState(reading({ schemaVersion: 2 }), 1_000)).toBe(
-      'unavailable',
+      'generic',
     );
-    expect(effectiveDisplayState(reading(), 121_000)).toBe('available');
-    expect(effectiveDisplayState(reading(), 122_000)).toBe('unavailable');
+    expect(effectiveDisplayState(reading(), 121_000)).toBe('generic');
+    expect(effectiveDisplayState(reading(), 122_000)).toBe('generic');
   });
 });

@@ -4,6 +4,7 @@ public struct AppConfiguration: Sendable, Equatable {
   public let supabaseURL: URL
   public let supabaseAnonKey: String
   public let turnstileSiteKey: String
+  public let viewerOrigins: [URL]
 
   public enum ConfigurationError: Error, CustomStringConvertible, Equatable {
     case missing(key: String)
@@ -28,11 +29,15 @@ public struct AppConfiguration: Sendable, Equatable {
   public init(
     supabaseHost: String?,
     supabaseAnonKey: String?,
-    turnstileSiteKey: String?
+    turnstileSiteKey: String?,
+    viewerScheme: String?,
+    viewerHosts: String?
   ) throws {
     let host = try Self.required("MP_SUPABASE_HOST", supabaseHost)
     let anonKey = try Self.required("MP_SUPABASE_ANON_KEY", supabaseAnonKey)
     let turnstileKey = try Self.required("MP_TURNSTILE_SITE_KEY", turnstileSiteKey)
+    let viewerSchemeValue = try Self.required("MP_VIEWER_SCHEME", viewerScheme)
+    let viewerHostsValue = try Self.required("MP_VIEWER_HOSTS", viewerHosts)
 
     if host.contains("YOUR_") {
       throw ConfigurationError.placeholder(key: "MP_SUPABASE_HOST")
@@ -45,6 +50,10 @@ public struct AppConfiguration: Sendable, Equatable {
     }
 
     let url = try Self.supabaseURL(from: host)
+    let viewerURLs = try Self.viewerURLs(
+      scheme: viewerSchemeValue,
+      hosts: viewerHostsValue
+    )
     guard Self.isJWTShape(anonKey) else {
       throw ConfigurationError.malformed(
         key: "MP_SUPABASE_ANON_KEY",
@@ -55,13 +64,16 @@ public struct AppConfiguration: Sendable, Equatable {
     self.supabaseURL = url
     self.supabaseAnonKey = anonKey
     self.turnstileSiteKey = turnstileKey
+    self.viewerOrigins = viewerURLs
   }
 
   public static func load(bundle: Bundle = .main) throws -> AppConfiguration {
     try AppConfiguration(
       supabaseHost: bundle.object(forInfoDictionaryKey: "MPSupabaseHost") as? String,
       supabaseAnonKey: bundle.object(forInfoDictionaryKey: "MPSupabaseAnonKey") as? String,
-      turnstileSiteKey: bundle.object(forInfoDictionaryKey: "MPTurnstileSiteKey") as? String
+      turnstileSiteKey: bundle.object(forInfoDictionaryKey: "MPTurnstileSiteKey") as? String,
+      viewerScheme: bundle.object(forInfoDictionaryKey: "MPViewerScheme") as? String,
+      viewerHosts: bundle.object(forInfoDictionaryKey: "MPViewerHosts") as? String
     )
   }
 
@@ -112,5 +124,51 @@ public struct AppConfiguration: Sendable, Equatable {
         of: #"^sb_publishable_[A-Za-z0-9_-]+$"#,
         options: .regularExpression
       ) != nil
+  }
+
+  private static func viewerURLs(scheme: String, hosts: String) throws -> [URL] {
+    let normalizedScheme = scheme.lowercased()
+    guard
+      normalizedScheme == "http" || normalizedScheme == "https"
+    else {
+      throw ConfigurationError.malformed(
+        key: "MP_VIEWER_SCHEME",
+        expected: "http or https"
+      )
+    }
+
+    let entries = hosts.split(separator: ",", omittingEmptySubsequences: false)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    guard !entries.isEmpty, entries.allSatisfy({ !$0.isEmpty }) else {
+      throw ConfigurationError.malformed(
+        key: "MP_VIEWER_HOSTS",
+        expected: "a comma-separated list of non-empty hosts"
+      )
+    }
+
+    var urls = [URL]()
+    for host in entries {
+      guard
+        !host.contains("://"),
+        let url = URL(string: "\(normalizedScheme)://\(host)"),
+        url.host != nil,
+        url.query == nil,
+        url.fragment == nil
+      else {
+        throw ConfigurationError.malformed(
+          key: "MP_VIEWER_HOSTS",
+          expected: "comma-separated hosts without schemes, queries, or fragments"
+        )
+      }
+      urls.append(url)
+    }
+
+    guard Set(urls.map { $0.absoluteString.lowercased() }).count == urls.count else {
+      throw ConfigurationError.malformed(
+        key: "MP_VIEWER_HOSTS",
+        expected: "unique viewer hosts"
+      )
+    }
+    return urls
   }
 }

@@ -15,8 +15,12 @@ export function startPoller(options: PollerOptions): {
   let stopped = false;
   let inFlight: Promise<void> | undefined;
 
-  const tick = async (): Promise<void> => {
-    if (stopped || !isActive() || inFlight) {
+  const tick = async (force = false): Promise<void> => {
+    if (stopped || (!force && !isActive())) {
+      return;
+    }
+    if (inFlight) {
+      await inFlight;
       return;
     }
     inFlight = options.onTick().finally(() => {
@@ -38,8 +42,8 @@ export function startPoller(options: PollerOptions): {
     }, options.intervalMs);
   };
 
-  const activate = async (): Promise<void> => {
-    await tick();
+  const activate = async (force = false): Promise<void> => {
+    await tick(force);
     schedule();
   };
   const onVisibility = (): void => {
@@ -54,7 +58,7 @@ export function startPoller(options: PollerOptions): {
   window.addEventListener('pagehide', schedule);
   window.addEventListener('online', onVisibility);
   window.addEventListener('offline', schedule);
-  void activate();
+  void activate(true);
 
   return {
     stop: () => {
@@ -70,7 +74,7 @@ export function startPoller(options: PollerOptions): {
       window.removeEventListener('offline', schedule);
     },
     refreshNow: async () => {
-      await tick();
+      await tick(true);
       schedule();
     },
   };

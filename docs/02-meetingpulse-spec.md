@@ -75,16 +75,17 @@ call_okay  : boolean                                        -- required, default
 - `busy` — the owner is confirmed to be in a detected meeting, **or** has manually set Busy.
 - `unavailable` — the app cannot provide a fresh, trustworthy state. Rendered to the viewer as **"Status unavailable"**.
 
-`call_okay` is **independent** of `state`. It is published always and **rendered only when `state == "busy"`**, as a small "You can call" note. It is never rendered when the state is `available` (redundant) or `unavailable` (untrustworthy).
+`call_okay` is **independent** of `state`. It is published always for the
+owner app and remains hidden from the viewer.
 
-The viewer therefore has four possible renderings, not four states:
+The viewer has two paired renderings, while the owner app retains the full
+internal state model:
 
-| `state` | `call_okay` | Viewer shows |
-|---|---|---|
-| `available` | any | **Available** |
-| `busy` | `false` | **Busy** |
-| `busy` | `true` | **Busy** + "You can call" |
-| `unavailable` | any | **Status unavailable** + explanation |
+| `state` | Viewer shows |
+|---|---|
+| `busy` | **In a meeting** |
+| `available` | **Meeting status unavailable** |
+| `unavailable` | **Meeting status unavailable** |
 
 ### 4.2 Owner first run
 
@@ -109,7 +110,7 @@ Meeting Pulse does **not** request Screen Recording. A diagnostic message must s
 - `Call okay` toggle (checkable).
 - `Refresh and publish now` — **owner-side**: takes an immediate local detector sample, recomputes the effective state, and publishes it. (The viewer's `Refresh now` is unrelated: it re-reads the last published row and cannot wake or command the Mac.)
 - `Edit display name…`.
-- `Pairing` ▸ create code · copy code · rotate codes · revoke viewer · revoke all viewers.
+- `Pairing` ▸ create viewer link · copy code/link · rotate viewer link · revoke viewer · revoke all viewers.
 - `Recovery` ▸ show recovery phrase · rebind this device…
 - Detector health for Google Meet and Slack Huddles.
 - Last successful sync time.
@@ -124,9 +125,10 @@ Meeting Pulse does **not** request Screen Recording. A diagnostic message must s
 A small responsive Astro static build with TypeScript, hosted on Cloudflare Pages at a configurable custom subdomain. The personal deployment origin used in documentation examples is `https://og.techdevix.com`; this value is **build-time configuration**, never a source-code default (§5.6).
 
 **First visit**
-1. The viewer enters the pairing code.
+1. The viewer opens the shared viewer link, or enters the pairing code.
 2. The page solves a Cloudflare **Turnstile** challenge and creates or restores an anonymous Supabase Auth session. *(Turnstile is new — audit A5.)*
-3. The page claims the code through the protected `claim_pairing_code` RPC.
+3. The page claims the persistent code through the protected
+   `claim_pairing_code` RPC and removes the URL fragment after success.
 4. The resulting viewer session persists in browser storage.
 
 **Returning visit**
@@ -138,9 +140,8 @@ A small responsive Astro static build with TypeScript, hosted on Cloudflare Page
 6. `Refresh now` triggers an immediate fetch regardless of the timer.
 
 **The page shows**
-- Large state label: Available, Busy, or Status unavailable.
+- Large state label: In a meeting or Meeting status unavailable.
 - Owner display name above the state, when configured and non-blank.
-- A small "You can call" note when `busy` and `call_okay`.
 - Last checked time (derived from a monotonic local timer, §9.3).
 - `Refresh now` button.
 - A clear explanation when the state is unavailable, when the pairing is revoked, or when the browser is offline.
@@ -213,7 +214,9 @@ At launch, enumerate `NSRunningApplication.runningApplications(withBundleIdentif
 
 All deployment-specific values are supplied through configuration and never hardcoded.
 
-**macOS app** reads `SUPABASE_URL` and the public anon/publishable key from an ignored local `Config.xcconfig` or CI build settings. Commit only `Config.xcconfig.example` with placeholders.
+**macOS app** reads the Supabase host, public anon/publishable key, Turnstile
+site key, and viewer scheme/host list from an ignored local `Config.xcconfig`
+or CI build settings. Commit only `Config.xcconfig.example` with placeholders.
 
 **Viewer** reads, at build time:
 
@@ -486,7 +489,7 @@ pairing_codes
   id            uuid primary key default gen_random_uuid()
   device_id     uuid not null references devices(id) on delete cascade
   code_hash     text not null unique          -- sha256 hex of the normalized code
-  expires_at    timestamptz not null
+  expires_at    timestamptz null                 -- NULL for the active persistent code
   claimed_at    timestamptz null
   revoked_at    timestamptz null
   created_at    timestamptz not null default now()
@@ -525,9 +528,9 @@ pairing_attempts_global                        -- internal; single row, id = tru
 1. The Mac authenticates anonymously.
 2. The Mac calls `register_device(recovery_hash)` if it has no device.
 3. The Mac generates a high-entropy code locally, sends only `sha256(normalize(code))` to `create_pairing_code`.
-4. The owner conveys the raw code to the viewer out of band.
+4. The owner shares the raw code directly or inside a viewer URL fragment.
 5. The viewer authenticates anonymously (Turnstile-gated) and calls `claim_pairing_code(raw_code)`.
-6. The RPC normalizes, hashes, looks up, verifies expiry/claim/revocation, applies the three-layer throttle, links the viewer to the device, marks the code claimed, and returns success. **It does not return the device id** to the client.
+6. The RPC normalizes, hashes, looks up, verifies expiry/revocation, applies the three-layer throttle, links the viewer to the device, records the first claim, and returns success. **It does not return the device id** to the client. A persistent code remains reusable until the owner rotates or revokes it.
 7. The owner publishes via `publish_status`; the viewer reads via `get_paired_status`.
 
 **The raw code is never stored in Postgres and never logged.**
@@ -541,8 +544,8 @@ All are `SECURITY DEFINER`, `SET search_path = public, pg_temp`, and revoke `EXE
 | `register_device` | owner | `(p_recovery_hash text)` | `uuid` | Idempotent per owner; errors if an active device exists |
 | `publish_status` | owner | `(p_state text, p_call_okay boolean, p_override_mode text, p_override_expires_at timestamptz, p_screen_sharing text)` | `timestamptz` (`last_seen_at`) | Upsert; validates enums; `last_seen_at = updated_at = now()`; used for both changes and heartbeats |
 | `update_device_profile` | owner | `(p_display_name text)` | `void` | Trims, enforces ≤ 80, rejects control characters; accepts no other column |
-| `create_pairing_code` | owner | `(p_code_hash text, p_ttl_seconds integer default 600)` | `uuid` | Revokes the owner's other unclaimed codes first |
-| `rotate_pairing_codes` | owner | `()` | `integer` | Revokes all unclaimed codes; returns the count |
+| `create_pairing_code` | owner | `(p_code_hash text)` | `uuid` | Revokes the owner's other active codes first |
+| `rotate_pairing_codes` | owner | `()` | `integer` | Revokes all active codes and viewer bindings; returns the code count |
 | `revoke_viewer` | owner | `(p_viewer_user_id uuid)` | `void` | |
 | `revoke_all_viewers` | owner | `()` | `integer` | |
 | `list_viewers` | owner | `()` | `setof (viewer_user_id uuid, created_at timestamptz, revoked_at timestamptz)` | For the menu-bar revoke UI |
@@ -561,7 +564,10 @@ All are `SECURITY DEFINER`, `SET search_path = public, pg_temp`, and revoke `EXE
 
 **Hashing:** `sha256` hex of the normalized code. A fast hash is correct here — 50 bits of entropy makes offline brute force infeasible, and a slow KDF would add RPC latency for no gain.
 
-**Lifetime:** 10 minutes, single use. Creating a new code revokes the owner's outstanding unclaimed codes.
+**Lifetime:** A code remains active until the owner manually rotates or
+revokes it. Creating a replacement revokes the previous active code. A
+successful claim records `claimed_at` for audit purposes but does not consume a
+persistent code.
 
 **Three-layer throttle.** All windows are **fixed 15-minute tumbling windows**: on an attempt, if `now() - window_started_at >= interval`, reset `window_started_at = now()` and the counter to 0, then increment (audit B15).
 
@@ -573,7 +579,11 @@ All are `SECURITY DEFINER`, `SET search_path = public, pg_temp`, and revoke `EXE
 
 **Turnstile.** Anonymous sign-in requires a Cloudflare Turnstile token (native Supabase Auth support), which prices out the anon-user-minting bypass.
 
-**Oracle suppression.** Invalid, expired, already-claimed, and revoked all return the identical `{ ok: false, reason: "invalid_code" }`. Rate limiting returns `{ ok: false, reason: "rate_limited" }` and may be shown distinctly. Detailed internal reason codes may be recorded server-side only. The claim path must not return early on the first failing check — evaluate all checks, then decide.
+**Oracle suppression.** Invalid, expired, and revoked all return the identical
+`{ ok: false, reason: "invalid_code" }`. Rate limiting returns
+`{ ok: false, reason: "rate_limited" }` and may be shown distinctly. Detailed
+internal reason codes may be recorded server-side only. The claim path must not
+return early on the first failing check. It evaluates all checks, then decides.
 
 ### 8.6 Device recovery — **NEW (audit A4)**
 
@@ -635,13 +645,18 @@ The browser's wall clock is **never** compared against a server timestamp. The "
 
 Rationale: a slow browser clock would otherwise show a stale `Available` indefinitely, which is exactly the guessed-Available that Goal 10 forbids.
 
-On a failed read the page must **not** make an optimistic Busy/Available claim; it keeps the previous value visibly marked as not-just-refreshed, and after 180 s of failure shows `Status unavailable`.
+On a failed read the page must **not** make an optimistic meeting claim; it
+keeps the previous value visibly marked as not-just-refreshed, and after 180 s
+of failure shows `Meeting status unavailable`.
 
 Expected end-to-end update delay: roughly the 30 s poll interval plus network latency. This is not a realtime product.
 
 ### 9.4 Schema version handling — **NEW (audit B3)**
 
-The viewer knows `SUPPORTED_SCHEMA_VERSION = 1`. If `schema_version > SUPPORTED_SCHEMA_VERSION`, it renders `Status unavailable` with "This page needs to be updated" rather than misinterpreting fields. If it is lower, apply documented defaults.
+The viewer knows `SUPPORTED_SCHEMA_VERSION = 1`. If
+`schema_version > SUPPORTED_SCHEMA_VERSION`, it renders `Meeting status
+unavailable` rather than misinterpreting fields. If it is lower, apply
+documented defaults.
 
 ### 9.5 Viewer presentation requirements — **NEW (audit B10)**
 
@@ -650,8 +665,9 @@ The primary user is a non-technical person on a phone.
 - **WCAG 2.2 AA**: contrast ≥ 4.5:1; state is conveyed by **text and shape**, never colour alone; a visible focus ring; a ≥ 44×44 px `Refresh now` hit target.
 - `aria-live="polite"` on the state region so a state change is announced.
 - `prefers-color-scheme` for light/dark; `prefers-reduced-motion` respected (no spinner animation when set).
-- Offline (`navigator.onLine === false` or a fetch failure): a plain banner — "You're offline. This is the last status we received." — with no state guessing.
-- No layout shift between states; reserve the display-name and "You can call" slots.
+- Offline (`navigator.onLine === false` or a fetch failure): the neutral
+  `Meeting status unavailable` message with no state guessing.
+- No layout shift between states; reserve the display-name slot.
 - The page must be usable and legible at 320 px width.
 - No analytics, no third-party scripts, no fonts fetched from third-party origins. (Turnstile is the sole third-party script, and only on the pairing screen.)
 

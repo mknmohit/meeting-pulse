@@ -280,20 +280,23 @@ paths = ['''\.example$''', '''\.ci$''', '''docs/.*\.md$''', '''\.gitleaks\.toml$
 
 ### T0.3 — Configuration templates, and the xcconfig trap
 
-An xcconfig file treats `//` as a comment, so `https://host` truncates at the slashes. This has cost many people an afternoon. Store the **host only** and build the URL in code.
+An xcconfig file treats `//` as a comment, so `https://host` truncates at the slashes. This has cost many people an afternoon. Store the scheme and host separately, then build the URL in code.
 
 `mac-app/Config.xcconfig.example`:
 
 ```
 // Copy to Config.xcconfig and fill in. Config.xcconfig is gitignored.
-// Host only, with no scheme: xcconfig treats // as a comment and would eat it.
+// Store the viewer scheme and host separately because xcconfig treats // as a comment.
 // The anon key is a PUBLIC publishable key. The service_role key never goes here.
 MP_SUPABASE_HOST = YOUR_PROJECT_REF.supabase.co
 MP_SUPABASE_ANON_KEY = YOUR_PUBLISHABLE_ANON_KEY
 MP_TURNSTILE_SITE_KEY = YOUR_TURNSTILE_SITE_KEY
+MP_VIEWER_SCHEME = https
+MP_VIEWER_HOSTS = meeting-pulse.example.com,og.example.com
 ```
 
-`Info.plist` maps them to `MPSupabaseHost`, `MPSupabaseAnonKey`, `MPTurnstileSiteKey`.
+`Info.plist` maps them to `MPSupabaseHost`, `MPSupabaseAnonKey`,
+`MPTurnstileSiteKey`, `MPViewerScheme`, and `MPViewerHosts`.
 
 `viewer/.env.example` (human placeholders, and building with it must **fail**):
 
@@ -516,15 +519,12 @@ The reader is a non-technical person standing near a door, mildly impatient, hol
 
 | Condition | Shape | Headline | Supporting line |
 |---|---|---|---|
-| `available` | disc | `{Name} is free` · or `Free` with no name | `Go ahead.` |
-| `busy` | cone | `{Name} is on a call` · or `On a call` | `Better to wait.` |
-| `busy` + `call_okay` | cone + pennant | `{Name} is on a call` | `He said it's fine to interrupt.` |
-| `unavailable` | bare mast | `No signal` | `His Mac stopped reporting a few minutes ago. This could be wrong either way, so assume he might be busy.` |
-| not paired / revoked | bare mast | `Not connected` | `Ask him for a code and enter it below.` |
-| offline | bare mast | `No signal` | `Your phone is offline. This is the last thing we heard.` |
-| schema too new | bare mast | `No signal` | `This page is out of date and can't read the latest status. Reload it.` |
+| `busy` | cone | `{Name} is in a meeting` · or `In a meeting` with no name | `Better to wait.` |
+| every other fresh, stale, offline, or unsupported result | bare mast | `Meeting status unavailable` | `Check again before you call.` |
+| not paired / revoked | bare mast | `Not connected` | `Open the viewer link or enter the code he shared.` |
 
-The `unavailable` line is the most important sentence in the product. It refuses to guess in either direction and it tells her what to assume. Everything else is one or two words.
+The neutral line avoids telling her that the owner is free when the Mac cannot
+provide a trustworthy meeting signal. Everything else is one or two words.
 
 **The chalked rail**
 
@@ -533,10 +533,10 @@ The `unavailable` line is the most important sentence in the product. It refuses
 **Pairing**
 
 - Heading: `Enter the code`
-- Lede: `Ask him for a code from the menu bar. It works once and expires in ten minutes.`
+- Lede: `Ask him for the viewer link or code. The link keeps working until he rotates it.`
 - Field label: `Code`
 - Button: `Connect`
-- Invalid, expired, used, or revoked: `That code didn't work. Ask for a fresh one.`
+- Invalid, expired, or revoked: `That code didn't work. Ask for a fresh link or code.`
 - Rate limited: `Too many tries. Wait a few minutes and try again.`
 - Offline during pairing: `You're offline. Connect to the internet and try again.`
 - After eviction: `This device was signed out. Ask him for a new code.`
@@ -557,7 +557,7 @@ Every failure names what to do next and none of them blames her. "That code didn
 
 **Owner app: menu items**
 
-`Set busy…` · `Set available…` · `Clear override` · `Calls are okay` · `Check and publish now` · `Display name…` · `Create pairing code…` · `Rotate codes` · `Disconnect viewer` · `Show recovery phrase…` · `Diagnostics…` · `Delete everything…` · `Quit Meeting Pulse`
+`Set busy…` · `Set available…` · `Clear override` · `Calls are okay` · `Check and publish now` · `Display name…` · `Create viewer link…` · `Rotate viewer link…` · `Revoke viewer access…` · `Show recovery phrase…` · `Diagnostics…` · `Delete everything…` · `Quit Meeting Pulse`
 
 **Owner app: recovery phrase**
 
@@ -2358,7 +2358,7 @@ This plan overrides `02-meetingpulse-spec.md` v2.0 in eight places.
 | §4.4 | The Mac also solves a Turnstile challenge, once, in a `WKWebView` | Defect B1 |
 | §7.3 | The latch holds a **set** of anchors, distinguishes "scan completed" from "confirmed", and does not settle | Defects B7, M15, M16 |
 | §8.2 | `devices.owner_user_id` is nullable, `ON DELETE SET NULL`. `instance_nonce` added | Defects B6, M30 |
-| §8.5 | Two throttle layers, not three. No per-IP table. TTL fixed at 600 s server-side | Defects M1, M7 |
+| §8.5 | Two throttle layers, not three. No per-IP table. Pairing codes persist until manual rotation or revocation | Defects M1, M7 |
 | §8.7 | `delete_device()` does not remove the `auth.users` row; the runbook covers it | Defect M6 |
 | §9.1 | A graceful quit attempts a final `unavailable` publish | Defect M24 |
 | §9.3 | Age is server age at fetch plus monotonic elapsed, failing closed on anything non-finite | Defect B5 |
@@ -2376,6 +2376,8 @@ Log the code, never the underlying text.
 | `MP_SUPABASE_HOST` | `Config.xcconfig` | yes | no | **none** |
 | `MP_SUPABASE_ANON_KEY` | `Config.xcconfig` | yes | no | **none** |
 | `MP_TURNSTILE_SITE_KEY` | `Config.xcconfig` | yes | no | **none** |
+| `MP_VIEWER_SCHEME` | `Config.xcconfig` | yes | no | **none** |
+| `MP_VIEWER_HOSTS` | `Config.xcconfig` | yes | no | **none** |
 | `PUBLIC_SUPABASE_URL` | viewer `.env` | yes | no | **none** |
 | `PUBLIC_SUPABASE_ANON_KEY` | viewer `.env` | yes | no | **none** |
 | `PUBLIC_STATUS_ORIGINS` | viewer `.env` | yes | no | **none** |
@@ -2393,7 +2395,7 @@ Log the code, never the underlying text.
 | heartbeat | constant | — | — | 60 s |
 | stale threshold | constant, both sides | — | — | 180 s |
 | viewer poll | constant | — | — | 30 s |
-| pairing code TTL | server-side constant | — | — | 600 s |
+| pairing code lifetime | owner action | — | — | until rotated or revoked |
 
 Nothing marked required has a fallback anywhere in the codebase.
 

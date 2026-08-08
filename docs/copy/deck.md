@@ -20,17 +20,14 @@ Two rules follow from that, and they govern every line below. Say the thing in t
 
 `{Name}` is the owner's display name when set. When it is blank, the shorter form is used and nothing shifts.
 
-| State | Shape | Headline | Supporting line |
+| Viewer result | Shape | Headline | Supporting line |
 |---|---|---|---|
-| available | disc | `{Name} is free` / `Free` | `Go ahead.` |
-| busy | cone | `{Name} is on a call` / `On a call` | `Better to wait.` |
-| busy + call okay | cone + pennant | `{Name} is on a call` / `On a call` | `He said it's fine to interrupt.` |
-| unavailable | bare mast | `No signal` | `His Mac stopped reporting a few minutes ago. This could be wrong either way, so assume he might be busy.` |
-| not paired | bare mast | `Not connected` | `Ask him for a code and enter it below.` |
-| offline | bare mast | `No signal` | `Your phone is offline. This is the last thing we heard.` |
-| schema too new | bare mast | `No signal` | `This page is out of date and can't read the latest status. Reload it.` |
+| busy | cone | `{Name} is in a meeting` / `In a meeting` | `Better to wait.` |
+| every other fresh, stale, offline, or unsupported result | bare mast | `Meeting status unavailable` | `Check again before you call.` |
+| not paired | bare mast | `Not connected` | `Open the viewer link or enter the code he shared.` |
 
-The `unavailable` line is the most important sentence in the product. It refuses to guess in either direction, and it tells her what to assume. Anything shorter would leave her to fill the gap herself, and she would fill it with "he's probably free".
+The neutral line is intentional. The page never tells her that the owner is
+free when the Mac cannot provide a trustworthy meeting signal.
 
 ## The chalked rail
 
@@ -43,10 +40,10 @@ Both time words are plural-aware. "Checked 1 minute ago", never "1 minutes".
 ## Pairing
 
 - Heading: `Enter the code`
-- Lede: `Ask him for a code from the menu bar. It works once and expires in ten minutes.`
+- Lede: `Ask him for the viewer link or code. The link keeps working until he rotates it.`
 - Field label: `Code`
 - Button: `Connect`
-- Invalid, expired, already used, or revoked: `That code didn't work. Ask for a fresh one.`
+- Invalid, expired, or revoked: `That code didn't work. Ask for a fresh link or code.`
 - Rate limited: `Too many tries. Wait a few minutes and try again.`
 - Offline: `You're offline. Connect to the internet and try again.`
 - After storage eviction: `This device was signed out. Ask him for a new code.`
@@ -74,7 +71,7 @@ Permission still missing after returning: `Still waiting on permission. Meeting 
 
 ### Menu
 
-`Set busy…` · `Set available…` · `Clear override` · `Calls are okay` · `Check and publish now` · `Display name…` · `Create pairing code…` · `Rotate codes` · `Disconnect viewer` · `Show recovery phrase…` · `Diagnostics…` · `Delete everything…` · `Quit Meeting Pulse`
+`Set busy…` · `Set available…` · `Clear override` · `Calls are okay` · `Check and publish now` · `Display name…` · `Create viewer link…` · `Rotate viewer link…` · `Revoke viewer access…` · `Show recovery phrase…` · `Diagnostics…` · `Delete everything…` · `Quit Meeting Pulse`
 
 Duration submenu: `15 minutes` · `30 minutes` · `45 minutes` · `1 hour` · `2 hours` · `4 hours` · `Until I clear it`
 
@@ -82,11 +79,11 @@ Status lines: `Busy for another 12 minutes` · `Watching automatically` · `Last
 
 ### Pairing window
 
-> **Give her this code**
+> **Share the viewer link**
 >
-> It works once and expires in ten minutes. If she needs another one later, come back here and make a new one.
+> The link stays active until you rotate or revoke it. Anyone who has it can view the status.
 >
-> `ABCDE-FGHJK`   `Copy`   `Expires in 9:42`
+> `ABCDE-FGHJK`   `Copy code`   `Copy viewer link`   `Rotate viewer link…`   `Revoke access…`
 
 ### Recovery phrase
 
@@ -124,7 +121,7 @@ Not out of squeamishness. Each one either misleads her or makes the product soun
 
 **Please note that, In order to, At this point in time.** Filler where a shorter phrase is clearer.
 
-**Unavailable** as a headline. It is technically the state's name, but it reads like the product broke rather than like a deliberate signal. The board says `No signal` and explains what to assume.
+**Free** as a headline. The board does not claim that the owner is free when the Mac cannot provide a trustworthy meeting signal.
 
 **Online, Offline, Active, Idle, Status: Green.** Dashboard vocabulary. She is not monitoring a service, she is deciding whether to open a door.
 

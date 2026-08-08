@@ -142,6 +142,17 @@ as $$
   where code_hash = p_value
 $$;
 
+create or replace function tests.code_expiry(p_code_hash text)
+returns timestamptz
+language sql
+security definer
+set search_path = public, auth, tests, pg_temp
+as $$
+  select expires_at
+  from public.pairing_codes
+  where code_hash = p_code_hash
+$$;
+
 create or replace function tests.global_failures()
 returns integer
 language sql

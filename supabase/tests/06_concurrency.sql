@@ -1,4 +1,4 @@
-select plan(2);
+select plan(3);
 
 create temporary table fixture (
   owner_id uuid,
@@ -132,8 +132,16 @@ select result::jsonb
 from dblink_get_result('claim_b') as response(result text);
 select is(
   (select count(*)::integer from claims where (result->>'ok')::boolean),
+  2,
+  'concurrent persistent claims both succeed'
+);
+select tests.become((select owner_id from fixture));
+select is(
+  (select count(*)::integer
+   from public.list_viewers()
+   where revoked_at is null),
   1,
-  'concurrent claim has exactly one winner'
+  'concurrent claims leave one active viewer'
 );
 
 select dblink_disconnect('register_a');

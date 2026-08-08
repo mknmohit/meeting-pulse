@@ -1,5 +1,5 @@
 export type State = 'available' | 'busy' | 'unavailable';
-export type DisplayState = State | 'unpaired';
+export type DisplayState = 'meeting' | 'callOkay' | 'generic' | 'unpaired';
 
 export const SUPPORTED_SCHEMA_VERSION = 1;
 export const STALE_AFTER_SECONDS = 180;
@@ -45,19 +45,22 @@ export function effectiveDisplayState(
   nowMonotonic: number,
 ): DisplayState {
   if (!reading) {
-    return 'unavailable';
+    return 'generic';
   }
   if (!reading.status.paired) {
     return 'unpaired';
   }
   if (reading.status.schemaVersion > SUPPORTED_SCHEMA_VERSION) {
-    return 'unavailable';
+    return 'generic';
   }
   const age = currentAgeSeconds(reading, nowMonotonic);
   if (!Number.isFinite(age) || age < 0 || age > STALE_AFTER_SECONDS) {
-    return 'unavailable';
+    return 'generic';
   }
-  return reading.status.state;
+  if (reading.status.state !== 'busy') {
+    return 'generic';
+  }
+  return reading.status.callOkay ? 'callOkay' : 'meeting';
 }
 
 export function checkedLabel(elapsedSeconds: number): string {

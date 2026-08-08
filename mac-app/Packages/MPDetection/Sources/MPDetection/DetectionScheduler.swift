@@ -139,6 +139,11 @@ public actor DetectionScheduler {
     await slack.stop()
   }
 
+  public func requestImmediateSample() async {
+    await tick()
+    emit()
+  }
+
   public func updateTuning(_ tuning: DetectionTuning) {
     self.tuning = tuning
     scheduleTimer()

@@ -28,5 +28,9 @@
 	<string>$(MP_SUPABASE_ANON_KEY)</string>
 	<key>MPTurnstileSiteKey</key>
 	<string>$(MP_TURNSTILE_SITE_KEY)</string>
+	<key>MPViewerScheme</key>
+	<string>$(MP_VIEWER_SCHEME)</string>
+	<key>MPViewerHosts</key>
+	<string>$(MP_VIEWER_HOSTS)</string>
 </dict>
 </plist>

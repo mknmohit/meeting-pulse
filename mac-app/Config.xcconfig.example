@@ -1,6 +1,8 @@
 // Copy to Config.xcconfig and fill in. Config.xcconfig is gitignored.
-// Host only, with no scheme: xcconfig treats // as a comment and would eat it.
+// Hosts only, with no scheme: xcconfig treats // as a comment and would eat it.
 // The anon key is a PUBLIC publishable key. The service_role key never goes here.
 MP_SUPABASE_HOST = YOUR_PROJECT_REF.supabase.co
 MP_SUPABASE_ANON_KEY = YOUR_PUBLISHABLE_ANON_KEY
 MP_TURNSTILE_SITE_KEY = YOUR_TURNSTILE_SITE_KEY
+MP_VIEWER_SCHEME = https
+MP_VIEWER_HOSTS = meeting-pulse.example.com,og.example.com

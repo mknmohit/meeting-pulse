@@ -11,6 +11,7 @@ public enum SecretKey: String, CaseIterable, Sendable {
   case deviceRecoveryPhrase
   case deviceID
   case deviceInstanceNonce
+  case pairingCode
 }
 
 public protocol SecretStore: Sendable {
