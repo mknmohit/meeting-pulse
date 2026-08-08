@@ -14,36 +14,59 @@ public struct MenuBarContent: View {
   public var body: some View {
     Text(store.plateHeadline)
       .font(MPFont.rowLabel)
-    Text(store.reasonLine)
-      .font(MPFont.caption)
-      .foregroundStyle(.secondary)
+    TimelineView(.periodic(from: .now, by: 30)) { context in
+      Text(store.reasonLine(at: context.date, presentation: .menuBar))
+        .font(MPFont.caption)
+        .foregroundStyle(.secondary)
+    }
     Divider()
 
-    Menu(MPString.menuBar.setBusy) {
+    Menu {
       ForEach(ManualOverride.Duration.allCases) { duration in
-        Button(MPString.mast.durationLabel(duration)) {
+        Button {
           Task { await actions.setBusy(for: duration) }
+        } label: {
+          Image(systemName: "moon.fill")
+          Text(MPString.mast.durationLabel(duration))
         }
       }
+    } label: {
+      Image(systemName: "moon.fill")
+      Text(MPString.menuBar.setBusy)
     }
 
-    Button(MPString.menuBar.setAvailable) {
+    Button {
       Task { await actions.setAvailable(for: store.preferredDuration) }
+    } label: {
+      Image(systemName: "checkmark.circle")
+      Text(MPString.menuBar.setAvailable)
     }
 
     if store.hasOverride {
-      Button(MPString.menuBar.backToAutomatic) {
+      Button {
         Task { await actions.clearOverride() }
+      } label: {
+        Image(systemName: "arrow.uturn.backward")
+        Text(MPString.menuBar.backToAutomatic)
       }
     }
 
-    Toggle(MPString.menuBar.callsAreOkay, isOn: callsOkayBinding)
-    Divider()
-    Button(MPString.menuBar.openStation) {
-      actions.openStation()
+    Toggle(isOn: callsOkayBinding) {
+      Image(systemName: "phone.fill")
+      Text(MPString.menuBar.callsAreOkay)
     }
-    Button(MPString.menuBar.quit) {
+    Divider()
+    Button {
+      actions.openStation()
+    } label: {
+      Image(systemName: "rectangle.grid.2x2")
+      Text(MPString.menuBar.openStation)
+    }
+    Button {
       actions.quit()
+    } label: {
+      Image(systemName: "power")
+      Text(MPString.menuBar.quit)
     }
   }
 

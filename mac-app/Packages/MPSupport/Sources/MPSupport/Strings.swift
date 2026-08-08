@@ -77,6 +77,22 @@ public enum MPString {
       "\(availableForPrefix) \(minutes) \(minutes == 1 ? "minute" : "minutes")"
     }
 
+    public static func busyRemaining(_ remaining: String) -> String {
+      "Busy - \(remaining)"
+    }
+
+    public static func availableRemaining(_ remaining: String) -> String {
+      "Available - \(remaining)"
+    }
+
+    public static func busyUntil(time: String, remaining: String) -> String {
+      "Busy until \(time) - \(remaining) remaining"
+    }
+
+    public static func availableUntil(time: String, remaining: String) -> String {
+      "Available until \(time) - \(remaining) remaining"
+    }
+
     private static let busyForPrefix = "Busy for another"
     private static let availableForPrefix = "Available for another"
   }
@@ -111,6 +127,8 @@ public enum MPString {
     public static let setupLinkHeadline = "Your signal is live."
     public static let setupLinkBody = "Create a private viewer link from Sharing when you're ready."
     public static let setupOpenSharing = "Open Sharing"
+    public static let securityCheckHeadline = "Quick security check"
+    public static let securityCheckBody = "Complete this once to connect your private link."
     public static let permissionHeadline = "Meeting Pulse can't see your windows yet."
     public static let permissionBody = "Turn on Accessibility so the Mac can read window titles. It never reads what is inside them."
     public static let openAccessibilitySettings = "Open Accessibility settings"
@@ -129,8 +147,8 @@ public enum MPString {
     public static let retrying = "Retrying"
     public static let stopped = "Stopped"
     public static let syncCadence = "Every \(activeCheckSeconds) seconds in a call, \(idleCheckSeconds) seconds idle"
-    public static let activeCheckSeconds = 2
-    public static let idleCheckSeconds = 15
+    public static let activeCheckSeconds = 5
+    public static let idleCheckSeconds = 20
     public static let supersededHeadline = "Another Mac took over."
     public static let supersededBody = "Meeting Pulse is running somewhere else. This Mac has stopped publishing."
   }
@@ -284,6 +302,8 @@ public enum MPString {
     public static let createLink = "Couldn't create the link. Try again."
     public static let viewers = "Can't load the list right now."
     public static let genericSetup = "Meeting Pulse isn't configured yet."
+    public static let launchFailed = "Meeting Pulse couldn't start."
+    public static let tryAgain = "Try again"
   }
 
   public enum SetupError {

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import MPCore
 import MPSupport
+import WebKit
 
 @MainActor
 @Observable
@@ -21,8 +22,8 @@ public final class PulseStore {
   public var slack: SourceObservation?
   public var meetSeenAt: Date?
   public var slackSeenAt: Date?
-  public var idleCheckInterval: Duration = .seconds(15)
-  public var activeCheckInterval: Duration = .seconds(2)
+  public var idleCheckInterval: Duration = .seconds(20)
+  public var activeCheckInterval: Duration = .seconds(5)
 
   public var displayName = "" {
     didSet {
@@ -47,7 +48,10 @@ public final class PulseStore {
 
   public var section: StationSection = .watch
   public var stationVisible = false
+  public var turnstilePresentation: TurnstilePresentationState = .hidden
+  public var turnstileWebView: WKWebView?
   public var setupFailure: String?
+  public var setupFailureHeadline = MPString.error.genericSetup
   public var hasCompletedOnboarding = false
   public var deleteCompleted = false
   public var lastError: PulseError?
@@ -85,6 +89,13 @@ public final class PulseStore {
   }
 
   public var reasonLine: String {
+    reasonLine(at: .now)
+  }
+
+  public func reasonLine(
+    at now: Date,
+    presentation: ReasonLinePresentation = .station
+  ) -> String {
     ReasonLineBuilder.build(
       deleteCompleted: deleteCompleted,
       accessibilityGranted: accessibilityGranted,
@@ -95,7 +106,9 @@ public final class PulseStore {
       stateReason: statusReason,
       callsOkay: callsOkay,
       face: plateFace,
-      activeSource: activeSource
+      activeSource: activeSource,
+      presentation: presentation,
+      now: now
     ).0
   }
 

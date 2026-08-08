@@ -90,6 +90,118 @@ directly matches macOS behavior for window close versus application quit.
   termination path and exits.
 - No custom termination cancellation or second process is introduced.
 
+## Dock icon visibility refinement
+
+The Dock icon mirrors the station window's visibility rather than the app's
+launch-time activation policy. Specifically:
+
+- At launch, before the station window appears, the app uses the
+  `.accessory` activation policy, so no Dock icon is visible.
+- When the station window is on screen, `DockVisibilityCoordinator` flips the
+  activation policy to `.regular` so the Dock icon appears.
+- When the station window closes, the coordinator flips back to `.accessory`
+  so the Dock icon disappears. This avoids the "ghost" Dock icon that
+  previously remained after the station closed and could not reopen the
+  window.
+- The `MenuBarExtra` is unaffected by activation policy, so the menu-bar
+  item stays available in either mode.
+- The coordinator reads `PulseStore.stationVisible`, which
+  `StationWindow.onAppear` / `.onDisappear` already maintain.
+
+This is a refinement of the launch-time `.regular` policy described in
+"Architecture and data flow" step 2. The bundle metadata, asset catalog,
+window scenes, and graceful termination flow are unchanged.
+
+### Launching from Launchpad and Dock-icon reopens
+
+Because the Dock icon now depends on the station window, the app must surface
+the station whenever the user activates the app from the Dock or from
+Launchpad. Otherwise the menu-bar process spawns (or re-activates) without a
+window, and the user sees a Dock icon with no content behind it.
+
+- `MeetingPulseAppDelegate.applicationShouldHandleReopen(_:hasVisibleWindows:)`
+  calls `pulseActions?.openStation()` whenever Dock / Launchpad activation
+  reopens the app. Returning `true` tells AppKit the reopen was handled so the
+  default window-restoration path does not interfere.
+- The `NativeMenuBarLabel.task` always calls `actions.openStation()` after
+  the menu-bar task wires the opener, so cold launches from Launchpad also
+  surface the station.
+- The delegate receives the `AppPulseActions` instance via `MeetingPulseApp.init`,
+  which sets `appDelegate.pulseActions = _actions.wrappedValue` immediately
+  after the actions are constructed. This keeps the Dock behavior wired
+  before `applicationDidFinishLaunching` fires.
+
+### Open Station flips activation policy synchronously
+
+When the station window opens while the app is still in `.accessory` mode
+(initial state at launch), AppKit orders the window beneath whatever app
+launched Meeting Pulse (Launchpad, Finder, the Dock, etc.). The window is
+technically on screen but visually hidden.
+
+`AppPulseActions.openStation()` therefore flips the activation policy to
+`.regular` *before* opening the window:
+
+1. Set `store.stationVisible = true` so the `DockVisibilityCoordinator`
+   observer sees the change and reapplies `.regular` on its next tick.
+2. Call `NSApplication.shared.setActivationPolicy(.regular)` directly so the
+   policy is already `.regular` by the time SwiftUI presents the window.
+3. The window opener also calls `NSApp.activate(ignoringOtherApps: true)` so
+   the station takes focus instead of politely asking for it.
+
+### Station view owns the activation policy flip
+
+`StationWindow.onAppear` and `.onDisappear` flip the activation policy
+synchronously, in addition to updating `store.stationVisible`. This keeps the
+Dock icon in lockstep with the window regardless of which close path the user
+takes:
+
+- Red close button — `.onDisappear` fires when the window closes; the
+  synchronous `setActivationPolicy(.accessory)` removes the Dock icon in the
+  same frame instead of waiting for the next runloop tick (the observer is a
+  safety net rather than the primary path).
+- Cmd+Q — `applicationShouldTerminate` calls `closeStation()`, which
+  synchronously flips the policy to `.accessory`. The window then closes,
+  `.onDisappear` fires, and the policy flip is re-asserted (no-op via
+  `lastPolicy`).
+- Menu-bar Quit — fully terminates the app, so the policy flip is irrelevant.
+
+The `DockVisibilityCoordinator` observer continues to run as a safety net for
+visibility changes that bypass the view callbacks (defense in depth), but the
+view callbacks are the primary source of truth.
+
+  ### Cmd+Q closes the station, not the app
+
+  The menu-bar app must keep running so the user can reopen the station later.
+  Cmd+Q is therefore scoped to closing the station window. The explicit
+  "Quit Meeting Pulse" menu item is the only path that fully terminates the
+  app.
+
+  - `MeetingPulseAppDelegate.applicationShouldTerminate(_:)` checks
+    `pulseActions?.isStationVisible` and `pulseActions?.requestedQuitFromMenu`.
+    When the station is on screen and the user did **not** invoke the menu-bar
+    Quit, the delegate calls `closeStation()` and returns `.terminateCancel`.
+    The Dock icon disappears via the synchronous flip in `closeStation()` (and
+    is re-asserted by `StationWindow.onDisappear`); the menu-bar item stays.
+  - `AppPulseActions.closeStation()` walks `NSApp.windows` and calls
+    `performClose(nil)` on the window whose title matches
+    `MPString.station.windowTitle`. It also flips the activation policy to
+    `.accessory` synchronously. `performClose` is asynchronous — the window
+    `.onDisappear` callback does not fire until the next runloop tick. Setting
+    `.accessory` directly in `closeStation` keeps the Dock icon in lockstep
+    with the window: pressing Cmd+Q closes the station and removes the Dock
+    icon in the same frame. `StationWindow.onDisappear` (which fires on the
+    next runloop tick) reaffirms `store.stationVisible = false` and re-asserts
+    `.accessory`; the observer's subsequent application is a no-op via
+    `lastPolicy`.
+  - `AppPulseActions.quit()` sets `requestedQuitFromMenu = true` before
+    calling `NSApp.terminate(nil)`. The delegate honors this flag and skips
+    the interception, so the menu-bar Quit always terminates the app.
+  - When the station is hidden, the Dock icon is gone and the app is in
+    `.accessory` mode. Cmd+Q then routes to whatever app the user has focused
+    (the menu-bar app is no longer foreground). The delegate falls through
+    to the existing graceful-quit path for the rare case where the user does
+    focus the menu bar and press Cmd+Q.
+
 ## Error handling
 
 - A failed `.regular` activation-policy request is logged explicitly. The

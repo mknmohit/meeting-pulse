@@ -64,6 +64,12 @@ public enum PulseError: Equatable, Sendable {
   case setup(String)
 }
 
+public enum TurnstilePresentationState: Equatable, Sendable {
+  case hidden
+  case verifying
+  case failed
+}
+
 public enum Freshness: Equatable, Sendable {
   case fresh(secondsAgo: Int)
   case stale(Date)

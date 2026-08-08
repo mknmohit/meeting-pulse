@@ -298,6 +298,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MeetingPulse/MeetingPulse.entitlements;
+				COMPRESS_PNG_FILES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MeetingPulse/Info.plist;
@@ -307,6 +308,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.techdevix.meetingpulse;
 				PRODUCT_NAME = "Meeting Pulse";
+				STRIP_INSTALLED_PRODUCT = YES;
+				STRIP_STYLE = "non-global";
 				SUPPORTED_PLATFORMS = macosx;
 				TARGETED_DEVICE_FAMILY = 1;
 			};

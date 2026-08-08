@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
-  <rect x="3" y="3" width="90" height="90" rx="23" fill="#F47770"/>
-  <path d="M31 32c5 4 11 5 17 1s12-3 17 1" fill="none" stroke="#FFD3D0" stroke-opacity=".56" stroke-width="3" stroke-linecap="round"/>
-  <path d="M48 76S24 60 24 43c0-9 10-14 17-7l7 7 7-7c7-7 17-2 17 7 0 17-24 33-24 33Z" fill="none" stroke="#FFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M22 61c10-6 18-6 26 0s16 6 26 0" fill="none" stroke="#FFDD7B" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="76" cy="25" r="7" fill="#74EFAD" stroke="#FFF" stroke-width="3"/>
+    <rect width="90" height="90" x="3" y="3" fill="#f47770" rx="23"/>
+    <path fill="none" stroke="#ffd3d0" stroke-linecap="round" stroke-opacity=".56" stroke-width="3" d="M31 32c5 4 11 5 17 1s12-3 17 1"/>
+    <path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="5" d="M48 76S24 60 24 43c0-9 10-14 17-7l7 7 7-7c7-7 17-2 17 7 0 17-24 33-24 33"/>
+    <path fill="none" stroke="#ffdd7b" stroke-linecap="round" stroke-width="4" d="M22 61c10-6 18-6 26 0s16 6 26 0"/>
+    <circle cx="76" cy="25" r="7" fill="#74efad" stroke="#fff" stroke-width="3"/>
 </svg>

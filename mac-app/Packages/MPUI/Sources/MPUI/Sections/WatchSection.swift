@@ -5,6 +5,7 @@ import MPSupport
 public struct WatchSection: View {
   private let store: PulseStore
   private let actions: any PulseActions
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   public init(store: PulseStore, actions: any PulseActions) {
     self.store = store
@@ -17,8 +18,21 @@ public struct WatchSection: View {
         Text(MPString.station.watch)
           .font(MPFont.sectionTitle)
 
+        if store.turnstilePresentation == .verifying,
+           let turnstileWebView = store.turnstileWebView {
+          MPTurnstileRail(webView: turnstileWebView)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+
         if let setupFailure = store.setupFailure {
-          MPBanner(tone: .alert, headline: MPString.error.genericSetup, detail: setupFailure)
+          MPBanner(
+            tone: .alert,
+            headline: store.setupFailureHeadline,
+            detail: setupFailure,
+            actionTitle: MPString.error.tryAgain
+          ) {
+            Task { await actions.retryLaunch() }
+          }
         }
 
         if store.hasCompletedOnboarding || store.accessibilityGranted {
@@ -91,6 +105,7 @@ public struct WatchSection: View {
       .padding(.horizontal, MPSpace.open)
       .padding(.vertical, MPSpace.loose)
       .frame(maxWidth: .infinity, alignment: .leading)
+      .animation(reduceMotion ? nil : MPMotion.quick, value: store.turnstilePresentation)
     }
   }
 

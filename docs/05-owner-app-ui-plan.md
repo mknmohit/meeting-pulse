@@ -1537,7 +1537,7 @@ Watch
   Publishing
   ┌──────────────────────────────────────────────────────┐
   │ Last published            12 seconds ago             │
-  │ Checks run           Every 2s in a call, 15s idle    │
+  │ Checks run           Every 5s in a call, 20s idle    │
   │ This Mac                  Publishing                 │
   └──────────────────────────────────────────────────────┘
 ```
@@ -1644,8 +1644,8 @@ Do not hide the row. A missing row reads as a bug.
 | `This Mac` | `Publishing` / `Retrying` / `Stopped` | `SyncCoordinator.currentState` |
 
 `Checks run` is a formatted value, not a literal, and there are two numbers
-rather than one. `DetectionTuning` has `activeSampleInterval` (default 2
-seconds) and `idleSampleInterval` (default 15 seconds), and the scheduler picks
+rather than one. `DetectionTuning` has `activeSampleInterval` (default 5
+seconds) and `idleSampleInterval` (default 20 seconds), and the scheduler picks
 between them depending on whether anything is currently active. Earlier drafts
 of this plan said "Every 4 seconds", which is a number that appears nowhere in
 the code.
@@ -1711,9 +1711,8 @@ extra origins the way an earlier draft of this plan did.
 
 #### 7.2.3 The pairing code
 
-`PairingCodeView.swift`. Ten characters in two rows of five, matching
-`PairingCodeFormat.display`'s `ABCDE-FGHJK` grouping. Each character is its own
-28 × 34 cell:
+`PairingCodeView.swift`. Ten characters in two rows of five, with no separator
+in the displayed value. Each character is its own 28 × 34 cell:
 
 ```swift
 RoundedRectangle(cornerRadius: MPRadius.cell, style: .continuous)
@@ -1763,7 +1762,7 @@ up to a phone. `.presentationCompactAdaptation` is not needed on macOS.
 | Button | Style | Behaviour |
 |---|---|---|
 | `Copy link` | `.bordered` | `MPCopyButton`, copies the full URL |
-| `Copy code` | `.bordered` | `MPCopyButton`, copies `ABCDE-FGHJK` |
+| `Copy code` | `.bordered` | `MPCopyButton`, copies `ABCDEFGHJK` |
 | `Share` | `.bordered` | `ShareLink(item: url)`, macOS 13+ |
 | `Create a new link` | `.link` | Confirmation required. Rotates |
 | `Stop sharing` | `.link`, `.red` | Confirmation required. Revokes |
@@ -2461,8 +2460,8 @@ public final class PulseStore {
   public var meetSeenAt: Date?
   public var slackSeenAt: Date?
   public var statusReason: StatusReason?
-  public var idleCheckInterval: Duration = .seconds(15)
-  public var activeCheckInterval: Duration = .seconds(2)
+  public var idleCheckInterval: Duration = .seconds(20)
+  public var activeCheckInterval: Duration = .seconds(5)
 
   // Publishing
   public var publishState: PublishState = .never

@@ -2,6 +2,11 @@ import Foundation
 import MPCore
 import MPSupport
 
+public enum ReasonLinePresentation: Equatable, Sendable {
+  case station
+  case menuBar
+}
+
 public enum ReasonLineBuilder {
   public static func build(
     deleteCompleted: Bool,
@@ -14,6 +19,7 @@ public enum ReasonLineBuilder {
     callsOkay: Bool,
     face: PlateFace,
     activeSource: String? = nil,
+    presentation: ReasonLinePresentation = .station,
     now: Date = .now
   ) -> (String, ReasonTone) {
     if deleteCompleted {
@@ -31,23 +37,27 @@ public enum ReasonLineBuilder {
     if !hasViewerLink {
       return (MPString.mast.reasonNoViewer, .info)
     }
-    if mode == .busy, let overrideExpiry {
-      return (
-        MPString.mast.busyFor(minutes: remainingMinutes(until: overrideExpiry, now: now)),
-        .info
-      )
-    }
     if mode == .busy {
-      return (MPString.mast.reasonBusyUntil, .info)
-    }
-    if mode == .available, let overrideExpiry {
       return (
-        MPString.mast.availableFor(minutes: remainingMinutes(until: overrideExpiry, now: now)),
+        overrideLine(
+          mode: mode,
+          overrideExpiry: overrideExpiry,
+          presentation: presentation,
+          now: now
+        ),
         .info
       )
     }
     if mode == .available {
-      return (MPString.mast.reasonAvailableUntil, .info)
+      return (
+        overrideLine(
+          mode: mode,
+          overrideExpiry: overrideExpiry,
+          presentation: presentation,
+          now: now
+        ),
+        .info
+      )
     }
     if stateReason == .confirmedActiveSource {
       let source = activeSource ?? MPString.station.googleMeet
@@ -63,7 +73,79 @@ public enum ReasonLineBuilder {
     return (MPString.mast.reasonAutomatic + suffix, .info)
   }
 
-  private static func remainingMinutes(until date: Date, now: Date) -> Int {
-    max(Int(ceil(date.timeIntervalSince(now) / 60)), 1)
+  public static func overrideLine(
+    mode: PulseMode,
+    overrideExpiry: Date?,
+    presentation: ReasonLinePresentation,
+    now: Date = .now
+  ) -> String {
+    guard let overrideExpiry else {
+      switch mode {
+      case .busy:
+        return MPString.mast.reasonBusyUntil
+      case .available:
+        return MPString.mast.reasonAvailableUntil
+      case .automatic:
+        return MPString.mast.reasonAutomatic
+      }
+    }
+
+    let remaining = remainingDuration(until: overrideExpiry, now: now)
+    switch (mode, presentation) {
+    case (.busy, .station):
+      return MPString.mast.busyUntil(
+        time: formattedEndTime(overrideExpiry),
+        remaining: remaining.long
+      )
+    case (.available, .station):
+      return MPString.mast.availableUntil(
+        time: formattedEndTime(overrideExpiry),
+        remaining: remaining.long
+      )
+    case (.busy, .menuBar):
+      return MPString.mast.busyRemaining(remaining.compact)
+    case (.available, .menuBar):
+      return MPString.mast.availableRemaining(remaining.compact)
+    case (.automatic, _):
+      return MPString.mast.reasonAutomatic
+    }
+  }
+
+  private static func formattedEndTime(_ date: Date) -> String {
+    date.formatted(date: .omitted, time: .shortened)
+  }
+
+  private static func remainingDuration(until date: Date, now: Date) -> RemainingDuration {
+    let seconds = date.timeIntervalSince(now)
+    guard seconds >= 60 else {
+      return RemainingDuration(compact: "<1m", long: "less than a minute")
+    }
+
+    let totalMinutes = Int(ceil(seconds / 60))
+    let hours = totalMinutes / 60
+    let minutes = totalMinutes % 60
+
+    let long: String
+    if hours == 0 {
+      long = "\(minutes) \(minutes == 1 ? "minute" : "minutes")"
+    } else if minutes == 0 {
+      long = "\(hours) \(hours == 1 ? "hour" : "hours")"
+    } else {
+      long = "\(hours) \(hours == 1 ? "hour" : "hours") " +
+        "\(minutes) \(minutes == 1 ? "minute" : "minutes")"
+    }
+
+    let compact = minutes == 0
+      ? "\(hours)h"
+      : hours == 0
+        ? "\(minutes)m"
+        : "\(hours)h \(minutes)m"
+
+    return RemainingDuration(compact: compact, long: long)
+  }
+
+  private struct RemainingDuration {
+    let compact: String
+    let long: String
   }
 }

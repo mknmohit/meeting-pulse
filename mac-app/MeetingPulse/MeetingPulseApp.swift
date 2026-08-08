@@ -6,7 +6,6 @@ import MPSync
 import MPUI
 import Observation
 import SwiftUI
-import WebKit
 
 typealias MeetingPulseState = MPCore.State
 
@@ -26,9 +25,14 @@ struct MeetingPulseApp: App {
     _launchCoordinator = SwiftUI.State(initialValue: AppLaunchCoordinator())
     _store = SwiftUI.State(initialValue: store)
     _actions = SwiftUI.State(initialValue: AppPulseActions(store: store, model: model))
-    if !NSApplication.shared.setActivationPolicy(.regular) {
-      NSLog("Meeting Pulse: failed to show the Dock icon.")
-    }
+    // The delegate is created by AppKit before this init runs; share the
+    // actions handle so Dock-icon / Launchpad reopens can surface the station.
+    appDelegate.pulseActions = _actions.wrappedValue
+    // Dock visibility tracks the station window: only show the Dock icon while
+    // the station is visible. The menu-bar item is unaffected by activation
+    // policy, so it stays in either mode. Start in .accessory because the
+    // station has not appeared yet at launch.
+    DockVisibilityCoordinator.shared.start(store: store)
   }
 
   @SceneBuilder
@@ -40,15 +44,36 @@ struct MeetingPulseApp: App {
         MenuBarView(model: model)
       }
     } label: {
-      NativeMenuBarLabel(store: store, model: model, actions: actions) {
-        await launchCoordinator.start(
-          model: model,
-          store: FeatureFlag.macNative ? store : nil
-        )
-        appDelegate.terminationHandler = {
-          await model.runtime?.gracefulQuit()
+      NativeMenuBarLabel(
+        store: store,
+        model: model,
+        actions: actions,
+        start: {
+          await launchCoordinator.start(
+            model: model,
+            store: FeatureFlag.macNative ? store : nil,
+            openStation: {
+              if FeatureFlag.macNative {
+                actions.openStation()
+              }
+            }
+          )
+          appDelegate.terminationHandler = {
+            await model.runtime?.gracefulQuit()
+          }
+        },
+        retryLaunch: {
+          await launchCoordinator.retryLaunch(
+            model: model,
+            store: FeatureFlag.macNative ? store : nil,
+            openStation: {
+              if FeatureFlag.macNative {
+                actions.openStation()
+              }
+            }
+          )
         }
-      }
+      )
     }
     .menuBarExtraStyle(.menu)
 
@@ -104,39 +129,57 @@ private struct NativeMenuBarLabel: View {
   let model: OwnerAppModel
   let actions: AppPulseActions
   let start: @MainActor () async -> Void
+  let retryLaunch: @MainActor () async -> Void
   @Environment(\.openWindow) private var openWindow
 
   init(
     store: PulseStore,
     model: OwnerAppModel,
     actions: AppPulseActions,
-    start: @escaping @MainActor () async -> Void
+    start: @escaping @MainActor () async -> Void,
+    retryLaunch: @escaping @MainActor () async -> Void
   ) {
     self.store = store
     self.model = model
     self.actions = actions
     self.start = start
+    self.retryLaunch = retryLaunch
   }
 
   private var menuBarState: MeetingPulseState {
-    FeatureFlag.macNative ? store.effectiveState : model.state
+    if FeatureFlag.macNative {
+      return store.isFresh ? store.effectiveState : .unavailable
+    }
+    return model.state
+  }
+
+  private var menuBarCallsOkay: Bool {
+    FeatureFlag.macNative ? store.callsOkay : model.callOkay
   }
 
   var body: some View {
     Group {
-      HeartThreadMenuIcon(state: menuBarState)
+      HeartThreadMenuIcon(state: menuBarState, callsOkay: menuBarCallsOkay)
         .opacity(FeatureFlag.macNative && store.deleteCompleted ? 0.4 : 1)
     }
     .task {
       if FeatureFlag.macNative {
-        actions.configure(openWindow: { id in
-          NSApp.activate()
-          openWindow(id: id)
-        })
+        actions.configure(
+          openWindow: { id in
+            // `ignoringOtherApps: true` is required so the station window can
+            // take focus when launched from Launchpad or the Dock. Without it,
+            // the window opens behind whatever app the user launched us from.
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: id)
+          },
+          retryLaunch: retryLaunch
+        )
       }
       await start()
-      if FeatureFlag.macNative,
-         !store.hasCompletedOnboarding || store.setupFailure != nil || !store.accessibilityGranted {
+      if FeatureFlag.macNative {
+        // Always surface the station on launch so the Dock icon mirrors a real
+        // window. Launchpad / Dock activations route through the same opener
+        // via `applicationShouldHandleReopen` in the app delegate.
         actions.openStation()
       }
     }
@@ -146,17 +189,54 @@ private struct NativeMenuBarLabel: View {
 @MainActor
 final class MeetingPulseAppDelegate: NSObject, NSApplicationDelegate {
   var terminationHandler: (@MainActor () async -> Void)?
+  var pulseActions: AppPulseActions?
   private var terminationStarted = false
+  private static let terminationWatchdog: Duration = .seconds(3)
+
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    // Surfacing the station here keeps the Dock icon and the window in sync:
+    // when the user clicks the Dock icon (or re-activates the app from
+    // Launchpad) the station window appears, so the Dock icon does not stay
+    // visible without a real window.
+    pulseActions?.openStation()
+    return true
+  }
 
   func applicationShouldTerminate(
     _: NSApplication
   ) -> NSApplication.TerminateReply {
+    // Cmd+Q while the station is visible should only close the station window,
+    // not terminate the app. The menu-bar "Quit Meeting Pulse" item calls
+    // `actions.quit()` which sets `requestedQuitFromMenu` so we can honor the
+    // explicit exit. When the station is hidden, the dock icon is gone and
+    // the app is in `.accessory` mode; a Cmd+Q then targets whatever app the
+    // user has focused, so terminating here is the right answer.
+    if let actions = pulseActions,
+       !actions.requestedQuitFromMenu,
+       actions.isStationVisible {
+      actions.closeStation()
+      return .terminateCancel
+    }
     guard let terminationHandler, !terminationStarted else {
       return .terminateNow
     }
     terminationStarted = true
     Task { @MainActor in
-      await terminationHandler()
+      let terminationTask = Task { @MainActor in
+        await terminationHandler()
+      }
+      let timeoutTask = Task { @MainActor in
+        try? await Task.sleep(for: Self.terminationWatchdog)
+        if !terminationTask.isCancelled {
+          NSLog("Meeting Pulse: graceful quit exceeded watchdog; forcing terminate.")
+          terminationTask.cancel()
+        }
+      }
+      await terminationTask.value
+      timeoutTask.cancel()
       NSApp.reply(toApplicationShouldTerminate: true)
     }
     return .terminateLater
@@ -405,7 +485,7 @@ final class OwnerRuntime {
       let publishTask = Task {
         await sync.submit(payload)
       }
-      try? await Task.sleep(for: .seconds(3))
+      try? await Task.sleep(for: .seconds(1))
       publishTask.cancel()
     }
     await stop()
@@ -575,6 +655,19 @@ final class OwnerAppModel {
     statusLine = override.state == .busy
       ? MPString.mast.modeBusy
       : MPString.menuBar.availableOverride
+  }
+
+  func menuBarStatusLine(at now: Date) -> String {
+    guard let override = manualOverride, let expiry = override.expiresAtWall else {
+      return statusLine
+    }
+    let mode: PulseMode = override.state == .busy ? .busy : .available
+    return ReasonLineBuilder.overrideLine(
+      mode: mode,
+      overrideExpiry: expiry,
+      presentation: .menuBar,
+      now: now
+    )
   }
 
   func clearManualOverride() {
@@ -747,7 +840,6 @@ final class OwnerAppModel {
         MPString.board.genericHeadline
       }
   }
-
 }
 
 private enum OwnerRuntimeError: Error {
@@ -768,11 +860,14 @@ final class AppLaunchCoordinator {
   private var instanceLock: SingleInstanceLock?
   private var permissionCoordinator: PermissionCoordinator?
   private var runtime: OwnerRuntime?
-  private var turnstilePanel: NSPanel?
   private var permissionTask: Task<Void, Never>?
   private(set) var state: LaunchState = .starting
 
-  func start(model: OwnerAppModel, store: PulseStore? = nil) async {
+  func start(
+    model: OwnerAppModel,
+    store: PulseStore? = nil,
+    openStation: @escaping @MainActor () -> Void = {}
+  ) async {
     NSLog("Meeting Pulse launch sequence started")
     let migratedDisplayName = UserDefaults.standard.string(forKey: "owner.displayName") ?? ""
     store?.displayName = migratedDisplayName
@@ -803,6 +898,7 @@ final class AppLaunchCoordinator {
             await self.runtime?.refreshAndPublish()
           }
         }
+
       }
       NSLog("Meeting Pulse permission coordinator started")
       try LegacyStorageReset().resetIfNeeded()
@@ -822,10 +918,13 @@ final class AppLaunchCoordinator {
         let webProvider = WKTurnstileProvider(
           siteKey: configuration.turnstileSiteKey,
           htmlURL: htmlURL,
-          baseURL: URL(string: "https://localhost")
+          baseURL: configuration.viewerOrigins[0]
         )
         provider = webProvider
-        showTurnstile(webProvider.view)
+        store?.turnstileWebView = webProvider.view
+        store?.turnstilePresentation = .verifying
+        openStation()
+        await Task.yield()
       } else {
         provider = UnavailableTurnstileProvider()
       }
@@ -856,19 +955,57 @@ final class AppLaunchCoordinator {
       store?.viewerLinks = model.pairingLinks
       store?.recoveryPhrase = model.recoveryPhrase
       store?.launchAtLogin = model.launchAtLogin
-      turnstilePanel?.close()
-      turnstilePanel = nil
+      store?.turnstileWebView = nil
+      store?.turnstilePresentation = .hidden
+      store?.setupFailure = nil
+      store?.setupFailureHeadline = MPString.error.genericSetup
       NSLog("Meeting Pulse detection runtime started")
       state = installLocationIsValid ? .running : .wrongInstallLocation
     } catch let error as AppConfiguration.ConfigurationError {
       NSLog("Meeting Pulse configuration error: %@", error.description)
+      store?.turnstileWebView = nil
+      store?.turnstilePresentation = .failed
+      store?.setupFailureHeadline = MPString.error.genericSetup
       store?.setupFailure = error.description
       state = .setupRequired(error.description)
     } catch {
-      NSLog("Meeting Pulse launch error: %@", String(describing: error))
-      store?.setupFailure = MPString.error.genericSetup
-      state = .setupRequired(MPString.error.genericSetup)
+      let detail = Self.launchFailureDetail(for: error)
+      NSLog("Meeting Pulse launch error: %@", detail)
+      store?.turnstileWebView = nil
+      store?.turnstilePresentation = .failed
+      store?.setupFailureHeadline = MPString.error.launchFailed
+      store?.setupFailure = detail
+      state = .setupRequired(detail)
     }
+  }
+
+  func retryLaunch(
+    model: OwnerAppModel,
+    store: PulseStore? = nil,
+    openStation: @escaping @MainActor () -> Void = {}
+  ) async {
+    guard case .setupRequired = state else {
+      return
+    }
+    permissionTask?.cancel()
+    permissionTask = nil
+    await permissionCoordinator?.stop()
+    permissionCoordinator = nil
+    await runtime?.stop()
+    runtime = nil
+    model.runtime = nil
+    model.runtimeStore = store
+    store?.turnstileWebView = nil
+    store?.turnstilePresentation = .hidden
+    store?.setupFailureHeadline = MPString.error.genericSetup
+    store?.setupFailure = nil
+    state = .starting
+    await start(model: model, store: store, openStation: openStation)
+  }
+
+  private static func launchFailureDetail(for error: Error) -> String {
+    let detail = String(describing: error).trimmingCharacters(in: .whitespacesAndNewlines)
+    return detail.isEmpty ? error.localizedDescription : detail
   }
 
   private enum LaunchError: Error {
@@ -904,22 +1041,6 @@ final class AppLaunchCoordinator {
     }
   }
 
-  private func showTurnstile(_ webView: WKWebView) {
-    let panel = NSPanel(
-      contentRect: NSRect(x: 0, y: 0, width: 420, height: 260),
-      styleMask: [.titled, .closable],
-      backing: .buffered,
-      defer: false
-    )
-    panel.title = MPString.station.windowTitle
-    webView.frame = NSRect(origin: .zero, size: NSSize(width: 420, height: 260))
-    webView.autoresizingMask = [.width, .height]
-    panel.contentView = webView
-    panel.center()
-    panel.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
-    turnstilePanel = panel
-  }
 }
 
 struct MenuBarView: View {
@@ -927,7 +1048,9 @@ struct MenuBarView: View {
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
-    Text(model.statusLine)
+    TimelineView(.periodic(from: .now, by: 30)) { context in
+      Text(model.menuBarStatusLine(at: context.date))
+    }
       .confirmationDialog(
         MPString.thisMac.deleteTitle,
         isPresented: $model.showingDeleteConfirmation,
@@ -942,61 +1065,110 @@ struct MenuBarView: View {
       }
     Text(model.connectionLine)
     Divider()
-    Menu(MPString.menuBar.setBusy) {
-      Button(MPString.mast.durationLabel(.m15)) { model.setBusy(duration: .m15) }
-      Button(MPString.mast.durationLabel(.m30)) { model.setBusy(duration: .m30) }
-      Button(MPString.mast.durationLabel(.m45)) { model.setBusy(duration: .m45) }
-      Button(MPString.mast.durationLabel(.h1)) { model.setBusy(duration: .h1) }
-      Button(MPString.mast.durationLabel(.h2)) { model.setBusy(duration: .h2) }
-      Button(MPString.mast.durationLabel(.h4)) { model.setBusy(duration: .h4) }
-      Button(MPString.mast.durationLabel(.untilCleared)) { model.setBusy(duration: .untilCleared) }
+    Menu {
+      ForEach(ManualOverride.Duration.allCases) { duration in
+        Button {
+          model.setBusy(duration: duration)
+        } label: {
+          Image(systemName: "moon.fill")
+          Text(MPString.mast.durationLabel(duration))
+        }
+      }
+    } label: {
+      Image(systemName: "moon.fill")
+      Text(MPString.menuBar.setBusy)
     }
-    Menu(MPString.menuBar.setAvailable) {
-      Button(MPString.mast.durationLabel(.m15)) { model.setAvailable(duration: .m15) }
-      Button(MPString.mast.durationLabel(.m30)) { model.setAvailable(duration: .m30) }
-      Button(MPString.mast.durationLabel(.m45)) { model.setAvailable(duration: .m45) }
-      Button(MPString.mast.durationLabel(.h1)) { model.setAvailable(duration: .h1) }
-      Button(MPString.mast.durationLabel(.h2)) { model.setAvailable(duration: .h2) }
-      Button(MPString.mast.durationLabel(.h4)) { model.setAvailable(duration: .h4) }
-      Button(MPString.mast.durationLabel(.untilCleared)) { model.setAvailable(duration: .untilCleared) }
+    Menu {
+      ForEach(ManualOverride.Duration.allCases) { duration in
+        Button {
+          model.setAvailable(duration: duration)
+        } label: {
+          Image(systemName: "checkmark.circle")
+          Text(MPString.mast.durationLabel(duration))
+        }
+      }
+    } label: {
+      Image(systemName: "checkmark.circle")
+      Text(MPString.menuBar.setAvailable)
     }
-    Button(MPString.menuBar.backToAutomatic) { model.clearOverride() }
-    Toggle(
-      MPString.menuBar.callsAreOkay,
-      isOn: Binding(
-        get: { model.callOkay },
-        set: { model.setCallOkay($0) }
-      )
-    )
-    Button(MPString.station.checkNow) { model.refreshAndPublish() }
+    Button {
+      model.clearOverride()
+    } label: {
+      Image(systemName: "arrow.uturn.backward")
+      Text(MPString.menuBar.backToAutomatic)
+    }
+    Toggle(isOn: Binding(
+      get: { model.callOkay },
+      set: { model.setCallOkay($0) }
+    )) {
+      Image(systemName: "phone.fill")
+      Text(MPString.menuBar.callsAreOkay)
+    }
+    Button {
+      model.refreshAndPublish()
+    } label: {
+      Image(systemName: "arrow.clockwise")
+      Text(MPString.station.checkNow)
+    }
     Divider()
-    Button(MPString.thisMac.name) { openWindow(id: "settings") }
-    Button(MPString.sharing.createLink) {
+    Button {
+      openWindow(id: "settings")
+    } label: {
+      Image(systemName: "rectangle.grid.2x2")
+      Text(MPString.thisMac.name)
+    }
+    Button {
       model.createPairingCode()
       openWindow(id: "pairing")
+    } label: {
+      Image(systemName: "link.badge.plus")
+      Text(MPString.sharing.createLink)
     }
-    Button(MPString.sharing.createNewLink) {
+    Button {
       model.showingRotateConfirmation = true
+    } label: {
+      Image(systemName: "arrow.triangle.2.circlepath")
+      Text(MPString.sharing.createNewLink)
     }
     .disabled(model.pairingCode == nil)
-    Button(MPString.sharing.stopSharing) {
+    Button {
       model.showingRevokeConfirmation = true
+    } label: {
+      Image(systemName: "link.slash")
+      Text(MPString.sharing.stopSharing)
     }
     .disabled(model.pairingCode == nil)
-    Button(MPString.thisMac.showRecoveryPhrase) { openWindow(id: "recovery") }
-    Button(MPString.diagnostics.headline) { openWindow(id: "diagnostics") }
-    Button(MPString.thisMac.deleteEverything) {
+    Button {
+      openWindow(id: "recovery")
+    } label: {
+      Image(systemName: "key.fill")
+      Text(MPString.thisMac.showRecoveryPhrase)
+    }
+    Button {
+      openWindow(id: "diagnostics")
+    } label: {
+      Image(systemName: "stethoscope")
+      Text(MPString.diagnostics.headline)
+    }
+    Button {
       model.showingDeleteConfirmation = true
+    } label: {
+      Image(systemName: "trash")
+      Text(MPString.thisMac.deleteEverything)
     }
     Divider()
-    Button(MPString.menuBar.quit) {
+    Button {
       NSApplication.shared.terminate(nil)
+    } label: {
+      Image(systemName: "power")
+      Text(MPString.menuBar.quit)
     }
   }
 }
 
 struct HeartThreadMenuIcon: View {
   let state: MeetingPulseState
+  let callsOkay: Bool
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
   var body: some View {
@@ -1004,6 +1176,10 @@ struct HeartThreadMenuIcon: View {
       .animation(
         accessibilityReduceMotion ? nil : .easeInOut(duration: 0.18),
         value: state
+      )
+      .animation(
+        accessibilityReduceMotion ? nil : .easeInOut(duration: 0.18),
+        value: callsOkay
       )
       .frame(width: 22, height: 22)
       .accessibilityElement(children: .ignore)
@@ -1112,6 +1288,9 @@ struct HeartThreadMenuIcon: View {
   private var statusDotColor: NSColor {
     switch state {
     case .busy:
+      if callsOkay {
+        return NSColor(calibratedRed: 0.42, green: 0.70, blue: 1, alpha: 1)
+      }
       return NSColor(calibratedRed: 0.45, green: 0.94, blue: 0.68, alpha: 1)
     case .available:
       return NSColor(calibratedRed: 0.99, green: 0.48, blue: 0.57, alpha: 1)
@@ -1298,5 +1477,61 @@ struct DiagnosticsWindow: View {
     }
     .padding(24)
     .frame(width: 460)
+  }
+}
+
+/// Mirrors the station-window visibility to the Dock icon.
+///
+/// The Dock icon is shown only while the station window is on screen. When the
+/// user closes the station, the activation policy flips back to `.accessory`
+/// so the Dock icon disappears. The menu-bar `MenuBarExtra` is unaffected by
+/// activation policy, so the menu-bar item stays available in either mode.
+@MainActor
+final class DockVisibilityCoordinator {
+  static let shared = DockVisibilityCoordinator()
+
+  private var observationTask: Task<Void, Never>?
+  private var lastPolicy: NSApplication.ActivationPolicy?
+
+  private init() {}
+
+  func start(store: PulseStore) {
+    observationTask?.cancel()
+    // Apply the initial policy immediately so the Dock icon is correct on
+    // launch. The station is not visible at this point, so start in .accessory.
+    applyPolicy(for: store.stationVisible)
+    observationTask = Task { @MainActor [weak store] in
+      while !Task.isCancelled {
+        guard let store else { return }
+        let visible = store.stationVisible
+        applyPolicy(for: visible)
+        await Self.waitForStationChange(store: store)
+      }
+    }
+  }
+
+  func stop() {
+    observationTask?.cancel()
+    observationTask = nil
+  }
+
+  private func applyPolicy(for stationVisible: Bool) {
+    let policy: NSApplication.ActivationPolicy = stationVisible ? .regular : .accessory
+    guard policy != lastPolicy else { return }
+    if !NSApplication.shared.setActivationPolicy(policy) {
+      NSLog("Meeting Pulse: failed to update activation policy to \(policy.rawValue).")
+      return
+    }
+    lastPolicy = policy
+  }
+
+  private static func waitForStationChange(store: PulseStore) async {
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      withObservationTracking {
+        _ = store.stationVisible
+      } onChange: {
+        continuation.resume()
+      }
+    }
   }
 }

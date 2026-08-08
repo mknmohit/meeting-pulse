@@ -1426,7 +1426,7 @@ public enum CrockfordBase32 {
 
 public enum PairingCodeFormat {
     public static let length = 10          // 50 bits
-    public static func display(_ raw: String) -> String   // "XXXXX-XXXXX"
+    public static func display(_ raw: String) -> String   // "XXXXXXXXXX"
 }
 
 public enum RecoveryPhraseFormat {
@@ -1724,8 +1724,8 @@ func requestSample() {
 
 ```swift
 public struct Tuning: Sendable, Codable {
-    var idleSampleInterval: Duration   = .seconds(15)
-    var activeSampleInterval: Duration = .seconds(2)
+    var idleSampleInterval: Duration   = .seconds(20)
+    var activeSampleInterval: Duration = .seconds(5)
     var endSettleCount: Int            = 2
     var maxLatchDuration: Duration     = .seconds(14400)
     var timerLeeway: Duration          = .milliseconds(500)
@@ -2392,8 +2392,8 @@ Log the code, never the underlying text.
 | `SUPABASE_SERVICE_ROLE_KEY` | operator secret store | migrations and runbook only | **yes** | — |
 | `MP_SIGN_IDENTITY` | local keychain | release only | **yes** | — |
 | `MP_NOTARY_PROFILE` | local keychain profile | release only | **yes** | — |
-| `idleSampleInterval` | `UserDefaults` | no | no | 15 s |
-| `activeSampleInterval` | `UserDefaults` | no | no | 2 s |
+| `idleSampleInterval` | `UserDefaults` | no | no | 20 s |
+| `activeSampleInterval` | `UserDefaults` | no | no | 5 s |
 | `endSettleCount` | `UserDefaults` | no | no | 2 |
 | `maxLatchDuration` | `UserDefaults` | no | no | 14 400 s |
 | `timerLeeway` | `UserDefaults` | no | no | 500 ms |

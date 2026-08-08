@@ -11,19 +11,34 @@ final class AppPulseActions: PulseActions {
   private let store: PulseStore
   private weak var model: OwnerAppModel?
   private var windowOpener: (@MainActor (String) -> Void)?
+  private var launchRetrier: (@MainActor () async -> Void)?
+
+  /// Set by `quit()` so the app delegate can distinguish an explicit menu Quit
+  /// from a Cmd+Q keypress. Cmd+Q should only close the station; the menu
+  /// Quit always terminates the app.
+  private(set) var requestedQuitFromMenu = false
 
   init(store: PulseStore, model: OwnerAppModel? = nil) {
     self.store = store
     self.model = model
   }
 
+  /// True while the station NSWindow is on screen. Mirrors
+  /// `PulseStore.stationVisible`, which `StationWindow.onAppear` /
+  /// `.onDisappear` maintain.
+  var isStationVisible: Bool { store.stationVisible }
+
   func attach(model: OwnerAppModel) {
     model.runtimeStore = store
     self.model = model
   }
 
-  func configure(openWindow: @escaping @MainActor (String) -> Void) {
+  func configure(
+    openWindow: @escaping @MainActor (String) -> Void,
+    retryLaunch: @escaping @MainActor () async -> Void
+  ) {
     windowOpener = openWindow
+    launchRetrier = retryLaunch
   }
 
   func setBusy(for duration: ManualOverride.Duration) async {
@@ -223,6 +238,14 @@ final class AppPulseActions: PulseActions {
     store.hasCompletedOnboarding = true
   }
 
+  func retryLaunch() async {
+    guard let launchRetrier else {
+      NSLog("Meeting Pulse: launch retry is unavailable")
+      return
+    }
+    await launchRetrier()
+  }
+
   func openAccessibilitySettings() -> Bool {
     guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
     else {
@@ -249,7 +272,38 @@ final class AppPulseActions: PulseActions {
 
   func openStation(section: StationSection) {
     store.section = section
+    // Flip the activation policy synchronously before opening the window.
+    // Without this, the window opens in `.accessory` mode and is ordered
+    // beneath whatever app the user launched us from (Launchpad / Dock /
+    // menu bar). Setting `.regular` first lets the window take focus and
+    // appear on top the moment SwiftUI presents it. The Dock icon is
+    // acceptable here: it disappears again as soon as the station closes,
+    // because `StationWindow.onDisappear` clears `stationVisible` and the
+    // `DockVisibilityCoordinator` observer flips the policy back.
+    if !store.stationVisible {
+      store.stationVisible = true
+      NSApplication.shared.setActivationPolicy(.regular)
+    }
     windowOpener?("station")
+  }
+
+  /// Close the station NSWindow if it is currently on screen. The menu-bar
+  /// process stays alive so the user can reopen the station later. No-op when
+  /// the station is already hidden.
+  func closeStation() {
+    guard store.stationVisible else { return }
+    let stationTitle = MPString.station.windowTitle
+    for window in NSApp.windows where window.title == stationTitle {
+      window.performClose(nil)
+    }
+    // `performClose` is asynchronous: the window's `.onDisappear` callback
+    // does not fire until the next runloop tick, and the `DockVisibilityCoordinator`
+    // observer would not see the policy change until that loop runs. Flip the
+    // activation policy synchronously so the Dock icon disappears at the same
+    // time the station window does, instead of staying visible for a frame or
+    // two after Cmd+Q.
+    store.stationVisible = false
+    NSApplication.shared.setActivationPolicy(.accessory)
   }
 
   func showOnboarding() {
@@ -273,6 +327,7 @@ final class AppPulseActions: PulseActions {
   }
 
   func quit() {
+    requestedQuitFromMenu = true
     NSApp.terminate(nil)
   }
 

@@ -48,11 +48,7 @@ public enum PairingCodeFormat {
   public static let length = 10
 
   public static func display(_ raw: String) -> String {
-    guard raw.count == length else {
-      return raw
-    }
-    let split = raw.index(raw.startIndex, offsetBy: 5)
-    return "\(raw[..<split])-\(raw[split...])"
+    raw
   }
 }
 

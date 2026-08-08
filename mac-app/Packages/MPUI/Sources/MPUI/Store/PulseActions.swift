@@ -21,6 +21,7 @@ public protocol PulseActions: AnyObject {
   func revealRecoveryPhrase() async
   func deleteEverything() async
   func completeOnboarding()
+  func retryLaunch() async
 
   func openAccessibilitySettings() -> Bool
   func openLoginItemsSettings()
@@ -43,4 +44,6 @@ public extension PulseActions {
   func setAvailable() async {
     await setAvailable(for: .m30)
   }
+
+  func retryLaunch() async {}
 }

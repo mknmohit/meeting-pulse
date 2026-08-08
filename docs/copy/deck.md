@@ -163,6 +163,7 @@ Section title: `Watch`
 - Group headers: `Permission` · `What the Mac watches` · `Publishing`
 - Accessibility row: `Accessibility`, value `Granted` or `Not granted`, detail `Meeting Pulse reads window titles. It never reads what is inside them.`
 - Permission banner: `Meeting Pulse can't see your windows yet.` / `Turn on Accessibility so the Mac can read window titles. It never reads what is inside them.` / `Open Accessibility settings`
+- First registration rail: `Quick security check` / `Complete this once to connect your private link.`
 - If that button fails: `Open System Settings, then Privacy & Security, then Accessibility.`
 - Sources: `Google Meet` · `Slack huddles`
 - Source values: `In a call` · `No call` · `Can't tell` · `Not seen yet`

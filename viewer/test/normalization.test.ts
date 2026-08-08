@@ -12,6 +12,7 @@ describe('pairing code normalization', () => {
   });
 
   it('accepts exactly ten canonical characters', () => {
+    expect(isPairingCode('1234567890')).toBe(true);
     expect(isPairingCode(['12345', '67890'].join('-'))).toBe(true);
     expect(isPairingCode('1234')).toBe(false);
   });

@@ -350,8 +350,8 @@ The app must never stop local monitoring, because it has to detect the *next* me
 
 | Mode | Behaviour |
 |---|---|
-| **Idle** | Register AX and app-lifecycle notifications. Low-power safety sample every **15 s** (`idleSampleInterval`). Re-evaluate immediately when Chrome or Slack changes. |
-| **Candidate/Active** | Re-evaluate immediately on events. Safety sample every **2 s** (`activeSampleInterval`). Require **two consecutive** inactive observations before declaring a meeting ended (`endSettleCount = 2`). Return to Idle after the reducer confirms the end. |
+| **Idle** | Register AX and app-lifecycle notifications. Low-power safety sample every **20 s** (`idleSampleInterval`). Re-evaluate immediately when Chrome or Slack changes. |
+| **Candidate/Active** | Re-evaluate immediately on events. Safety sample every **5 s** (`activeSampleInterval`). Require **two consecutive** inactive observations before declaring a meeting ended (`endSettleCount = 2`). Return to Idle after the reducer confirms the end. |
 
 All three values are configuration, not literals, and must be tunable without a rebuild (read from `Defaults` with the above fallbacks) so they can be adjusted during detector validation.
 
@@ -562,7 +562,7 @@ All are `SECURITY DEFINER`, `SET search_path = public, pg_temp`, and revoke `EXE
 
 ### 8.5 Pairing code security — **CHANGED (audit A5, B12, B15)**
 
-**Code format.** Crockford Base32 alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I, L, O, U), **10 characters = 50 bits** of entropy, generated from `SecRandomCopyBytes`, displayed as `XXXXX-XXXXX`.
+**Code format.** Crockford Base32 alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I, L, O, U), **10 characters = 50 bits** of entropy, generated from `SecRandomCopyBytes`, displayed as `XXXXXXXXXX`.
 
 **Normalization** before hashing, on both sides, identically: uppercase; strip all non-alphabet characters (so hyphens and spaces are irrelevant); map `I`→`1`, `L`→`1`, `O`→`0` (Crockford's standard confusables). Reject any code whose normalized length ≠ 10.
 
@@ -739,7 +739,7 @@ If a dependency violates these, remove or replace it before adding features.
 | Path | Bound |
 |---|---|
 | Confirmed start → local menu-bar state, **when an AX event fires** | ≤ 5 s |
-| Confirmed start → local state, **no AX event (safety sample only)** | ≤ 15 s (`idleSampleInterval`) + publish latency |
+| Confirmed start → local state, **no AX event (safety sample only)** | ≤ 20 s (`idleSampleInterval`) + publish latency |
 | Confirmed end → local state | Two-sample settle (≈ 4 s in active mode) |
 | Local state → focused viewer | ≤ 30 s (next poll), or immediate on `Refresh now` |
 | Heartbeat loss → `Status unavailable` on the viewer | ≤ 180 s + the next read (≤ 210 s) |
@@ -815,7 +815,7 @@ Every "open decision" from v1 §12 is now closed. These are binding.
 | Minimum macOS target | **14.0**, Universal 2, Xcode 16.x / Swift 6.0 |
 | Exact AX labels/roles | Determined empirically by **Spikes S1 and S2**; isolated to one module per detector |
 | Cloudflare Pages project & DNS | Project `meetingpulse-viewer`; `PUBLIC_STATUS_ORIGINS` is required build config with no default. `og.techdevix.com` appears only as a documentation example |
-| Code alphabet and length | **Crockford Base32, 10 chars, 50 bits**, shown `XXXXX-XXXXX` |
+| Code alphabet and length | **Crockford Base32, 10 chars, 50 bits**, shown `XXXXXXXXXX` |
 | RPC only, or an Edge Function | **Postgres RPC only.** Turnstile is verified by Supabase Auth natively; no Edge Function is needed |
 | Heartbeat interval | **60 s**, stale at **180 s**; viewer polls **30 s** when focused. Revisit after real-world use |
 | Universal binary in v1 | **Yes** |

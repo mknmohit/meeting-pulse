@@ -11,28 +11,51 @@ public struct PublishRail: View {
 
   public var body: some View {
     VStack(alignment: .leading, spacing: MPSpace.hair) {
-      GeometryReader { geometry in
-        RoundedRectangle(cornerRadius: 2)
-          .fill(railColor)
-          .frame(width: railWidth(total: geometry.size.width), height: 3)
-          .frame(maxWidth: .infinity, alignment: .leading)
+      HStack(spacing: MPSpace.hair) {
+        Image(systemName: railSymbol)
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(railColor)
+          .accessibilityHidden(true)
+        Text(railLabel)
+          .font(MPFont.chalkLine)
+          .foregroundStyle(store.syncState == .idle ? MPColor.chalk : MPColor.brass)
+          .lineLimit(1)
       }
-      .frame(height: 3)
-
-      Text(railLabel)
-        .font(MPFont.chalkLine)
-        .foregroundStyle(store.syncState == .idle ? MPColor.chalk : MPColor.brass)
-        .lineLimit(1)
     }
     .padding(.horizontal, MPSpace.base)
     .padding(.vertical, MPSpace.tight)
-    .background(MPColor.groundRail)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .overlay(alignment: .top) {
+      Rectangle()
+        .fill(MPColor.chalk.opacity(0.14))
+        .frame(height: 1)
+    }
   }
 
   private var railColor: Color {
     store.syncState == .idle
       ? MPColor.chalk
       : (increaseContrast ? MPColor.brassIncreaseContrast : MPColor.brass)
+  }
+
+  private var railSymbol: String {
+    if !store.isOnline {
+      return "wifi.slash"
+    }
+    switch store.publishState {
+    case .never:
+      return "circle.dashed"
+    case .publishing:
+      return "arrow.up.circle"
+    case .retrying:
+      return "arrow.clockwise.circle"
+    case .offline:
+      return "wifi.slash"
+    case .superseded:
+      return "exclamationmark.triangle"
+    case .published:
+      return "checkmark.circle.fill"
+    }
   }
 
   private var railLabel: String {
@@ -53,19 +76,6 @@ public struct PublishRail: View {
     case .published(let date):
       let seconds = max(Int(Date.now.timeIntervalSince(date)), 0)
       return MPString.Relative.published(seconds)
-    }
-  }
-
-  private func railWidth(total: CGFloat) -> CGFloat {
-    switch store.publishState {
-    case .never:
-      return total * 0.5
-    case .published:
-      return total
-    case .publishing:
-      return total * 0.7
-    case .retrying, .offline, .superseded:
-      return total * 0.15
     }
   }
 }

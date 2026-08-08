@@ -13,13 +13,29 @@ public struct ModeControl: View {
 
   public var body: some View {
     VStack(spacing: MPSpace.tight) {
-      Picker("", selection: modeBinding) {
-        Text(MPString.mast.modeBusy).tag(PulseMode.busy)
-        Text(MPString.mast.modeAutomatic).tag(PulseMode.automatic)
-        Text(MPString.mast.modeAvailable).tag(PulseMode.available)
+      HStack(spacing: MPSpace.hair) {
+        modeButton(
+          title: MPString.mast.modeBusy,
+          mode: .busy
+        )
+        modeButton(
+          title: MPString.mast.modeAutomatic,
+          mode: .automatic
+        )
+        modeButton(
+          title: MPString.mast.modeAvailable,
+          mode: .available
+        )
       }
-      .pickerStyle(.segmented)
-      .labelsHidden()
+      .padding(MPSpace.hair)
+      .background(
+        RoundedRectangle(cornerRadius: MPRadius.well, style: .continuous)
+          .fill(MPColor.groundRail)
+          .overlay(
+            RoundedRectangle(cornerRadius: MPRadius.well, style: .continuous)
+              .strokeBorder(MPColor.chalk.opacity(0.2), lineWidth: 1)
+          )
+      )
 
       if store.mode != .automatic {
         HStack {
@@ -39,6 +55,15 @@ public struct ModeControl: View {
       }
     }
     .frame(width: MPShape.plateWidth)
+  }
+
+  private func modeButton(title: String, mode: PulseMode) -> some View {
+    ModeRailButton(
+      title: title,
+      isSelected: store.mode == mode
+    ) {
+      modeBinding.wrappedValue = mode
+    }
   }
 
   private var modeBinding: Binding<PulseMode> {
@@ -72,5 +97,60 @@ public struct ModeControl: View {
         }
       }
     )
+  }
+}
+
+private struct ModeRailButton: View {
+  let title: String
+  let isSelected: Bool
+  let action: () -> Void
+
+  @Environment(\.isEnabled) private var isEnabled
+  @FocusState private var isFocused
+  @SwiftUI.State private var isHovered = false
+
+  init(title: String, isSelected: Bool, action: @escaping () -> Void) {
+    self.title = title
+    self.isSelected = isSelected
+    self.action = action
+  }
+
+  var body: some View {
+    Button(action: action) {
+      Text(title)
+        .font(MPFont.rowValue.weight(isSelected ? .semibold : .regular))
+        .foregroundStyle(isSelected ? MPColor.ground : MPColor.chalk)
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, minHeight: 32)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .background(
+      RoundedRectangle(cornerRadius: MPRadius.cell, style: .continuous)
+        .fill(backgroundColor)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: MPRadius.cell, style: .continuous)
+        .strokeBorder(focusColor, lineWidth: 2)
+        .padding(-2)
+    )
+    .focused($isFocused)
+    .onHover { isHovered = $0 }
+    .opacity(isEnabled ? 1 : 0.45)
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+  }
+
+  private var backgroundColor: Color {
+    if isSelected {
+      return MPColor.brass
+    }
+    if isHovered {
+      return MPColor.chalk.opacity(0.1)
+    }
+    return .clear
+  }
+
+  private var focusColor: Color {
+    isFocused ? (isSelected ? MPColor.ground : MPColor.brass) : .clear
   }
 }

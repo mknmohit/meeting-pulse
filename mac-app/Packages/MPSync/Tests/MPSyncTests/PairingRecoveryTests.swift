@@ -14,7 +14,7 @@ struct PairingRecoveryTests {
     let result = try await service.createCode()
 
     #expect(result.rawCode.count == PairingCodeFormat.length)
-    #expect(result.displayCode.contains("-"))
+    #expect(result.displayCode == result.rawCode)
     #expect(
       transport.createdPairingHash
         == CrockfordBase32.sha256Hex(

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import MPSupport
 
@@ -30,11 +31,25 @@ public struct StationWindow: View {
     .frame(minWidth: 940, minHeight: 620)
     .environment(\.mpIncreaseContrast, contrastOverride ?? systemContrast)
     .onAppear {
-      store.stationVisible = true
+      // Mark the station as visible and flip the activation policy to
+      // `.regular` synchronously. The synchronous flip ensures the Dock icon
+      // appears at the same moment SwiftUI presents the window, even before
+      // the `DockVisibilityCoordinator` observer has a chance to react. The
+      // observer's subsequent application is a no-op.
+      if !store.stationVisible {
+        store.stationVisible = true
+        NSApplication.shared.setActivationPolicy(.regular)
+      }
       systemContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
     }
     .onDisappear {
+      // Mark the station as hidden and flip the activation policy to
+      // `.accessory` synchronously. Without this, the user clicking the red
+      // close button would close the window but the Dock icon would stay
+      // visible until the next runloop tick (when the observer fires). The
+      // synchronous flip keeps the Dock icon in lockstep with the window.
       store.stationVisible = false
+      NSApplication.shared.setActivationPolicy(.accessory)
     }
   }
 }
@@ -47,31 +62,108 @@ private struct StationSidebar: View {
   var body: some View {
     VStack(spacing: 0) {
       MastView(store: store, actions: actions)
-      Spacer(minLength: MPSpace.loose)
-      Divider()
-      List {
-        ForEach(StationSection.allCases) { section in
-          Button {
-            selection = section
-          } label: {
-            Label(section.title, systemImage: section.symbol)
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
-          .buttonStyle(.plain)
-          .padding(.vertical, MPSpace.hair)
-          .background(
-            selection == section
-              ? Color.accentColor.opacity(0.12)
-              : Color.clear,
-            in: RoundedRectangle(cornerRadius: MPRadius.cell)
-          )
-        }
-      }
-      .listStyle(.sidebar)
       Spacer(minLength: MPSpace.tight)
-      PublishRail(store: store)
+      VStack(spacing: 0) {
+        ScrollView {
+          VStack(spacing: MPSpace.hair) {
+            ForEach(StationSection.allCases) { section in
+              SidebarNavigationRow(
+                section: section,
+                isSelected: selection == section
+              ) {
+                selection = section
+              }
+            }
+          }
+          .padding(.horizontal, MPSpace.tight)
+          .padding(.vertical, MPSpace.hair)
+        }
+        .scrollIndicators(.hidden)
+        .frame(maxWidth: .infinity)
+        PublishRail(store: store)
+      }
+      .background(
+        RoundedRectangle(cornerRadius: MPRadius.well, style: .continuous)
+          .fill(MPColor.groundRail)
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: MPRadius.well, style: .continuous)
+          .strokeBorder(MPColor.chalk.opacity(0.16), lineWidth: 1)
+      )
+      .clipShape(RoundedRectangle(cornerRadius: MPRadius.well, style: .continuous))
+      .padding(.horizontal, MPSpace.tight)
     }
     .background(MPColor.ground)
+  }
+}
+
+private struct SidebarNavigationRow: View {
+  let section: StationSection
+  let isSelected: Bool
+  let action: () -> Void
+
+  @Environment(\.isEnabled) private var isEnabled
+  @FocusState private var isFocused
+  @SwiftUI.State private var isHovered = false
+
+  init(section: StationSection, isSelected: Bool, action: @escaping () -> Void) {
+    self.section = section
+    self.isSelected = isSelected
+    self.action = action
+  }
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: MPSpace.snug) {
+        Image(systemName: section.symbol)
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(isSelected ? MPColor.brass : MPColor.chalk)
+          .frame(width: 18)
+        Text(section.title)
+          .font(MPFont.rowLabel.weight(isSelected ? .semibold : .regular))
+          .foregroundStyle(MPColor.chalk)
+        Spacer(minLength: 0)
+      }
+      .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+      .padding(.horizontal, MPSpace.snug)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .frame(maxWidth: .infinity)
+    .contentShape(Rectangle())
+    .background(
+      RoundedRectangle(cornerRadius: MPRadius.cell, style: .continuous)
+        .fill(backgroundColor)
+    )
+    .overlay(alignment: .leading) {
+      RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+        .fill(isSelected ? MPColor.brass : .clear)
+        .frame(width: 2, height: 20)
+        .padding(.leading, MPSpace.hair)
+    }
+    .overlay(
+      RoundedRectangle(cornerRadius: MPRadius.cell, style: .continuous)
+        .strokeBorder(focusColor, lineWidth: 2)
+        .padding(-2)
+    )
+    .focused($isFocused)
+    .onHover { isHovered = $0 }
+    .opacity(isEnabled ? 1 : 0.45)
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
+  }
+
+  private var backgroundColor: Color {
+    if isSelected {
+      return MPColor.brass.opacity(0.14)
+    }
+    if isHovered {
+      return MPColor.chalk.opacity(0.08)
+    }
+    return .clear
+  }
+
+  private var focusColor: Color {
+    isFocused ? MPColor.brass : .clear
   }
 }
 

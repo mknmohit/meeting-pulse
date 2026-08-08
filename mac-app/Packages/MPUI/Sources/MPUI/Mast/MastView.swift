@@ -19,12 +19,14 @@ public struct MastView: View {
         supporting: store.plateSupporting
       )
 
-      Text(store.reasonLine)
-        .font(MPFont.chalkLine)
-        .foregroundStyle(reasonColor)
-        .multilineTextAlignment(.center)
-        .lineLimit(2)
-        .frame(maxWidth: MPShape.plateWidth)
+      TimelineView(.periodic(from: .now, by: 30)) { context in
+        Text(store.reasonLine(at: context.date))
+          .font(MPFont.chalkLine)
+          .foregroundStyle(reasonColor)
+          .multilineTextAlignment(.center)
+          .lineLimit(2)
+          .frame(maxWidth: MPShape.plateWidth)
+      }
 
       ModeControl(store: store, actions: actions)
       CallsOkaySwitch(store: store, actions: actions)

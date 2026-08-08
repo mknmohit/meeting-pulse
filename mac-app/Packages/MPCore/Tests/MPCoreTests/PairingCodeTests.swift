@@ -27,7 +27,7 @@ struct PairingCodeTests {
     let code = CrockfordBase32.generate(characters: PairingCodeFormat.length)
     #expect(code.count == PairingCodeFormat.length)
     #expect(code.allSatisfy { CrockfordBase32.alphabet.contains($0) })
-    #expect(PairingCodeFormat.display("1234567890") == ["12345", "67890"].joined(separator: "-"))
+    #expect(PairingCodeFormat.display("1234567890") == "1234567890")
   }
 
   @Test

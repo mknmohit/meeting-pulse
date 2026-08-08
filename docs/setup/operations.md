@@ -24,9 +24,29 @@ logs.
 
 ## Retention
 
-An operator may review devices whose `current_status.last_seen_at` is older
-than 90 days and remove them after confirming that the owner no longer needs
-the pairing. Do not prune an active device based only on viewer inactivity.
+The migration `20260808000200_retention_cleanup.sql` defines
+`public.mp_run_retention_cleanup()`, scheduled daily at 03:15 UTC via
+`pg_cron` (when the extension is enabled on the project). It deletes only
+terminal rows and never touches an active pairing:
+
+- `pairing_codes` rows that are claimed or revoked for 30+ days.
+- `viewers` rows with `revoked_at` older than 90 days (active pairings are
+  preserved across long inactivity on both sides).
+- `pairing_attempts` rows whose 15-minute throttle window has expired.
+- `pairing_attempts_global` counter reset in place when its 1-hour window
+  has expired (not deleted, since it is a singleton).
+- `devices` rows that are soft-revoked AND no longer referenced by any
+  viewer (active or revoked), older than 90 days.
+
+Active devices and active viewer pairings are never pruned by the cleanup.
+The pairing survives until the owner calls `create_pairing_code`,
+`rotate_pairing_codes`, `revoke_viewer`, `revoke_all_viewers`, or
+`delete_device`.
+
+If `pg_cron` is not enabled on the target project, the migration skips
+scheduling and an operator should invoke
+`select public.mp_run_retention_cleanup();` from a Supabase Edge Function
+on its own cron trigger, or run it manually from the SQL editor.
 
 ## Free-tier pausing
 

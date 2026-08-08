@@ -9,8 +9,8 @@ public struct DetectionTuning: Codable, Equatable, Sendable {
   public var timerLeeway: Duration
 
   public init(
-    idleSampleInterval: Duration = .seconds(15),
-    activeSampleInterval: Duration = .seconds(2),
+    idleSampleInterval: Duration = .seconds(20),
+    activeSampleInterval: Duration = .seconds(5),
     endSettleCount: Int = 2,
     maxLatchDuration: Duration = .seconds(14_400),
     timerLeeway: Duration = .milliseconds(500)

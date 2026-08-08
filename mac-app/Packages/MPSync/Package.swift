@@ -23,7 +23,8 @@ let package = Package(
       dependencies: [
         .product(name: "MPCore", package: "MPCore"),
         .product(name: "MPSupport", package: "MPSupport"),
-        .product(name: "Supabase", package: "supabase-swift"),
+        .product(name: "Auth", package: "supabase-swift"),
+        .product(name: "PostgREST", package: "supabase-swift"),
       ],
       swiftSettings: [.enableUpcomingFeature("StrictConcurrency")]
     ),
