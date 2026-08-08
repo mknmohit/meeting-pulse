@@ -16,9 +16,10 @@ public struct SharingSection: View {
 
   public var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: MPSpace.loose) {
+      VStack(alignment: .leading, spacing: MPSpace.open) {
         Text(MPString.sharing.headline)
           .font(MPFont.sectionTitle)
+          .padding(.bottom, MPSpace.tight)
 
         if store.viewerLinks.isEmpty {
           MPEmptyState(
@@ -42,7 +43,7 @@ public struct SharingSection: View {
               .buttonStyle(.link)
               .foregroundStyle(.red)
             }
-            .padding(.top, MPSpace.tight)
+            .padding(.top, MPSpace.snug)
           }
 
           MPGroup(title: MPString.sharing.viewers) {
@@ -51,7 +52,7 @@ public struct SharingSection: View {
         }
       }
       .padding(.horizontal, MPSpace.open)
-      .padding(.vertical, MPSpace.loose)
+      .padding(.vertical, MPSpace.breath)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .task {
@@ -133,7 +134,7 @@ private struct ViewerLinkCard: View {
   let actions: any PulseActions
 
   var body: some View {
-    VStack(alignment: .leading, spacing: MPSpace.tight) {
+    VStack(alignment: .leading, spacing: MPSpace.snug) {
       if let pairingCode = store.pairingCode {
         Text(PairingCodeFormat.display(pairingCode))
           .font(MPFont.code)

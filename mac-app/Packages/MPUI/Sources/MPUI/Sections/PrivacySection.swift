@@ -6,9 +6,10 @@ public struct PrivacySection: View {
 
   public var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: MPSpace.loose) {
+      VStack(alignment: .leading, spacing: MPSpace.open) {
         Text(MPString.privacy.headline)
           .font(MPFont.sectionTitle)
+          .padding(.bottom, MPSpace.tight)
         HStack(alignment: .top, spacing: MPSpace.base) {
           privacyGroup(
             title: MPString.privacy.leavesThisMac,
@@ -48,7 +49,7 @@ public struct PrivacySection: View {
           .font(MPFont.rowLabel)
       }
       .padding(.horizontal, MPSpace.open)
-      .padding(.vertical, MPSpace.loose)
+      .padding(.vertical, MPSpace.breath)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
   }

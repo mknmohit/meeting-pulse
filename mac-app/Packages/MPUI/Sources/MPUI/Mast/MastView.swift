@@ -11,7 +11,7 @@ public struct MastView: View {
   }
 
   public var body: some View {
-    VStack(spacing: MPSpace.base) {
+    VStack(spacing: MPSpace.snug) {
       MPPlate(
         face: store.plateFace,
         ownerName: store.displayName.isEmpty ? nil : store.displayName,

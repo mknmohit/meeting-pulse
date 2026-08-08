@@ -11,7 +11,7 @@ public actor PermissionCoordinator {
   private var lastValue: Bool?
 
   public init(
-    pollInterval: Duration = .seconds(1),
+    pollInterval: Duration = .seconds(5),
     trustProvider: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() }
   ) {
     self.trustProvider = trustProvider

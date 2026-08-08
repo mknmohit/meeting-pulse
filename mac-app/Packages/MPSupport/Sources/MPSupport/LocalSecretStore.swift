@@ -8,6 +8,13 @@ public final class LocalSecretStore: SecretStore, @unchecked Sendable {
   private let fileURL: URL
   private let fileManager: FileManager
   private let lock = NSLock()
+  // Cached decoded dictionary. The previous implementation re-read the
+  // entire plist from disk on every `read`, `save`, and `delete`. The
+  // storage is now appended/mutated through an in-memory cache and the
+  // file is only touched when the cache is undefined. The cache is
+  // invalidated on stale-modified time to detect external writes.
+  private var cachedValues: [String: Data]?
+  private var cachedAt: Date?
 
   public init(
     fileURL: URL? = nil,
@@ -47,16 +54,39 @@ public final class LocalSecretStore: SecretStore, @unchecked Sendable {
   }
 
   private func load() throws -> [String: Data] {
+    if let cachedValues,
+      let cachedAt,
+      let modified = modificationDate(),
+      abs(modified.timeIntervalSince(cachedAt)) < 0.5
+    {
+      return cachedValues
+    }
+
     guard fileManager.fileExists(atPath: fileURL.path) else {
+      cachedValues = [:]
+      cachedAt = Date()
       return [:]
     }
 
     let data = try Data(contentsOf: fileURL)
     do {
-      return try PropertyListDecoder().decode([String: Data].self, from: data)
+      let decoded = try PropertyListDecoder().decode([String: Data].self, from: data)
+      cachedValues = decoded
+      cachedAt = modificationDate() ?? Date()
+      return decoded
     } catch {
+      // Cached state is now stale; clear it so the next call re-reads the
+      // file and we don't keep returning the previous good copy after a
+      // malformed write.
+      cachedValues = nil
+      cachedAt = nil
       throw StoreError.invalidData
     }
+  }
+
+  private func modificationDate() -> Date? {
+    let attributes = try? fileManager.attributesOfItem(atPath: fileURL.path)
+    return attributes?[.modificationDate] as? Date
   }
 
   private func persist(_ values: [String: Data]) throws {
@@ -64,6 +94,8 @@ public final class LocalSecretStore: SecretStore, @unchecked Sendable {
       if fileManager.fileExists(atPath: fileURL.path) {
         try fileManager.removeItem(at: fileURL)
       }
+      cachedValues = [:]
+      cachedAt = Date()
       return
     }
 
@@ -104,6 +136,8 @@ public final class LocalSecretStore: SecretStore, @unchecked Sendable {
       [.posixPermissions: 0o600],
       ofItemAtPath: fileURL.path
     )
+    cachedValues = values
+    cachedAt = Date()
   }
 
   private static func defaultFileURL(fileManager: FileManager) -> URL {

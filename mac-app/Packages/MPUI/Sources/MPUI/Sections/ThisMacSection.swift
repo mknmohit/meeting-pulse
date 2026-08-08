@@ -16,9 +16,10 @@ public struct ThisMacSection: View {
 
   public var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: MPSpace.loose) {
+      VStack(alignment: .leading, spacing: MPSpace.open) {
         Text(MPString.thisMac.headline)
           .font(MPFont.sectionTitle)
+          .padding(.bottom, MPSpace.tight)
 
         if !store.installLocationIsValid {
           MPBanner(
@@ -80,7 +81,7 @@ public struct ThisMacSection: View {
         }
       }
       .padding(.horizontal, MPSpace.open)
-      .padding(.vertical, MPSpace.loose)
+      .padding(.vertical, MPSpace.breath)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .onAppear {
@@ -161,7 +162,7 @@ struct RecoveryPhraseView: View {
   @State private var resetID = 0
 
   var body: some View {
-    VStack(alignment: .leading, spacing: MPSpace.tight) {
+    VStack(alignment: .leading, spacing: MPSpace.snug) {
       if isPresented, let phrase = store.recoveryPhrase {
         Text(phrase)
           .font(MPFont.phrase)

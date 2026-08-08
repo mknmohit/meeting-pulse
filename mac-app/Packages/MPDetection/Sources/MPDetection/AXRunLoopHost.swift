@@ -177,10 +177,16 @@ public final class AXRunLoopHost: AXElementTree, AXEventSource, @unchecked Senda
       CFRunLoopAddSource(CFRunLoopGetCurrent(), source, CFRunLoopMode.defaultMode!)
     }
     ready.signal()
+    // The previous implementation used a 1-second timeout, which meant the
+    // dedicated AX thread woke up roughly every second even when no
+    // notifications were pending. The thread is correctly woken by
+    // `CFRunLoopWakeUp` whenever `schedule(...)` is invoked, so a 30-second
+    // timeout keeps observers responsive while removing the 1 Hz spin that
+    // contributed to steady CPU/RAM overhead.
     while true {
       let result = CFRunLoopRunInMode(
         CFRunLoopMode.defaultMode!,
-        1,
+        30,
         false
       )
       if result == .stopped {

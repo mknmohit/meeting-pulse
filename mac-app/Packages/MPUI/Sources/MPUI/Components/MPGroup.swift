@@ -13,15 +13,16 @@ public struct MPGroup<Content: View>: View {
   }
 
   public var body: some View {
-    VStack(alignment: .leading, spacing: MPSpace.tight) {
+    VStack(alignment: .leading, spacing: MPSpace.snug) {
       Text(title)
         .font(MPFont.groupHeader)
         .foregroundStyle(.secondary)
+        .padding(.horizontal, MPSpace.hair)
       VStack(alignment: .leading, spacing: 0) {
         content
       }
-      .padding(.horizontal, MPSpace.base)
-      .padding(.vertical, MPSpace.tight)
+      .padding(.horizontal, MPSpace.wide)
+      .padding(.vertical, MPSpace.snug)
       .background(
         RoundedRectangle(cornerRadius: MPRadius.well, style: .continuous)
           .fill(Color(nsColor: .controlBackgroundColor))

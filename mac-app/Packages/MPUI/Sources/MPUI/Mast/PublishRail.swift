@@ -23,7 +23,7 @@ public struct PublishRail: View {
       }
     }
     .padding(.horizontal, MPSpace.base)
-    .padding(.vertical, MPSpace.tight)
+    .padding(.vertical, MPSpace.snug)
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .top) {
       Rectangle()

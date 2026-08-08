@@ -17,7 +17,7 @@ public struct MPRow<Trailing: View>: View {
 
   public var body: some View {
     HStack(alignment: .top, spacing: MPSpace.base) {
-      VStack(alignment: .leading, spacing: MPSpace.hair) {
+      VStack(alignment: .leading, spacing: MPSpace.tight) {
         Text(label)
           .font(MPFont.rowLabel)
         if let detail {
@@ -30,7 +30,7 @@ public struct MPRow<Trailing: View>: View {
       Spacer(minLength: MPSpace.base)
       trailing
     }
-    .padding(.vertical, MPSpace.tight)
+    .padding(.vertical, MPSpace.snug)
     .contentShape(Rectangle())
   }
 }

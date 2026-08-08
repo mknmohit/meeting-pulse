@@ -177,7 +177,7 @@ public actor GoogleMeetDetector: MeetingDetector {
         let snapshot = try await elementTree.snapshot(
           pid: app.processIdentifier,
           maxDepth: 20,
-          maxElements: 5_000
+          maxElements: 3_000
         )
         scanCompleted = scanCompleted && snapshot.scanCompleted
         confirmedSessions.formUnion(
@@ -352,7 +352,7 @@ public actor SlackHuddleDetector: MeetingDetector {
         let snapshot = try await elementTree.snapshot(
           pid: app.processIdentifier,
           maxDepth: 20,
-          maxElements: 5_000
+          maxElements: 3_000
         )
         scanCompleted = scanCompleted && snapshot.scanCompleted
         sawActive = sawActive || SlackSelectors.hasActiveHuddle(in: snapshot)

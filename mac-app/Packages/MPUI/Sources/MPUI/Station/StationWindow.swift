@@ -62,10 +62,10 @@ private struct StationSidebar: View {
   var body: some View {
     VStack(spacing: 0) {
       MastView(store: store, actions: actions)
-      Spacer(minLength: MPSpace.tight)
+      Spacer(minLength: MPSpace.snug)
       VStack(spacing: 0) {
         ScrollView {
-          VStack(spacing: MPSpace.hair) {
+          VStack(spacing: MPSpace.tight) {
             ForEach(StationSection.allCases) { section in
               SidebarNavigationRow(
                 section: section,
@@ -76,7 +76,7 @@ private struct StationSidebar: View {
             }
           }
           .padding(.horizontal, MPSpace.tight)
-          .padding(.vertical, MPSpace.hair)
+          .padding(.vertical, MPSpace.tight)
         }
         .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity)
@@ -116,16 +116,16 @@ private struct SidebarNavigationRow: View {
     Button(action: action) {
       HStack(spacing: MPSpace.snug) {
         Image(systemName: section.symbol)
-          .font(.system(size: 13, weight: .medium))
+          .font(.system(size: 14, weight: .medium))
           .foregroundStyle(isSelected ? MPColor.brass : MPColor.chalk)
-          .frame(width: 18)
+          .frame(width: 20)
         Text(section.title)
           .font(MPFont.rowLabel.weight(isSelected ? .semibold : .regular))
           .foregroundStyle(MPColor.chalk)
         Spacer(minLength: 0)
       }
-      .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
-      .padding(.horizontal, MPSpace.snug)
+      .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+      .padding(.horizontal, MPSpace.base)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)

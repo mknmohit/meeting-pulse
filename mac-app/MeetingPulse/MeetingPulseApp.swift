@@ -1210,9 +1210,10 @@ struct HeartThreadMenuIcon: View {
   let state: MeetingPulseState
   let callsOkay: Bool
   @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+  @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
-    Image(nsImage: menuBarImage)
+    Image(nsImage: cachedImage)
       .animation(
         accessibilityReduceMotion ? nil : .easeInOut(duration: 0.18),
         value: state
@@ -1227,7 +1228,24 @@ struct HeartThreadMenuIcon: View {
       .accessibilityIdentifier("meetingpulse.menu-bar-status")
   }
 
-  private var menuBarImage: NSImage {
+  /// Cached rasterization of the menu-bar icon. The original implementation
+  /// re-rasterized an NSImage with NSBezierPath on every SwiftUI render and
+  /// on every state change, allocating a 22x22 bitmap each time. The menu
+  /// bar re-evaluates the label frequently (every store mutation), so the
+  /// cache lookup now happens on a hot path. The cache is keyed on the
+  /// three render inputs that affect appearance: state, callsOkay,
+  /// colorScheme. NSCache evicts under memory pressure automatically.
+  private var cachedImage: NSImage {
+    let key = ImageCacheKey(state: state, callsOkay: callsOkay, colorScheme: colorScheme)
+    if let cached = ImageCache.shared.image(forKey: key) {
+      return cached
+    }
+    let image = renderMenuBarImage()
+    ImageCache.shared.setImage(image, forKey: key)
+    return image
+  }
+
+  private func renderMenuBarImage() -> NSImage {
     let image = NSImage(size: NSSize(width: 22, height: 22))
     image.lockFocusFlipped(true)
     defer {
@@ -1348,6 +1366,34 @@ struct HeartThreadMenuIcon: View {
     case .unavailable:
       return MPString.board.genericHeadline
     }
+  }
+}
+
+private struct ImageCacheKey: Hashable {
+  let state: MeetingPulseState
+  let callsOkay: Bool
+  let colorScheme: ColorScheme
+}
+
+private final class ImageCache: @unchecked Sendable {
+  static let shared = ImageCache()
+
+  private let cache = NSCache<NSString, NSImage>()
+
+  private init() {
+    cache.countLimit = 6
+  }
+
+  func image(forKey key: ImageCacheKey) -> NSImage? {
+    cache.object(forKey: Self.cacheKey(key))
+  }
+
+  func setImage(_ image: NSImage, forKey key: ImageCacheKey) {
+    cache.setObject(image, forKey: Self.cacheKey(key))
+  }
+
+  private static func cacheKey(_ key: ImageCacheKey) -> NSString {
+    "\(key.state.rawValue)-\(key.callsOkay ? 1 : 0)-\(key.colorScheme == .dark ? 1 : 0)" as NSString
   }
 }
 

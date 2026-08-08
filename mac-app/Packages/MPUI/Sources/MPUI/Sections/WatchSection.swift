@@ -13,9 +13,10 @@ public struct WatchSection: View {
 
   public var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: MPSpace.loose) {
+      VStack(alignment: .leading, spacing: MPSpace.open) {
         Text(MPString.station.watch)
           .font(MPFont.sectionTitle)
+          .padding(.bottom, MPSpace.tight)
 
         if store.turnstilePresentation == .verifying,
            let turnstileWebView = store.turnstileWebView {
@@ -103,7 +104,7 @@ public struct WatchSection: View {
         }
       }
       .padding(.horizontal, MPSpace.open)
-      .padding(.vertical, MPSpace.loose)
+      .padding(.vertical, MPSpace.breath)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
   }

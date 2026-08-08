@@ -18,6 +18,20 @@ public struct AXNode: Codable, Equatable, Sendable {
   public let path: String
   public let windowID: CGWindowID?
   public let children: [AXNode]
+  /// Pre-flattened descendant list. The previous implementation recomputed
+  /// this on every access via `children + children.flatMap(\.descendants)`,
+  /// yielding O(N^2) work over a 5,000-element Chrome accessibility tree and
+  /// allocating tens of megabytes of transient arrays per snapshot. Selectors
+  /// call `descendants` 4+ times per sample, which made this the single
+  /// biggest memory hotspot. The list is now built once at node construction
+  /// (iterative DFS, single allocation) and stored for the lifetime of the
+  /// snapshot.
+  public let descendants: [AXNode]
+
+  private enum CodingKeys: String, CodingKey {
+    case role, subrole, roleDescription, identifier, title, description, value,
+      help, enabled, focused, childCount, path, windowID, children
+  }
 
   public init(
     role: String?,
@@ -49,10 +63,65 @@ public struct AXNode: Codable, Equatable, Sendable {
     self.path = path
     self.windowID = windowID
     self.children = children
+    self.descendants = AXNode.flatten(children: children)
   }
 
-  public var descendants: [AXNode] {
-    children + children.flatMap(\.descendants)
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.role = try c.decodeIfPresent(String.self, forKey: .role)
+    self.subrole = try c.decodeIfPresent(String.self, forKey: .subrole)
+    self.roleDescription = try c.decodeIfPresent(String.self, forKey: .roleDescription)
+    self.identifier = try c.decodeIfPresent(String.self, forKey: .identifier)
+    self.title = try c.decodeIfPresent(String.self, forKey: .title)
+    self.description = try c.decodeIfPresent(String.self, forKey: .description)
+    self.value = try c.decodeIfPresent(String.self, forKey: .value)
+    self.help = try c.decodeIfPresent(String.self, forKey: .help)
+    self.enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled)
+    self.focused = try c.decodeIfPresent(Bool.self, forKey: .focused)
+    self.childCount = try c.decode(Int.self, forKey: .childCount)
+    self.path = try c.decode(String.self, forKey: .path)
+    self.windowID = try c.decodeIfPresent(CGWindowID.self, forKey: .windowID)
+    let decodedChildren = try c.decode([AXNode].self, forKey: .children)
+    self.children = decodedChildren
+    self.descendants = AXNode.flatten(children: decodedChildren)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encodeIfPresent(role, forKey: .role)
+    try c.encodeIfPresent(subrole, forKey: .subrole)
+    try c.encodeIfPresent(roleDescription, forKey: .roleDescription)
+    try c.encodeIfPresent(identifier, forKey: .identifier)
+    try c.encodeIfPresent(title, forKey: .title)
+    try c.encodeIfPresent(description, forKey: .description)
+    try c.encodeIfPresent(value, forKey: .value)
+    try c.encodeIfPresent(help, forKey: .help)
+    try c.encodeIfPresent(enabled, forKey: .enabled)
+    try c.encodeIfPresent(focused, forKey: .focused)
+    try c.encode(childCount, forKey: .childCount)
+    try c.encode(path, forKey: .path)
+    try c.encodeIfPresent(windowID, forKey: .windowID)
+    try c.encode(children, forKey: .children)
+  }
+
+  private static func flatten(children: [AXNode]) -> [AXNode] {
+    guard !children.isEmpty else {
+      return []
+    }
+    var totalCount = 0
+    for child in children {
+      totalCount += 1 + child.descendants.count
+    }
+    var result: [AXNode] = []
+    result.reserveCapacity(totalCount)
+    var stack: [AXNode] = children.reversed()
+    while let node = stack.popLast() {
+      result.append(node)
+      if !node.children.isEmpty {
+        stack.append(contentsOf: node.children.reversed())
+      }
+    }
+    return result
   }
 }
 

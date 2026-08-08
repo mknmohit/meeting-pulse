@@ -19,7 +19,7 @@ public struct MPEmptyState: View {
   }
 
   public var body: some View {
-    VStack(spacing: MPSpace.tight) {
+    VStack(spacing: MPSpace.snug) {
       DayShapeView(shape: .mast, tint: MPColor.chalk)
         .frame(width: 64, height: 96)
         .opacity(0.4)
@@ -36,10 +36,10 @@ public struct MPEmptyState: View {
         Button(actionTitle, action: action)
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
-          .padding(.top, MPSpace.tight)
+          .padding(.top, MPSpace.snug)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding(MPSpace.open)
+    .padding(MPSpace.breath)
   }
 }

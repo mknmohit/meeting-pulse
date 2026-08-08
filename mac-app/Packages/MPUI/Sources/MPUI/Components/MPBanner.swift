@@ -28,10 +28,10 @@ public struct MPBanner: View {
   }
 
   public var body: some View {
-    HStack(alignment: .top, spacing: MPSpace.tight) {
+    HStack(alignment: .top, spacing: MPSpace.snug) {
       Image(systemName: symbolName)
         .foregroundStyle(tint)
-      VStack(alignment: .leading, spacing: MPSpace.hair) {
+      VStack(alignment: .leading, spacing: MPSpace.tight) {
         Text(headline)
           .font(MPFont.rowLabel.weight(.semibold))
         if let detail {
@@ -42,12 +42,12 @@ public struct MPBanner: View {
         if let actionTitle, let action {
           Button(actionTitle, action: action)
             .buttonStyle(.link)
-            .padding(.top, MPSpace.hair)
+            .padding(.top, MPSpace.tight)
         }
       }
       Spacer(minLength: 0)
     }
-    .padding(MPSpace.base)
+    .padding(MPSpace.wide)
     .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: MPRadius.well))
   }
 
