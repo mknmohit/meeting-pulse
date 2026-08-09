@@ -7,7 +7,7 @@ Initial Meeting Pulse release for local macOS distribution.
 ### macOS app
 
 - Runs as a Swift 6 menu-bar application on macOS 14 or newer.
-- Detects Google Meet calls in Chrome and native Slack Huddles through
+- Detects Google Meet meetings in Chrome and native Slack Huddles through
   Accessibility APIs.
 - Uses a fail-closed reducer with available, busy, and unavailable states.
 - Publishes changes and a lightweight heartbeat without Realtime subscriptions.
@@ -45,6 +45,19 @@ Initial Meeting Pulse release for local macOS distribution.
 - Does not send meeting titles, URLs, participants, audio, video, screenshots,
   screen contents, camera state, or microphone state.
 - Does not request Screen Recording permission.
-- Provides separate optimized `arm64` and `x86_64` Release DMGs.
+- Supports up to five active viewer pairings with owner-side viewer deletion.
+- Supports couple-mode copy and viewer presentation alongside the standard
+  status copy.
 - The local `0.0.1` DMGs are ad-hoc signed and not notarized; first launch on a
   fresh Mac requires Finder's one-time Open action or quarantine removal.
+
+### Release assets
+
+The assets below were rebuilt from commit `ae347e2`:
+
+| Architecture | Downloadable asset | SHA-256 |
+|---|---|---|
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg` | `3e6ab802652985ceef5714430e50da83b8602b330354620a4cf1562135c2bc94` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.1-Intel-x86_64.dmg` | `e980014ea28624167c39fa4d747563ce50a96f589f1e0d2090fadeb343a78b77` |
+
+Both images are compressed, ad-hoc signed, and verified with `hdiutil`.

@@ -48,6 +48,16 @@ build/dmg/Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg
 build/dmg/Meeting-Pulse-0.0.1-Intel-x86_64.dmg
 ```
 
+The refreshed `0.0.1` assets built from commit `ae347e2` are:
+
+| Architecture | File | SHA-256 |
+|---|---|---|
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg` | `3e6ab802652985ceef5714430e50da83b8602b330354620a4cf1562135c2bc94` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.1-Intel-x86_64.dmg` | `e980014ea28624167c39fa4d747563ce50a96f589f1e0d2090fadeb343a78b77` |
+
+Both assets pass `hdiutil verify` and contain only their named target
+architecture.
+
 To create the DMG without changing the installed app:
 
 ```sh

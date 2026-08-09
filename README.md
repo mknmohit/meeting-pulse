@@ -1,9 +1,9 @@
 # Meeting Pulse
 
 Meeting Pulse is a privacy-first macOS menu-bar app and static viewer for one
-question: **is he on a call right now?**
+question: **is he in a meeting right now?**
 
-The macOS app watches Google Meet calls in Chrome and native Slack Huddles
+The macOS app watches Google Meet meetings in Chrome and native Slack Huddles
 through Accessibility APIs. The viewer reads only the latest trustworthy
 availability state from Supabase. Meeting titles, URLs, participants, audio,
 video, screenshots, screen contents, camera state, and microphone state never
