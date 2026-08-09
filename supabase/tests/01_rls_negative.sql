@@ -1,6 +1,6 @@
 begin;
 
-select plan(14);
+select plan(15);
 
 create temporary table fixture (
   owner_a uuid,
@@ -116,6 +116,14 @@ select throws_ok(
   '23505',
   'duplicate key value violates unique constraint "viewers_one_active_per_viewer"',
   'one active pairing is enforced per viewer'
+);
+
+select tests.become((select viewer from fixture));
+select throws_ok(
+  $$ select public.delete_viewer((select viewer from fixture)) $$,
+  '42704',
+  'no_device',
+  'viewers cannot hard-delete a binding'
 );
 
 select is(

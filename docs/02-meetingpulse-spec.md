@@ -511,6 +511,8 @@ viewers
   primary key (device_id, viewer_user_id)
   index on (viewer_user_id)                   -- audit C7: the RPC's actual lookup direction
 
+  -- At most five active bindings per owner device; older bindings expire by age.
+
 pairing_attempts                               -- internal; NO client grant
   viewer_user_id     uuid primary key references auth.users(id) on delete cascade
   window_started_at  timestamptz not null
@@ -538,7 +540,7 @@ pairing_attempts_global                        -- internal; single row, id = tru
 3. The Mac generates a high-entropy code locally, sends only `sha256(normalize(code))` to `create_pairing_code`.
 4. The owner shares the raw code directly or inside a viewer URL fragment.
 5. The viewer authenticates anonymously (Turnstile-gated) and calls `claim_pairing_code(raw_code)`.
-6. The RPC normalizes, hashes, looks up, verifies expiry/revocation, applies the three-layer throttle, links the viewer to the device, records the first claim, and returns success. **It does not return the device id** to the client. A persistent code remains reusable until the owner rotates or revokes it.
+6. The RPC normalizes, hashes, looks up, verifies expiry/revocation, applies the three-layer throttle, links the viewer to the device, enforces the five-viewer capacity, records the first claim, and returns success. **It does not return the device id** to the client. A persistent code remains reusable until the owner rotates or revokes it.
 7. The owner publishes via `publish_status`; the viewer reads via `get_paired_status`.
 
 **The raw code is never stored in Postgres and never logged.**
@@ -555,14 +557,19 @@ All are `SECURITY DEFINER`, `SET search_path = public, pg_temp`, and revoke `EXE
 | `create_pairing_code` | owner | `(p_code_hash text)` | `uuid` | Revokes the owner's other active codes first |
 | `rotate_pairing_codes` | owner | `()` | `integer` | Revokes all active codes and viewer bindings; returns the code count |
 | `revoke_viewer` | owner | `(p_viewer_user_id uuid)` | `void` | |
+| `delete_viewer` | owner | `(p_viewer_user_id uuid)` | `void` | Hard-deletes one binding; never deletes the auth user |
 | `revoke_all_viewers` | owner | `()` | `integer` | |
-| `list_viewers` | owner | `()` | `setof (viewer_user_id uuid, created_at timestamptz, revoked_at timestamptz)` | For the menu-bar revoke UI |
+| `list_viewers` | owner | `()` | `setof (viewer_user_id uuid, created_at timestamptz, revoked_at timestamptz)` | Active, non-expired rows for the owner UI; at most five |
 | `rebind_device` | owner | `(p_recovery_secret text)` | `uuid` | §8.6; throttled like a claim |
 | `delete_device` | owner | `()` | `void` | §8.7; cascades |
 | `claim_pairing_code` | viewer | `(p_code text)` | `jsonb {ok, reason}` | §8.5; generic failure reason |
 | `get_paired_status` | viewer | `()` | `jsonb` | **The only viewer read.** Returns exactly `{ display_name, state, call_okay, last_seen_at, server_now, schema_version }` |
 
 `get_paired_status()` deliberately omits `device_id`, `override_mode`, and `override_expires_at`. It returns `{ "paired": false }` when the viewer has no active pairing, so a revoked viewer gets a clear, non-enumerating answer.
+
+Viewer bindings expire 30 days after `created_at`; reads and owner lists treat
+older active rows as unpaired before the scheduled cleanup deletes them. A
+fourth distinct claim hard-deletes the oldest active binding for that device.
 
 ### 8.5 Pairing code security — **CHANGED (audit A5, B12, B15)**
 

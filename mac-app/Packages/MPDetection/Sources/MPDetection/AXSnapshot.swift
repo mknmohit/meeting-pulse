@@ -15,7 +15,6 @@ public struct AXNode: Codable, Equatable, Sendable {
   public let enabled: Bool?
   public let focused: Bool?
   public let childCount: Int
-  public let path: String
   public let windowID: CGWindowID?
   public let children: [AXNode]
   /// Pre-flattened descendant list. The previous implementation recomputed
@@ -30,7 +29,7 @@ public struct AXNode: Codable, Equatable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case role, subrole, roleDescription, identifier, title, description, value,
-      help, enabled, focused, childCount, path, windowID, children
+      help, enabled, focused, childCount, windowID, children
   }
 
   public init(
@@ -45,7 +44,6 @@ public struct AXNode: Codable, Equatable, Sendable {
     enabled: Bool?,
     focused: Bool?,
     childCount: Int,
-    path: String,
     windowID: CGWindowID?,
     children: [AXNode]
   ) {
@@ -60,7 +58,6 @@ public struct AXNode: Codable, Equatable, Sendable {
     self.enabled = enabled
     self.focused = focused
     self.childCount = childCount
-    self.path = path
     self.windowID = windowID
     self.children = children
     self.descendants = AXNode.flatten(children: children)
@@ -79,7 +76,6 @@ public struct AXNode: Codable, Equatable, Sendable {
     self.enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled)
     self.focused = try c.decodeIfPresent(Bool.self, forKey: .focused)
     self.childCount = try c.decode(Int.self, forKey: .childCount)
-    self.path = try c.decode(String.self, forKey: .path)
     self.windowID = try c.decodeIfPresent(CGWindowID.self, forKey: .windowID)
     let decodedChildren = try c.decode([AXNode].self, forKey: .children)
     self.children = decodedChildren
@@ -99,7 +95,6 @@ public struct AXNode: Codable, Equatable, Sendable {
     try c.encodeIfPresent(enabled, forKey: .enabled)
     try c.encodeIfPresent(focused, forKey: .focused)
     try c.encode(childCount, forKey: .childCount)
-    try c.encode(path, forKey: .path)
     try c.encodeIfPresent(windowID, forKey: .windowID)
     try c.encode(children, forKey: .children)
   }
@@ -173,7 +168,6 @@ func makeSnapshot(
   var scanCompleted = true
   let root = try makeNode(
     application,
-    path: "application",
     remainingDepth: maxDepth,
     maxElements: maxElements,
     elementCount: &elementCount,
@@ -189,7 +183,6 @@ func makeSnapshot(
 
 private func makeNode(
   _ element: AXUIElement,
-  path: String,
   remainingDepth: Int,
   maxElements: Int,
   elementCount: inout Int,
@@ -260,10 +253,9 @@ private func makeNode(
   let childElements = (childrenResult.1 as? [AXUIElement]) ?? []
   let children: [AXNode]
   if remainingDepth > 0 {
-    children = try childElements.enumerated().map { index, child in
+    children = try childElements.enumerated().map { _, child in
       try makeNode(
         child,
-        path: "\(path)/\(index)",
         remainingDepth: remainingDepth - 1,
         maxElements: maxElements,
         elementCount: &elementCount,
@@ -286,7 +278,6 @@ private func makeNode(
     enabled: enabled,
     focused: focused,
     childCount: childElements.count,
-    path: path,
     windowID: windowID(for: element),
     children: children
   )
@@ -339,6 +330,11 @@ private func stringValue(_ value: CFTypeRef?) -> String? {
     return nil
   }
   if let string = value as? String {
+    // Truncate accessibilitiy values to keep the snapshot compact. Strings
+    // already short enough are returned as-is to avoid allocating a copy.
+    if string.count <= 120 {
+      return string
+    }
     return String(string.prefix(120))
   }
   if let number = value as? NSNumber {

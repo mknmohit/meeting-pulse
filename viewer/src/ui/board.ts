@@ -1,5 +1,11 @@
 import { CONFIG } from '../config';
 import { ensureSession } from '../lib/auth';
+import { type CoupleDisplayState } from '../lib/coupleCopy';
+import {
+  readCoupleMode,
+  selectCouplePhrase,
+  writeCoupleMode,
+} from '../lib/coupleMode';
 import { COPY } from '../lib/copy';
 import {
   checkedLabel,
@@ -44,6 +50,16 @@ export function boot(): void {
   let fragmentPairingStarted = false;
   let initialHydrationComplete = false;
   let pairingStatus: 'unknown' | 'paired' | 'unpaired' = 'unknown';
+  let coupleMode = readCoupleMode();
+  let couplePhrase: string | null = null;
+  let couplePhraseDisplayState: CoupleDisplayState | null = null;
+  let couplePhraseName = '';
+  let lastBoardRender: {
+    display: DisplayState;
+    status: Reading['status'] | undefined;
+    offline: boolean;
+    coupleMode: boolean;
+} | null = null;
 
   const render = (): void => {
     if (!initialHydrationComplete) {
@@ -66,7 +82,25 @@ export function boot(): void {
     if (display === 'unpaired') {
       return;
     }
-    renderBoard(display, status, now);
+    if (
+      !lastBoardRender ||
+      lastBoardRender.display !== display ||
+      lastBoardRender.status !== status ||
+      lastBoardRender.offline !== (lastFetchFailed || !navigator.onLine) ||
+      lastBoardRender.coupleMode !== coupleMode
+    ) {
+      renderBoard(display, status, now);
+      lastBoardRender = {
+        display,
+        status,
+        offline: lastFetchFailed || !navigator.onLine,
+        coupleMode,
+      };
+      return;
+    }
+    elements.checked.textContent = checkedLabel(
+      (now - lastFetchMonotonic) / 1000,
+    );
   };
 
   const renderBoard = (
@@ -78,6 +112,8 @@ export function boot(): void {
     const effective = display;
     const previous = elements.plate.dataset.state;
     elements.plate.dataset.state = effective;
+    elements.plate.dataset.coupleMode = String(coupleMode);
+    syncCoupleModeControl();
     if (previous && previous !== effective) {
       elements.plate.classList.remove('is-changing');
       void elements.plate.offsetWidth;
@@ -87,25 +123,40 @@ export function boot(): void {
       shape.hidden = shape.dataset.shape !== shapeFor(effective);
       shape.style.display = shape.hidden ? 'none' : 'block';
     }
-    const name = status?.displayName ?? '';
-    elements.name.textContent = name;
-    elements.name.hidden = !name;
+    const name = status?.displayName?.trim() ?? '';
     elements.plate.dataset.hasName = String(Boolean(name));
-    if (effective === 'meeting') {
-      elements.headline.textContent = name
-        ? COPY.board.meeting.headlineWithName(name)
-        : COPY.board.meeting.headline;
-      elements.supporting.textContent = COPY.board.meeting.supporting;
-    } else if (effective === 'callOkay') {
-      elements.headline.textContent = name
-        ? COPY.board.callOkay.headlineWithName(name)
-        : COPY.board.callOkay.headline;
-      elements.supporting.textContent = COPY.board.callOkay.supporting;
+
+    if (coupleMode && isCoupleDisplayState(effective)) {
+      if (
+        couplePhrase === null ||
+        couplePhraseDisplayState !== effective ||
+        couplePhraseName !== name
+      ) {
+        couplePhrase = selectCouplePhrase(effective, name);
+        couplePhraseDisplayState = effective;
+        couplePhraseName = name;
+      }
+      elements.headline.textContent = couplePhrase;
+      elements.supporting.textContent = '';
+      elements.supporting.hidden = true;
     } else {
-      elements.headline.textContent = COPY.board.generic.headline;
-      elements.supporting.textContent = offline
-        ? COPY.board.generic.offlineSupporting
-        : COPY.board.generic.supporting;
+      elements.supporting.hidden = false;
+      if (effective === 'meeting') {
+        elements.headline.textContent = name
+          ? COPY.board.meeting.headlineWithName(name)
+          : COPY.board.meeting.headline;
+        elements.supporting.textContent = COPY.board.meeting.supporting;
+      } else if (effective === 'callOkay') {
+        elements.headline.textContent = name
+          ? COPY.board.callOkay.headlineWithName(name)
+          : COPY.board.callOkay.headline;
+        elements.supporting.textContent = COPY.board.callOkay.supporting;
+      } else {
+        elements.headline.textContent = COPY.board.generic.headline;
+        elements.supporting.textContent = offline
+          ? COPY.board.generic.offlineSupporting
+          : COPY.board.generic.supporting;
+      }
     }
     elements.stateRegion.setAttribute(
       'aria-label',
@@ -114,6 +165,16 @@ export function boot(): void {
     elements.checked.textContent = checkedLabel(
       (now - lastFetchMonotonic) / 1000,
     );
+  };
+
+  const syncCoupleModeControl = (): void => {
+    const state = coupleMode ? COPY.rail.coupleModeOn : COPY.rail.coupleModeOff;
+    elements.coupleModeToggle.setAttribute('aria-checked', String(coupleMode));
+    elements.coupleModeToggle.setAttribute(
+      'aria-label',
+      COPY.rail.coupleModeAria(coupleMode),
+    );
+    elements.coupleModeState.textContent = state;
   };
 
   const read = async (): Promise<void> => {
@@ -157,6 +218,15 @@ export function boot(): void {
     void poller.refreshNow().finally(() => {
       elements.refresh.textContent = COPY.rail.checkAgain;
     });
+  });
+
+  elements.coupleModeToggle.addEventListener('click', () => {
+    coupleMode = !coupleMode;
+    writeCoupleMode(coupleMode);
+    couplePhrase = null;
+    couplePhraseDisplayState = null;
+    couplePhraseName = '';
+    render();
   });
 
   const submitPairing = (raw: string, clearFragment: boolean): void => {
@@ -313,7 +383,6 @@ function getElements() {
   const stateRegion = document.querySelector<HTMLElement>(
     '[data-state-region]',
   );
-  const name = document.querySelector<HTMLElement>('[data-name]');
   const headline = document.querySelector<HTMLElement>('[data-headline]');
   const supporting = document.querySelector<HTMLElement>('[data-supporting]');
   const checked = document.querySelector<HTMLElement>('[data-checked]');
@@ -325,6 +394,12 @@ function getElements() {
     '[data-pairing-message]',
   );
   const turnstile = document.querySelector<HTMLElement>('[data-turnstile]');
+  const coupleModeToggle = document.querySelector<HTMLButtonElement>(
+    '[data-couple-mode-toggle]',
+  );
+  const coupleModeState = document.querySelector<HTMLElement>(
+    '[data-couple-mode-state]',
+  );
   const shapes = [...document.querySelectorAll<HTMLElement>('[data-shape]')];
   if (
     !root ||
@@ -333,7 +408,6 @@ function getElements() {
     !pairing ||
     !plate ||
     !stateRegion ||
-    !name ||
     !headline ||
     !supporting ||
     !checked ||
@@ -342,7 +416,9 @@ function getElements() {
     !code ||
     !submit ||
     !pairingMessage ||
-    !turnstile
+    !turnstile ||
+    !coupleModeToggle ||
+    !coupleModeState
   ) {
     throw new Error('Meeting Pulse: viewer markup is incomplete.');
   }
@@ -353,7 +429,6 @@ function getElements() {
     pairing,
     plate,
     stateRegion,
-    name,
     headline,
     supporting,
     checked,
@@ -363,6 +438,14 @@ function getElements() {
     submit,
     pairingMessage,
     turnstile,
+    coupleModeToggle,
+    coupleModeState,
     shapes,
   };
+}
+
+function isCoupleDisplayState(
+  display: DisplayState,
+): display is CoupleDisplayState {
+  return display !== 'unpaired';
 }

@@ -21,7 +21,6 @@ import '../styles/board.css';
     <section class="board" data-board hidden>
       <div class="plate" data-plate data-state="generic">
         <div class="plate__content" data-state-region aria-live="polite">
-          <p class="plate__name" data-name></p>
           <div class="plate__shape" aria-hidden="true">
             <svg data-shape="cone" viewBox="0 0 120 180">
               <path d="M60 18 28 74h64L60 18Z" />
@@ -41,7 +40,29 @@ import '../styles/board.css';
       </div>
       <div class="rail">
         <p class="rail__checked" data-checked>{COPY.rail.checkedJustNow}</p>
-        <button class="rail__button" type="button" data-refresh>{COPY.rail.checkAgain}</button>
+        <div class="rail__actions">
+          <button class="rail__button" type="button" data-refresh>{COPY.rail.checkAgain}</button>
+          <label class="mode">
+            <span class="mode__label">{COPY.rail.coupleMode}</span>
+            <span class="mode__control">
+              <button
+                class="mode__track"
+                type="button"
+                role="switch"
+                aria-checked="false"
+                aria-label={COPY.rail.coupleModeAria(false)}
+                data-couple-mode-toggle
+              >
+                <span class="mode__thumb" aria-hidden="true"></span>
+              </button>
+              <span
+                class="mode__state"
+                aria-hidden="true"
+                data-couple-mode-state
+              >{COPY.rail.coupleModeOff}</span>
+            </span>
+          </label>
+        </div>
       </div>
     </section>
 

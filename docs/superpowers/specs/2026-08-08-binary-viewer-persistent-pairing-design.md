@@ -24,7 +24,7 @@ the viewer can leave the meeting state.
 - Make one pairing code persistent until the owner manually rotates or
   revokes it.
 - Generate a shareable viewer link containing the code in a URL fragment.
-- Keep one active viewer device per owner device.
+- Keep up to five active viewer devices per owner device.
 - Preserve the existing internal status model, owner controls, fail-closed
   sync behavior, anonymous auth, polling, and privacy boundary.
 
@@ -34,8 +34,8 @@ the viewer can leave the meeting state.
 - Do not remove manual Busy/Available overrides or the call-okay control from
   the owner app.
 - Do not replace the internal three-state database model with a boolean.
-- Do not add Realtime, a new authentication service, or multi-device viewer
-  support.
+- Do not add Realtime, a new authentication service, or unbounded viewer
+  capacity.
 - Do not put the raw pairing code in database columns, query strings, request
   paths, analytics, or logs.
 
@@ -109,9 +109,9 @@ There is one active pairing code for a device:
    `history.replaceState` and relies on the persisted anonymous session.
 7. If browser storage is cleared, opening the saved link repeats the claim
    without requiring the owner to create another code.
-8. **Rotate viewer link** revokes the active code and viewer binding, then
-   creates a replacement. **Revoke viewer** invalidates the code and active
-   viewer binding without creating a replacement.
+8. **Rotate viewer link** revokes the active code and all viewer bindings, then
+   creates a replacement. **Stop sharing** invalidates the code and all active
+   viewer bindings without creating a replacement.
 
 The pairing window has no countdown or automatic regeneration. Rotation and
 revocation are explicit owner actions with confirmation.
@@ -127,8 +127,13 @@ The current `pairing_codes` table remains the source of truth:
   inserting the new persistent row.
 - `claim_pairing_code` accepts a non-revoked persistent row whose expiry is
   null, records the first claim, and remains reusable.
-- A successful claim revokes existing active viewer bindings for that device
-  before creating the single active binding.
+- A successful claim keeps up to five active viewer bindings for the device.
+  Claims are serialized per device; a sixth distinct claim hard-deletes the
+  oldest binding by `created_at` before creating the new binding.
+- Active viewer bindings expire 30 days after `created_at`. Reads and owner
+  lists ignore expired bindings immediately, and retention cleanup deletes them.
+- The owner can soft-revoke a viewer or hard-delete its binding without
+  deleting the anonymous auth user.
 - `rotate_pairing_codes` revokes every active code and viewer binding for the
   device, including previously claimed codes and sessions.
 - Expiring legacy rows remain invalid when their non-null expiry is in the
@@ -192,7 +197,8 @@ Add pgTAP coverage for:
 - repeated successful claims of the same active code;
 - rotation invalidating a previously claimed code;
 - rotation and revoke invalidating both code and viewer binding;
-- one active viewer binding per device;
+- five active viewer bindings per device and oldest-first sixth-claim
+  eviction;
 - legacy expired-code rejection;
 - hash-only storage and existing throttle/RLS negatives.
 

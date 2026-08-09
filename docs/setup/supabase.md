@@ -13,9 +13,12 @@ supabase db reset
 supabase test db
 ```
 
-The local config enables anonymous sign-ins and disables Realtime. Migrations
-create the tables, policies, RPCs, and grants. The local seed is intentionally
-empty.
+The local config enables anonymous sign-ins and disables Realtime. The project
+uses one squashed baseline migration,
+`supabase/migrations/20260809000100_initial_schema.sql`, to create the tables,
+policies, RPCs, grants, retention cleanup, and five-viewer capacity. The local
+seed is intentionally empty. Keep the baseline for future fresh deployments;
+an empty database still needs a reproducible schema definition.
 
 ## Hosted project
 

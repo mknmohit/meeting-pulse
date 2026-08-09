@@ -288,7 +288,21 @@ final class OwnerRuntime {
     let registration = try await registration()
     sync = SyncCoordinator(
       transport: transport,
-      nonce: registration.instanceNonce
+      nonce: registration.instanceNonce,
+      onStateChange: { [weak self] state in
+        guard let self else {
+          return
+        }
+        self.store?.syncState = Self.mapSyncState(state)
+        switch state {
+        case .retrying:
+          self.store?.publishState = .retrying
+        case .superseded:
+          self.store?.publishState = .superseded
+        case .idle:
+          break
+        }
+      }
     )
     overrideStore = ManualOverrideStore(
       publish: { [weak self] override in
@@ -375,7 +389,7 @@ final class OwnerRuntime {
 
   private func registration() async throws -> DeviceRegistration {
     if let existingRegistration {
-      return existingRegistration
+      return try await recovery.registerStoredDevice() ?? existingRegistration
     }
     return try await recovery.registerDevice().registration
   }
@@ -410,6 +424,10 @@ final class OwnerRuntime {
 
   func revokeViewer(_ id: UUID) async throws {
     try await transport.revokeViewer(id)
+  }
+
+  func deleteViewer(_ id: UUID) async throws {
+    try await transport.deleteViewer(id)
   }
 
   func refreshAndPublish() async {
@@ -888,7 +906,8 @@ final class AppLaunchCoordinator {
   func start(
     model: OwnerAppModel,
     store: PulseStore? = nil,
-    openStation: @escaping @MainActor () -> Void = {}
+    openStation: @escaping @MainActor () -> Void = {},
+    allowIdentityRecovery: Bool = true
   ) async {
     NSLog("Meeting Pulse launch sequence started")
     let migratedDisplayName = UserDefaults.standard.string(forKey: "owner.displayName") ?? ""
@@ -897,6 +916,7 @@ final class AppLaunchCoordinator {
     guard state == .starting else {
       return
     }
+    let secrets = LocalSecretStore()
     do {
       instanceLock = try SingleInstanceLock()
       let configuration = try AppConfiguration.load()
@@ -925,35 +945,34 @@ final class AppLaunchCoordinator {
       NSLog("Meeting Pulse permission coordinator started")
       try LegacyStorageReset().resetIfNeeded()
       store?.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "setup.completed")
-      let secrets = LocalSecretStore()
       let existingRegistration = try existingRegistration(from: secrets)
-      let provider: any TurnstileProvider
-      if existingRegistration == nil {
-        guard
-          let htmlURL = Bundle.main.url(
-            forResource: "turnstile",
-            withExtension: "html"
-          )
-        else {
-          throw LaunchError.turnstileResourceMissing
-        }
-        let webProvider = WKTurnstileProvider(
-          siteKey: configuration.turnstileSiteKey,
-          htmlURL: htmlURL,
-          baseURL: configuration.viewerOrigins[0]
+      guard
+        let htmlURL = Bundle.main.url(
+          forResource: "turnstile",
+          withExtension: "html"
         )
-        provider = webProvider
-        store?.turnstileWebView = webProvider.view
-        store?.turnstilePresentation = .verifying
-        openStation()
-        await Task.yield()
-      } else {
-        provider = UnavailableTurnstileProvider()
+      else {
+        throw LaunchError.turnstileResourceMissing
       }
-      let gate = TurnstileGate(provider: provider) { [weak store] in
-        store?.turnstileWebView = nil
-        store?.turnstilePresentation = .hidden
-      }
+      let provider = LazyTurnstileProvider(
+        siteKey: configuration.turnstileSiteKey,
+        htmlURL: htmlURL,
+        baseURL: configuration.viewerOrigins[0],
+        onCreated: { @MainActor [weak store] view in
+          store?.turnstileWebView = view
+        }
+      )
+      let gate = TurnstileGate(
+        provider: provider,
+        onTokenStarted: { @MainActor [weak store] in
+          store?.turnstilePresentation = .verifying
+          openStation()
+        },
+        onTokenFinished: { @MainActor [weak store] in
+          store?.turnstileWebView = nil
+          store?.turnstilePresentation = .hidden
+        }
+      )
       turnstileGate = gate
       let transport = SupabaseStatusTransport(
         configuration: configuration,
@@ -989,6 +1008,30 @@ final class AppLaunchCoordinator {
       store?.setupFailureHeadline = MPString.error.genericSetup
       NSLog("Meeting Pulse detection runtime started")
       state = installLocationIsValid ? .running : .wrongInstallLocation
+    } catch let error as SupabaseStatusTransport.TransportError
+      where error == .identityLost && allowIdentityRecovery {
+      await cleanupAfterFailedLaunch(model: model, store: store)
+      do {
+        for key in SecretKey.allCases {
+          try secrets.delete(key)
+        }
+      } catch {
+        let detail = Self.launchFailureDetail(for: error)
+        NSLog("Meeting Pulse identity reset error: %@", detail)
+        store?.turnstileWebView = nil
+        store?.turnstilePresentation = .failed
+        store?.setupFailureHeadline = MPString.error.launchFailed
+        store?.setupFailure = detail
+        state = .setupRequired(detail)
+        return
+      }
+      state = .starting
+      await start(
+        model: model,
+        store: store,
+        openStation: openStation,
+        allowIdentityRecovery: false
+      )
     } catch let error as AppConfiguration.ConfigurationError {
       await cleanupAfterFailedLaunch(model: model, store: store)
       NSLog("Meeting Pulse configuration error: %@", error.description)

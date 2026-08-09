@@ -1780,31 +1780,31 @@ Both replace `OwnerAppModel.showingRotateConfirmation` and
 
 #### 7.2.6 Paired viewers
 
-`PairedViewerRow.swift`. Backed by `StatusTransport.listViewers()`, which exists
-and has never been called from the app.
+`PairedViewerRow.swift`. Backed by `StatusTransport.listViewers()`, loaded when
+the Sharing section appears and refreshed after owner actions.
 
 ```
-  Who has the link
+  Viewers (up to 5)
   ┌──────────────────────────────────────────────────────┐
-  │ 👤 Paired 3 days ago                        Remove   │
-  │ 👤 Paired 2 weeks ago                       Remove   │
+  │ 👤 Paired 3 days ago                   Remove Delete │
+  │ 👤 Paired 2 weeks ago                  Remove Delete │
   └──────────────────────────────────────────────────────┘
 ```
 
+The group also says `Five people or devices can watch at the same time.`.
 Show only what is true, which here is less than you would like. `ViewerRecord`
 has exactly three fields, because `list_viewers()` returns exactly three
 columns: `viewer_user_id`, `created_at`, `revoked_at`. There is no name and
 there is no last-seen timestamp anywhere in the schema.
 
-So the row is one line: `Paired {relative} ago`, plus a trailing `Remove`
-button in `.link` style with its own confirmation. Do not render a second
-column. An earlier draft of this plan specified `Last seen 2h ago` and `Never
-opened`; that data does not exist, and adding it would mean a migration, which
-§2.3 puts out of scope. If you want it later, it is a schema change first and a
-UI change second.
+So the row is one line: `Paired {relative} ago`, plus trailing `Remove` and
+`Delete` buttons in `.link` style. `Remove` soft-revokes immediately. `Delete`
+has its own destructive confirmation and permanently removes the binding. Do
+not render a second data column. An earlier draft of this plan specified `Last
+seen 2h ago` and `Never opened`; that data still does not exist.
 
-Filter the list to rows where `revokedAt == nil`. The RPC returns revoked
-viewers too, and a removed viewer must not reappear.
+The RPC returns active, non-expired rows only, capped at five, so a removed
+or expired viewer must not reappear.
 
 Loading: three `MPSkeleton` rows, not a spinner. Failure: an inline
 `MPRow` reading `Can't load the list right now.` with a `Try again` button.
@@ -1985,7 +1985,8 @@ The only prose section, and the one that has to be exactly true. Read the source
 before you write a word of it:
 
 - `MPSync/StatusTransport.swift`, `StatusPayload`: what the Mac sends.
-- `supabase/migrations/20260807000600_viewer_rpc.sql`, `get_paired_status()`:
+- `supabase/migrations/20260809000100_initial_schema.sql`,
+  `get_paired_status()`:
   what a viewer can read.
 
 **These are two different lists, and the gap between them is the product's
@@ -2538,6 +2539,7 @@ public protocol PulseActions: AnyObject {
   func revokeViewerAccess() async
   func loadViewers() async
   func removeViewer(id: UUID) async     // ViewerSummary.id, passed to revokeViewer(_:)
+  func deleteViewer(id: UUID) async     // ViewerSummary.id, passed to delete_viewer(_:)
 
   func setLaunchAtLogin(_ on: Bool) throws
   func setOpenWindowAtLogin(_ on: Bool)
@@ -2843,12 +2845,16 @@ no deck and reads like a database column. It is replaced by
 | `Sharing.revoke` | `Stop sharing` |
 | `Sharing.revokeConfirmTitle` | `Stop sharing?` |
 | `Sharing.revokeConfirmBody` | `The link stops working right away. No one will be able to see your status.` |
-| `Sharing.viewersHeader` | `Who has the link` |
+| `Sharing.viewersHeader` | `Viewers (up to 5)` |
+| `Sharing.viewersBody` | `Five people or devices can watch at the same time.` |
 | `Sharing.viewerPaired` | `Paired {relative} ago` |
 | `Sharing.viewersEmpty` | `Nobody has used the link yet.` |
 | `Sharing.viewersFailed` | `Can't load the list right now.` |
 | `Sharing.tryAgain` | `Try again` |
 | `Sharing.removeViewer` | `Remove` |
+| `Sharing.deleteViewer` | `Delete` |
+| `Sharing.deleteViewerTitle` | `Delete viewer?` |
+| `Sharing.deleteViewerBody` | `This permanently removes the viewer binding. The person can pair again with the link.` |
 
 **Durations**, used by the picker in §6.5.2 and the menu bar submenus in §9.2
 

@@ -192,6 +192,19 @@ final class AppPulseActions: PulseActions {
     }
   }
 
+  func deleteViewer(id: UUID) async {
+    guard let runtime = model?.runtime else {
+      store.lastError = .viewers
+      return
+    }
+    do {
+      try await runtime.deleteViewer(id)
+      await loadViewers()
+    } catch {
+      store.lastError = .viewers
+    }
+  }
+
   func setLaunchAtLogin(_ on: Bool) throws {
     guard let runtime = model?.runtime else {
       throw AppPulseActionError.runtimeUnavailable

@@ -8,11 +8,14 @@ public actor SyncCoordinator {
     case superseded
   }
 
+  public typealias StateChangeHandler = @MainActor @Sendable (State) async -> Void
+
   private let transport: any StatusTransport
   private let nonce: UUID
   private let retryPolicy: RetryPolicy
   private let sleep: @Sendable (Duration) async -> Void
   private let randomUnit: @Sendable () -> Double
+  private let onStateChange: StateChangeHandler?
   private var pending: StatusPayload?
   private var drainTask: Task<Void, Never>?
   private var heartbeatTask: Task<Void, Never>?
@@ -27,13 +30,15 @@ public actor SyncCoordinator {
     sleep: @escaping @Sendable (Duration) async -> Void = { duration in
       try? await Task.sleep(for: duration)
     },
-    randomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0...1) }
+    randomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0...1) },
+    onStateChange: StateChangeHandler? = nil
   ) {
     self.transport = transport
     self.nonce = nonce
     self.retryPolicy = retryPolicy
     self.sleep = sleep
     self.randomUnit = randomUnit
+    self.onStateChange = onStateChange
   }
 
   public var currentState: State {
@@ -106,16 +111,16 @@ public actor SyncCoordinator {
         do {
           let result = try await transport.publish(payload, nonce: nonce)
           if result.superseded {
-            state = .superseded
+            await setState(.superseded)
             return
           }
           successfulPayload = payload
           lastSync = result.lastSeenAt ?? Date()
-          state = .idle
+          await setState(.idle)
           attempt = 0
           break
         } catch {
-          state = .retrying
+          await setState(.retrying)
           if let latest = pending {
             payload = latest
             pending = nil
@@ -131,5 +136,13 @@ public actor SyncCoordinator {
         }
       }
     }
+  }
+
+  private func setState(_ newState: State) async {
+    guard state != newState else {
+      return
+    }
+    state = newState
+    await onStateChange?(newState)
   }
 }

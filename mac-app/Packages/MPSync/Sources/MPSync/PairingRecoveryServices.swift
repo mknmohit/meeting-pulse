@@ -20,6 +20,11 @@ public enum PairingServiceError: Error, Equatable, Sendable {
   case invalidViewerOrigin
 }
 
+public enum RecoveryServiceError: Error, Equatable, Sendable {
+  case invalidStoredPhrase
+  case secretStoreUnavailable
+}
+
 public struct RecoveryRegistration: Equatable, Sendable {
   public let phrase: String
   public let registration: DeviceRegistration
@@ -115,6 +120,26 @@ public struct RecoveryService: Sendable {
       phrase: RecoveryPhraseFormat.display(rawPhrase),
       registration: registration
     )
+  }
+
+  public func registerStoredDevice() async throws -> DeviceRegistration? {
+    switch try secrets.read(.deviceRecoveryPhrase) {
+    case .missing:
+      return nil
+    case .temporarilyUnavailable:
+      throw RecoveryServiceError.secretStoreUnavailable
+    case .present(let data):
+      let rawPhrase = String(decoding: data, as: UTF8.self)
+      let normalized = CrockfordBase32.normalize(rawPhrase)
+      guard normalized.count == RecoveryPhraseFormat.length else {
+        throw RecoveryServiceError.invalidStoredPhrase
+      }
+      let registration = try await transport.registerDevice(
+        recoveryHash: CrockfordBase32.sha256Hex(normalized)
+      )
+      try save(registration)
+      return registration
+    }
   }
 
   public func rebindDevice(recoverySecret: String) async throws -> DeviceRegistration {

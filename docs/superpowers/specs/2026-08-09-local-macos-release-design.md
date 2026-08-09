@@ -46,8 +46,8 @@ Release builds use:
   telemetry is introduced.
 
 The helper stages a validated app, creates
-`Meeting-Pulse-0.0.1-arm64.dmg` or
-`Meeting-Pulse-0.0.1-x86_64.dmg`, verifies the image, and replaces
+`Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg` or
+`Meeting-Pulse-0.0.1-Intel-x86_64.dmg`, verifies the image, and replaces
 `/Applications/Meeting Pulse.app` only after the build succeeds. A failed
 install leaves the existing application in place. The DMG welcome page states
 that ad-hoc builds require a one-time Finder `Open` action or quarantine

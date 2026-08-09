@@ -1,6 +1,7 @@
 :root {
   --ground: #0c1418;
   --ground-rail: #070e11;
+  --ink: #0c1418;
   --plate-clear: #10614a;
   --plate-clear-rim: #0a4534;
   --plate-storm: #8c2a22;
@@ -21,9 +22,7 @@
   --type-lede: 1.125rem;
   --type-body: 1rem;
   --type-chalk: 0.875rem;
-  --type-name: clamp(0.8125rem, 2.4cqw, 1.0625rem);
   --track-state: -0.03em;
-  --track-name: 0.22em;
 }
 
 @media (prefers-color-scheme: light) {

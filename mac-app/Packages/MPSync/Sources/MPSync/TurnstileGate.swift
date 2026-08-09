@@ -21,21 +21,70 @@ public extension TurnstileProvider {
   func shutdown() {}
 }
 
+@MainActor
+public final class LazyTurnstileProvider: TurnstileProvider, @unchecked Sendable {
+  private let siteKey: String
+  private let htmlURL: URL
+  private let baseURL: URL?
+  private let onCreated: (@MainActor @Sendable (WKWebView) -> Void)?
+  private var provider: WKTurnstileProvider?
+
+  public init(
+    siteKey: String,
+    htmlURL: URL,
+    baseURL: URL? = nil,
+    onCreated: (@MainActor @Sendable (WKWebView) -> Void)? = nil
+  ) {
+    self.siteKey = siteKey
+    self.htmlURL = htmlURL
+    self.baseURL = baseURL
+    self.onCreated = onCreated
+  }
+
+  public func token(for reason: TurnstileReason) async throws -> String {
+    let provider = makeProvider()
+    return try await provider.token(for: reason)
+  }
+
+  public func shutdown() {
+    provider?.shutdown()
+    provider = nil
+  }
+
+  private func makeProvider() -> WKTurnstileProvider {
+    if let provider {
+      return provider
+    }
+    let provider = WKTurnstileProvider(
+      siteKey: siteKey,
+      htmlURL: htmlURL,
+      baseURL: baseURL
+    )
+    self.provider = provider
+    onCreated?(provider.view)
+    return provider
+  }
+}
+
 public actor TurnstileGate {
   private let provider: any TurnstileProvider
+  private let onTokenStarted: (@MainActor @Sendable () -> Void)?
   private let onTokenFinished: (@MainActor @Sendable () -> Void)?
 
   public init(
     provider: any TurnstileProvider,
+    onTokenStarted: (@MainActor @Sendable () -> Void)? = nil,
     onTokenFinished: (@MainActor @Sendable () -> Void)? = nil
   ) {
     self.provider = provider
+    self.onTokenStarted = onTokenStarted
     self.onTokenFinished = onTokenFinished
   }
 
   public func token(for reason: TurnstileReason) async throws -> String {
     let rawToken: String
     do {
+      await onTokenStarted?()
       rawToken = try await provider.token(for: reason)
     } catch {
       await finishTokenWork()

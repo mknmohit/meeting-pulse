@@ -1,55 +1,92 @@
 # Release setup
 
-Meeting Pulse public releases are Developer ID signed, notarized, stapled DMGs.
-The bundle identifier and signing identity are stable because macOS binds the
-Accessibility grant to both.
+Meeting Pulse has two local distribution modes:
 
-## Local-only build without Apple Developer Program
+1. An ad-hoc signed, optimized DMG for local testing and direct distribution.
+2. A Developer ID signed, notarized, stapled DMG for trusted distribution.
 
-An Apple Developer Program subscription is not required for local development.
-Use the repository's local build helper:
+The first mode does not require an Apple Developer Program account. It cannot
+remove Gatekeeper's first-launch warning on another Mac.
 
-```sh
-make mac-local-build
-open "build/local/Build/Products/Debug/Meeting Pulse.app"
-```
+## Local ad-hoc release
 
-This produces an ad-hoc signed app by default. It does not produce a DMG, does
-not pass notarization, and must not be distributed as a public release. macOS
-may show an Open Anyway prompt and may require a fresh Accessibility grant
-after each rebuild.
-
-Meeting Pulse stores its local session, recovery, identity, nonce, and pairing
-values in
-`~/Library/Application Support/MeetingPulse/secrets.plist`. The file is
-owner-only but not encrypted. The first launch after the storage change deletes
-legacy Meeting Pulse Keychain items and starts setup again without migrating
-their values. No Keychain prompt is expected.
-
-For the optimized local artifact installed by the current project:
+Create the ignored app configuration first:
 
 ```sh
-make mac-local-release
-open "build/local-release/Build/Products/Release/Meeting Pulse.app"
+cp mac-app/Config.xcconfig.example mac-app/Config.xcconfig
 ```
 
-The Release configuration uses whole-module compilation and `-O`; it is still
-ad-hoc signed and remains local-only.
-
-To skip ad-hoc signing:
+Build the Apple silicon asset:
 
 ```sh
-MP_LOCAL_SIGNING=none make mac-local-build
+./mac-app/Tools/build-release-arm64.sh
 ```
 
-Use this path for local UI review, detector development, and personal testing.
-The bundle identifier remains `com.techdevix.meetingpulse` so future
-Developer ID builds can retain the documented product identity.
+Build the Intel asset:
 
-## Local release
+```sh
+./mac-app/Tools/build-release-x86_64.sh
+```
 
-Install the pinned Xcode 16.2 toolchain, configure a notarytool keychain profile, and create a
-local `mac-app/Config.xcconfig` from the example file. Then set:
+Both commands can run on either host architecture when the installed Xcode
+toolchain supports the requested target. They:
+
+- build the Xcode `Release` configuration with whole-module Swift
+  optimization;
+- disable testability and debug-information generation;
+- strip the installed product and dead code;
+- add no analytics or telemetry to the release build;
+- patch the built bundle to version `0.0.1` and build `1`;
+- ad-hoc sign and verify the app;
+- create and verify a compressed DMG; and
+- replace `/Applications/Meeting Pulse.app` only after all checks pass.
+
+The assets are:
+
+```text
+build/dmg/Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg
+build/dmg/Meeting-Pulse-0.0.1-Intel-x86_64.dmg
+```
+
+To create the DMG without changing the installed app:
+
+```sh
+MP_RELEASE_INSTALL=0 ./mac-app/Tools/build-release-arm64.sh
+MP_RELEASE_INSTALL=0 ./mac-app/Tools/build-release-x86_64.sh
+```
+
+The DMGs are ad-hoc signed and not notarized. On a fresh Mac, move the app to
+`/Applications`, then use Finder's right-click **Open** action once. If needed,
+remove the quarantine attribute only after verifying the artifact:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Meeting Pulse.app"
+```
+
+Do not describe these artifacts as notarized or trusted releases.
+
+## Draft GitHub release
+
+The draft `v0.0.1` release uses the current committed `HEAD`, not uncommitted
+working-tree changes. After building and verifying both assets, a maintainer
+can create it with:
+
+```sh
+gh release create v0.0.1 \
+  --draft \
+  --target HEAD \
+  --title "Meeting Pulse 0.0.1" \
+  --notes-file CHANGELOG.md \
+  build/dmg/Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg \
+  build/dmg/Meeting-Pulse-0.0.1-Intel-x86_64.dmg
+```
+
+The release notes must retain the ad-hoc/no-notarization warning.
+
+## Trusted Developer ID release
+
+Install the pinned Xcode toolchain, configure a `notarytool` keychain profile,
+and create `mac-app/Config.xcconfig` from the example file. Then set:
 
 ```sh
 export MP_SIGN_IDENTITY='Developer ID Application: ...'
@@ -58,9 +95,9 @@ export MP_NOTARY_PROFILE='...'
 ./mac-app/Tools/notarize.sh
 ```
 
-The script fails if any required value or local configuration is missing. It
-archives, exports, creates the DMG, signs it, submits it to notarytool,
+The script fails if a required value or local configuration is missing. It
+archives, exports, creates the DMG, signs it, submits it to `notarytool`,
 staples the ticket, and runs `spctl`.
 
-GitHub-hosted release automation is currently disabled. Releases must be
-created locally with the steps above.
+Keep the release bundle identifier `com.techdevix.meetingpulse` and signing
+identity stable. macOS binds the Accessibility permission grant to both.

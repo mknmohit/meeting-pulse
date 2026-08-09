@@ -46,17 +46,15 @@ public struct WatchSection: View {
             }
           }
 
-          StatusControlSection(store: store, actions: actions)
-
-          MPGroup(title: MPString.station.permission) {
-            MPRow(
-              label: MPString.station.accessibility,
-              detail: MPString.station.readsWindowTitles
-            ) {
-              Text(store.accessibilityGranted ? MPString.station.granted : MPString.station.notGranted)
-                .font(MPFont.rowValue)
-            }
-            if !store.accessibilityGranted {
+          if !store.accessibilityGranted {
+            MPGroup(title: MPString.station.permission) {
+              MPRow(
+                label: MPString.station.accessibility,
+                detail: MPString.station.readsWindowTitles
+              ) {
+                Text(MPString.station.notGranted)
+                  .font(MPFont.rowValue)
+              }
               MPBanner(
                 tone: .caution,
                 headline: MPString.station.permissionHeadline,
@@ -67,6 +65,8 @@ public struct WatchSection: View {
               }
             }
           }
+
+          StatusControlSection(store: store, actions: actions)
 
           MPGroup(title: MPString.station.whatMacWatches) {
             sourceRow(

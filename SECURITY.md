@@ -20,12 +20,15 @@ Accessibility grant while working on the app.
 
 ## Local unsigned and ad-hoc builds
 
-Contributors without an Apple Developer Program account can build locally with
-`make mac-local-build`. These artifacts are not notarized, are not trusted
-release packages, and must not be uploaded or redistributed. macOS may require
-a new Accessibility grant after every unsigned or ad-hoc rebuild. Keep the
-bundle identifier unchanged so a future Developer ID release has one stable
-identity and an explicit permission migration story.
+Contributors without an Apple Developer Program account can use
+`make mac-local-build` for development or
+`./mac-app/Tools/build-release-arm64.sh` and
+`./mac-app/Tools/build-release-x86_64.sh` for optimized local DMGs. These
+artifacts are not notarized or trusted release packages. A fresh Mac requires a
+one-time Finder **Open** action or explicit quarantine removal before launch.
+macOS may require a new Accessibility grant after every unsigned or ad-hoc
+rebuild. Keep the bundle identifier unchanged so a future Developer ID release
+has one stable identity and an explicit permission migration story.
 
 The app stores the Supabase session token and local device secrets in
 `~/Library/Application Support/MeetingPulse/secrets.plist`. The app creates the

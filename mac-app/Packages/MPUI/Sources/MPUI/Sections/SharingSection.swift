@@ -8,6 +8,8 @@ public struct SharingSection: View {
   private let actions: any PulseActions
   @SwiftUI.State private var showingRotateConfirmation = false
   @SwiftUI.State private var showingRevokeConfirmation = false
+  @SwiftUI.State private var showingDeleteConfirmation = false
+  @SwiftUI.State private var viewerPendingDeletion: UUID?
 
   public init(store: PulseStore, actions: any PulseActions) {
     self.store = store
@@ -88,42 +90,73 @@ public struct SharingSection: View {
     } message: {
       Text(MPString.sharing.stopSharingBody)
     }
+    .confirmationDialog(
+      MPString.sharing.deleteViewerTitle,
+      isPresented: $showingDeleteConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button(MPString.sharing.delete, role: .destructive) {
+        guard let viewerID = viewerPendingDeletion else {
+          return
+        }
+        viewerPendingDeletion = nil
+        Task { await actions.deleteViewer(id: viewerID) }
+      }
+      Button(MPString.cancel, role: .cancel) {
+        viewerPendingDeletion = nil
+      }
+    } message: {
+      Text(MPString.sharing.deleteViewerBody)
+    }
   }
 
   @ViewBuilder
   private var viewersContent: some View {
-    switch store.viewers {
-    case .idle, .loading:
-      VStack(alignment: .leading, spacing: MPSpace.tight) {
-        MPSkeleton()
-        MPSkeleton()
-        MPSkeleton()
-      }
-    case .loaded(let viewers):
-      if viewers.isEmpty {
-        Text(MPString.sharing.noViewers)
-          .font(MPFont.rowLabel)
-          .foregroundStyle(.secondary)
-      } else {
-        ForEach(viewers) { viewer in
-          MPRow(label: MPString.Relative.paired(max(Int(Date.now.timeIntervalSince(viewer.pairedAt)), 0))) {
-            Button(MPString.sharing.remove) {
-              Task { await actions.removeViewer(id: viewer.id) }
+    VStack(alignment: .leading, spacing: MPSpace.tight) {
+      Text(MPString.sharing.viewersBody)
+        .font(MPFont.caption)
+        .foregroundStyle(.secondary)
+      switch store.viewers {
+      case .idle, .loading:
+        VStack(alignment: .leading, spacing: MPSpace.tight) {
+          MPSkeleton()
+          MPSkeleton()
+          MPSkeleton()
+        }
+      case .loaded(let viewers):
+        if viewers.isEmpty {
+          Text(MPString.sharing.noViewers)
+            .font(MPFont.rowLabel)
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(viewers) { viewer in
+            MPRow(label: MPString.Relative.paired(max(Int(Date.now.timeIntervalSince(viewer.pairedAt)), 0))) {
+              HStack(spacing: MPSpace.tight) {
+                Button(MPString.sharing.remove) {
+                  Task { await actions.removeViewer(id: viewer.id) }
+                }
+                .buttonStyle(.link)
+                Button(MPString.sharing.delete) {
+                  viewerPendingDeletion = viewer.id
+                  showingDeleteConfirmation = true
+                }
+                .buttonStyle(.link)
+                .foregroundStyle(.red)
+              }
             }
-            .buttonStyle(.link)
           }
         }
-      }
-      Button(MPString.refresh) {
-        Task { await actions.loadViewers() }
-      }
-      .buttonStyle(.link)
-    case .failed:
-      MPRow(label: MPString.sharing.viewersLoadFailed) {
-        Button(MPString.sharing.tryAgain) {
+        Button(MPString.refresh) {
           Task { await actions.loadViewers() }
         }
         .buttonStyle(.link)
+      case .failed:
+        MPRow(label: MPString.sharing.viewersLoadFailed) {
+          Button(MPString.sharing.tryAgain) {
+            Task { await actions.loadViewers() }
+          }
+          .buttonStyle(.link)
+        }
       }
     }
   }

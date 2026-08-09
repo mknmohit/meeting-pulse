@@ -26,7 +26,8 @@ fi
 
 TARGET_ARCH="$1"
 case "$TARGET_ARCH" in
-  arm64|x86_64) ;;
+  arm64) ARCH_LABEL="Apple-Silicon" ;;
+  x86_64) ARCH_LABEL="Intel" ;;
   *)
     usage >&2
     fail "unsupported architecture '$TARGET_ARCH'."
@@ -55,9 +56,11 @@ ASSET_DIR="${MP_RELEASE_ASSET_DIR:-$ROOT/build/dmg-assets-$TARGET_ARCH}"
 APP="$BUILD_DIR/Build/Products/Release/$APP_BUNDLE"
 EXECUTABLE="$APP/Contents/MacOS/$APP_NAME"
 PLIST="$APP/Contents/Info.plist"
-DMG="$DMG_DIR/Meeting-Pulse-$VERSION-$TARGET_ARCH.dmg"
+DMG="$DMG_DIR/Meeting-Pulse-$VERSION-$ARCH_LABEL-$TARGET_ARCH.dmg"
+LEGACY_DMG="$DMG_DIR/Meeting-Pulse-$VERSION-$TARGET_ARCH.dmg"
 
 rm -rf "$BUILD_DIR"
+rm -f "$LEGACY_DMG"
 mkdir -p "$BUILD_DIR" "$DMG_DIR" "$ASSET_DIR"
 
 printf '%s\n' "build-release: building $TARGET_ARCH Release app"
@@ -110,9 +113,10 @@ MP_DMG_APP="$APP" \
 MP_DMG_OUT_DIR="$DMG_DIR" \
 MP_DMG_ASSET_DIR="$ASSET_DIR" \
 MP_DMG_STAGE="$BUILD_DIR/dmg-stage" \
-MP_DMG_VOLUME_NAME="$APP_NAME $VERSION" \
+MP_DMG_VOLUME_NAME="$APP_NAME $VERSION ($ARCH_LABEL)" \
 MP_DMG_VERSION="$VERSION" \
 MP_DMG_ARCH="$TARGET_ARCH" \
+MP_DMG_ARCH_LABEL="$ARCH_LABEL" \
 "$DMG_SCRIPT"
 
 [ -f "$DMG" ] || fail "DMG helper did not produce $DMG."

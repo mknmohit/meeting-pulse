@@ -27,6 +27,7 @@ APP_PATH = Path(
     )
 )
 VERSION = os.environ.get("MP_DMG_VERSION", "0.0.1")
+ARCH_LABEL = os.environ.get("MP_DMG_ARCH_LABEL", "")
 ARROW_FROM_X, ARROW_FROM_Y = 200, 195
 ARROW_TO_X, ARROW_TO_Y = 410, 195
 
@@ -189,11 +190,15 @@ def write_welcome() -> None:
         except subprocess.CalledProcessError:
             pass
 
+    display_name = f"{APP_NAME} {version}"
+    if ARCH_LABEL:
+        display_name = f"{display_name} ({ARCH_LABEL})"
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>{APP_NAME} {version} — Install</title>
+<title>{display_name} — Install</title>
 <style>
   :root {{ color-scheme: light dark; }}
   body {{
@@ -216,7 +221,7 @@ def write_welcome() -> None:
 </head>
 <body>
   <div class="accent"></div>
-  <h1>{APP_NAME} {version}</h1>
+  <h1>{display_name}</h1>
   <p class="lede">{PRODUCT_LINE}.</p>
 
   <h2>Install</h2>

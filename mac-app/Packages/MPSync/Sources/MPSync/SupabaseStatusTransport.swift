@@ -54,10 +54,15 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
   public func registerDevice(recoveryHash: String) async throws -> DeviceRegistration {
     try await ensureSession()
     let params: JSONObject = ["p_recovery_hash": .string(recoveryHash)]
-    let response: RegisterResponse = try await client.rpc("register_device", params: params)
-      .single()
-      .execute()
-      .value
+    let response: RegisterResponse
+    do {
+      response = try await client.rpc("register_device", params: params)
+        .single()
+        .execute()
+        .value
+    } catch let error as PostgrestError where error.code == "23503" {
+      throw TransportError.identityLost
+    }
     return DeviceRegistration(
       deviceID: response.deviceID,
       instanceNonce: response.instanceNonce
@@ -118,6 +123,12 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
     try await ensureSession()
     let params: JSONObject = ["p_viewer_user_id": .string(id.uuidString)]
     _ = try await client.rpc("revoke_viewer", params: params).execute().value
+  }
+
+  public func deleteViewer(_ id: UUID) async throws {
+    try await ensureSession()
+    let params: JSONObject = ["p_viewer_user_id": .string(id.uuidString)]
+    _ = try await client.rpc("delete_viewer", params: params).execute().value
   }
 
   public func revokeAllViewers() async throws -> Int {

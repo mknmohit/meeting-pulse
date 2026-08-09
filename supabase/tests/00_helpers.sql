@@ -86,6 +86,22 @@ as $$
   values (p_device, p_viewer)
 $$;
 
+create or replace function tests.age_viewer(
+  p_device uuid,
+  p_viewer uuid,
+  p_days integer
+)
+returns void
+language sql
+security definer
+set search_path = public, auth, tests, pg_temp
+as $$
+  update public.viewers
+  set created_at = now() - make_interval(days => p_days)
+  where device_id = p_device
+    and viewer_user_id = p_viewer
+$$;
+
 create or replace function tests.expire_code(p_code_hash text)
 returns void
 language sql
@@ -95,6 +111,19 @@ as $$
   update public.pairing_codes
   set expires_at = now() - interval '1 second'
   where code_hash = p_code_hash
+$$;
+
+create or replace function tests.insert_expired_code(
+  p_device uuid,
+  p_code_hash text
+)
+returns void
+language sql
+security definer
+set search_path = public, auth, tests, pg_temp
+as $$
+  insert into public.pairing_codes (device_id, code_hash, expires_at)
+  values (p_device, p_code_hash, now() - interval '1 second')
 $$;
 
 create or replace function tests.revoke_code(p_code_hash text)
@@ -160,6 +189,15 @@ security definer
 set search_path = public, auth, tests, pg_temp
 as $$
   select failure_count from public.pairing_attempts_global where id = true
+$$;
+
+create or replace function tests.run_retention_cleanup()
+returns jsonb
+language sql
+security definer
+set search_path = public, auth, tests, pg_temp
+as $$
+  select public.mp_run_retention_cleanup()
 $$;
 
 grant usage on schema tests to authenticated, anon;

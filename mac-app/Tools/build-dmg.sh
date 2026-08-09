@@ -14,6 +14,7 @@ APP_BUNDLE="$APP_NAME.app"
 : "${MP_DMG_VOLUME_NAME:=$APP_NAME Installer}"
 : "${MP_DMG_VERSION:=}"
 : "${MP_DMG_ARCH:=}"
+: "${MP_DMG_ARCH_LABEL:=}"
 
 PLIST="$MP_DMG_APP/Contents/Info.plist"
 if [ ! -f "$PLIST" ]; then
@@ -32,7 +33,12 @@ if [ -z "$MP_DMG_ARCH" ]; then
 fi
 
 case "$MP_DMG_ARCH" in
-  arm64|x86_64) ;;
+  arm64)
+    [ -n "$MP_DMG_ARCH_LABEL" ] || MP_DMG_ARCH_LABEL="Apple-Silicon"
+    ;;
+  x86_64)
+    [ -n "$MP_DMG_ARCH_LABEL" ] || MP_DMG_ARCH_LABEL="Intel"
+    ;;
   *)
     printf '%s\n' "build-dmg: unsupported architecture '$MP_DMG_ARCH'." >&2
     exit 1
@@ -49,12 +55,13 @@ mkdir -p "$MP_DMG_OUT_DIR" "$MP_DMG_ASSET_DIR"
 printf '%s\n' "build-dmg: rendering assets"
 MP_DMG_APP="$MP_DMG_APP" \
 MP_DMG_VERSION="$MP_DMG_VERSION" \
+MP_DMG_ARCH_LABEL="$MP_DMG_ARCH_LABEL" \
 MP_DMG_ASSET_DIR="$MP_DMG_ASSET_DIR" \
 python3 "$ROOT/mac-app/Tools/render-dmg-assets.py"
 
 STAGE="$MP_DMG_STAGE"
-RW="$MP_DMG_OUT_DIR/.Meeting-Pulse-$MP_DMG_VERSION-$MP_DMG_ARCH.rw.dmg"
-FINAL="$MP_DMG_OUT_DIR/Meeting-Pulse-$MP_DMG_VERSION-$MP_DMG_ARCH.dmg"
+RW="$MP_DMG_OUT_DIR/.Meeting-Pulse-$MP_DMG_VERSION-$MP_DMG_ARCH_LABEL-$MP_DMG_ARCH.rw.dmg"
+FINAL="$MP_DMG_OUT_DIR/Meeting-Pulse-$MP_DMG_VERSION-$MP_DMG_ARCH_LABEL-$MP_DMG_ARCH.dmg"
 
 cleanup() {
   rm -rf "$STAGE"

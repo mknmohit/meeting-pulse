@@ -51,6 +51,23 @@ struct PairingRecoveryTests {
     #expect(secrets.values[.deviceID] != nil)
     #expect(secrets.values[.deviceInstanceNonce] != nil)
   }
+
+  @Test
+  func storedRecoveryPhraseReRegistersTheExistingDevice() async throws {
+    let transport = FakeTransport()
+    let secrets = InMemorySecrets()
+    try secrets.save(
+      Data(String(repeating: "A", count: RecoveryPhraseFormat.length).utf8),
+      for: .deviceRecoveryPhrase
+    )
+    let service = RecoveryService(transport: transport, secrets: secrets)
+
+    let registration = try await service.registerStoredDevice()
+
+    #expect(registration == transport.registration)
+    #expect(secrets.values[.deviceID] != nil)
+    #expect(secrets.values[.deviceInstanceNonce] != nil)
+  }
 }
 
 private final class FakeTransport: StatusTransport, @unchecked Sendable {
@@ -80,6 +97,7 @@ private final class FakeTransport: StatusTransport, @unchecked Sendable {
   func rotatePairingCodes() async throws -> Int { 0 }
   func listViewers() async throws -> [ViewerRecord] { [] }
   func revokeViewer(_: UUID) async throws {}
+  func deleteViewer(_: UUID) async throws {}
   func revokeAllViewers() async throws -> Int { 0 }
   func rebindDevice(recoverySecret: String) async throws -> DeviceRegistration { registration }
   func deleteDevice() async throws {}

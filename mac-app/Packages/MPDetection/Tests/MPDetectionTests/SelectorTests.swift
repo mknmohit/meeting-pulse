@@ -148,7 +148,6 @@ private func node(
     enabled: true,
     focused: false,
     childCount: children.count,
-    path: UUID().uuidString,
     windowID: windowID,
     children: children
   )

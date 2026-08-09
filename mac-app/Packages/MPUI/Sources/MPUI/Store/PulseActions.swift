@@ -15,6 +15,7 @@ public protocol PulseActions: AnyObject {
   func revokeViewerAccess() async
   func loadViewers() async
   func removeViewer(id: UUID) async
+  func deleteViewer(id: UUID) async
 
   func setLaunchAtLogin(_ on: Bool) throws
   func setOpenWindowAtLogin(_ on: Bool)

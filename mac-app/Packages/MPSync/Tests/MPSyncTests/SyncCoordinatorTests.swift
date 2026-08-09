@@ -96,6 +96,7 @@ private actor CoordinatorTransport: StatusTransport {
   func rotatePairingCodes() async throws -> Int { 0 }
   func listViewers() async throws -> [ViewerRecord] { [] }
   func revokeViewer(_ id: UUID) async throws {}
+  func deleteViewer(_ id: UUID) async throws {}
   func revokeAllViewers() async throws -> Int { 0 }
   func rebindDevice(recoverySecret: String) async throws -> DeviceRegistration {
     fatalError("unused")

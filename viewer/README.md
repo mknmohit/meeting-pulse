@@ -1,43 +1,64 @@
-# Astro Starter Kit: Minimal
+# Meeting Pulse viewer
+
+The viewer is a static Astro site. It runs in the browser and shows the latest
+trustworthy status published by the paired macOS owner app. It does not expose
+meeting source, title, duration, participants, override metadata, or device
+identifiers.
+
+## Requirements
+
+- Node.js 22.12 or newer.
+- pnpm.
+
+## Configuration
+
+Copy the template and fill in the required build-time values:
 
 ```sh
-pnpm create astro@latest -- --template minimal
+cp .env.example .env
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Required variables:
 
-## 🚀 Project Structure
+- `PUBLIC_SUPABASE_URL`
+- `PUBLIC_SUPABASE_ANON_KEY`
+- `PUBLIC_STATUS_ORIGINS`
+- `PUBLIC_TURNSTILE_SITE_KEY`
 
-Inside of your Astro project, you'll see the following folders and files:
+There are no source-code or production fallbacks. `.env.ci` contains fake
+shape-valid values for local checks and must not be used as a deployment
+configuration.
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+## Commands
+
+Run from this directory:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run dev
+pnpm run check
+pnpm run lint
+pnpm test
+pnpm run format:check
+pnpm run build
+pnpm run preview
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+The production build is written to `dist/`.
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+## Viewer behavior
 
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                | Action                                           |
-| :--------------------- | :----------------------------------------------- |
-| `pnpm install`         | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+- First pairing accepts a shared link fragment or a normalized ten-character
+  code.
+- Turnstile protects anonymous Supabase session creation and pairing claims.
+- Returning visitors restore their anonymous session from browser storage.
+- Status polling runs every 30 seconds only while the page is visible and
+  focused.
+- `Refresh now` performs an immediate fetch.
+- Freshness is computed from server timestamps; stale, malformed, revoked, or
+  offline states fail closed.
+- Couple mode is an optional viewer-local preference. When enabled, it selects
+  one curated phrase for the current status and keeps it stable until reload or
+  a status change.
+- The page supports responsive light/dark presentation, reduced motion, visible
+  focus, screen-reader announcements, and color-independent state cues.

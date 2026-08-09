@@ -140,8 +140,8 @@ select is(
   (select count(*)::integer
    from public.list_viewers()
    where revoked_at is null),
-  1,
-  'concurrent claims leave one active viewer'
+  2,
+  'concurrent claims leave both viewers active'
 );
 
 select dblink_disconnect('register_a');

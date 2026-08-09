@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { COUPLE_MODE_BANKS } from '../src/lib/coupleCopy';
+import { COUPLE_MODE_STORAGE_KEY } from '../src/lib/coupleMode';
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -47,7 +49,6 @@ function installMarkup(): void {
       <section data-board hidden>
         <div data-plate data-state="generic">
           <div data-state-region></div>
-          <p data-name></p>
           <div data-shape="mast"></div>
           <div data-shape="cone"></div>
           <div data-shape="pennant"></div>
@@ -56,6 +57,14 @@ function installMarkup(): void {
         </div>
         <p data-checked></p>
         <button data-refresh type="button"></button>
+        <button
+          data-couple-mode-toggle
+          type="button"
+          role="switch"
+          aria-checked="false"
+        >
+          <span data-couple-mode-state>Off</span>
+        </button>
       </section>
       <section data-pairing hidden>
         <form data-pairing-form>
@@ -89,6 +98,7 @@ describe('viewer initial hydration', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     mocks.onTick = undefined;
+    window.localStorage.clear();
     installMarkup();
   });
 
@@ -225,4 +235,99 @@ describe('viewer initial hydration', () => {
       );
     },
   );
+
+  it('keeps a selected Couple mode phrase stable for the same display state', async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: {} } });
+    mocks.fetchPairedStatus.mockResolvedValue({
+      paired: true,
+      displayName: 'Alex',
+      state: 'busy',
+      callOkay: false,
+      lastSeenAt: '2026-08-08T05:00:00.000Z',
+      serverNow: '2026-08-08T05:00:01.000Z',
+      schemaVersion: 1,
+    });
+
+    boot();
+    await readOnce();
+    const toggle = element('[data-couple-mode-toggle]') as HTMLButtonElement;
+    toggle.click();
+
+    const headline = element('[data-headline]').textContent ?? '';
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(element('[data-couple-mode-state]').textContent).toBe('On');
+    expect(window.localStorage.getItem(COUPLE_MODE_STORAGE_KEY)).toBe('true');
+    expect(element('[data-supporting]').hidden).toBe(true);
+    expect(
+      COUPLE_MODE_BANKS.meeting.some(
+        (phrase) => phrase.replaceAll('{{name}}', 'Alex') === headline,
+      ),
+    ).toBe(true);
+
+    await readOnce();
+    expect(element('[data-headline]').textContent).toBe(headline);
+  });
+
+  it('restores canonical copy when Couple mode is turned off', async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: {} } });
+    mocks.fetchPairedStatus.mockResolvedValue({
+      paired: true,
+      displayName: 'Alex',
+      state: 'busy',
+      callOkay: false,
+      lastSeenAt: '2026-08-08T05:00:00.000Z',
+      serverNow: '2026-08-08T05:00:01.000Z',
+      schemaVersion: 1,
+    });
+
+    boot();
+    await readOnce();
+    const toggle = element('[data-couple-mode-toggle]') as HTMLButtonElement;
+    toggle.click();
+    toggle.click();
+
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    expect(element('[data-couple-mode-state]').textContent).toBe('Off');
+    expect(element('[data-supporting]').hidden).toBe(false);
+    expect(element('[data-headline]').textContent).toBe('Alex is in a meeting');
+    expect(document.querySelector('[data-name]')).toBeNull();
+  });
+
+  it('switches to the new status bank when the display state changes', async () => {
+    window.localStorage.setItem(COUPLE_MODE_STORAGE_KEY, 'true');
+    mocks.getSession.mockResolvedValue({ data: { session: {} } });
+    mocks.fetchPairedStatus.mockResolvedValue({
+      paired: true,
+      displayName: null,
+      state: 'busy',
+      callOkay: false,
+      lastSeenAt: '2026-08-08T05:00:00.000Z',
+      serverNow: '2026-08-08T05:00:01.000Z',
+      schemaVersion: 1,
+    });
+
+    boot();
+    await readOnce();
+    const meetingHeadline = element('[data-headline]').textContent ?? '';
+    expect(
+      COUPLE_MODE_BANKS.meeting.some((phrase) => phrase === meetingHeadline),
+    ).toBe(true);
+
+    mocks.fetchPairedStatus.mockResolvedValue({
+      paired: true,
+      displayName: null,
+      state: 'busy',
+      callOkay: true,
+      lastSeenAt: '2026-08-08T05:00:00.000Z',
+      serverNow: '2026-08-08T05:00:01.000Z',
+      schemaVersion: 1,
+    });
+    await readOnce();
+
+    const callOkayHeadline = element('[data-headline]').textContent ?? '';
+    expect(element('[data-plate]').dataset.state).toBe('callOkay');
+    expect(
+      COUPLE_MODE_BANKS.callOkay.some((phrase) => phrase === callOkayHeadline),
+    ).toBe(true);
+  });
 });

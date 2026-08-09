@@ -18,6 +18,7 @@ private final class ReviewActions: PulseActions {
   func revokeViewerAccess() async {}
   func loadViewers() async {}
   func removeViewer(id _: UUID) async {}
+  func deleteViewer(id _: UUID) async {}
   func setLaunchAtLogin(_: Bool) throws {}
   func setOpenWindowAtLogin(_: Bool) {}
   func revealRecoveryPhrase() async {}

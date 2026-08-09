@@ -208,9 +208,9 @@ meetingpulse/
 │
 ├── supabase/
 │   ├── config.toml
-│   ├── migrations/2026080700{0100..0800}_*.sql
+│   ├── migrations/20260809000100_initial_schema.sql
 │   ├── tests/{00_helpers,01_rls_negative,02_pairing,03_throttle,04_recovery,
-│   │          05_viewer_read,06_concurrency,07_normalization}.sql
+│   │          05_viewer_read,06_concurrency,07_normalization,08_viewer_capacity}.sql
 │   └── seed/seed.sql
 │
 ```

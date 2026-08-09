@@ -64,6 +64,7 @@ public protocol StatusTransport: Sendable {
   func rotatePairingCodes() async throws -> Int
   func listViewers() async throws -> [ViewerRecord]
   func revokeViewer(_ id: UUID) async throws
+  func deleteViewer(_ id: UUID) async throws
   func revokeAllViewers() async throws -> Int
   func rebindDevice(recoverySecret: String) async throws -> DeviceRegistration
   func deleteDevice() async throws

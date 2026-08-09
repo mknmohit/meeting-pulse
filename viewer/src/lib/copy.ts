@@ -9,7 +9,7 @@ export const COPY = {
       headlineWithName: (name: string) =>
         `${name} is in Meeting, but it's fine to ring through`,
       headline: "In Meeting, but it's fine to ring through",
-      supporting: "He said to go ahead and interrupt.",
+      supporting: 'He said to go ahead and interrupt.',
     },
     generic: {
       headline: 'Meeting status unavailable',
@@ -30,6 +30,11 @@ export const COPY = {
     checkedAWhile: 'Checked a while ago',
     checkAgain: 'Check again',
     checking: 'Checking',
+    coupleMode: 'Couple mode',
+    coupleModeOn: 'On',
+    coupleModeOff: 'Off',
+    coupleModeAria: (enabled: boolean) =>
+      `Couple mode: ${enabled ? 'on' : 'off'}`,
   },
   pairing: {
     heading: 'Enter the code',

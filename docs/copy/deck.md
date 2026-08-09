@@ -196,7 +196,8 @@ otherwise is how she gets told he is free while he is in a meeting.
 Section title: `Sharing`
 
 - Empty state: `No one is watching yet.` / `Create a link and send it to whoever needs to know when to call.` / `Create the viewer link`
-- Group headers: `The link` · `Who has the link`
+- Group headers: `The link` · `Viewers (up to 5)`
+- Viewer capacity note: `Five people or devices can watch at the same time.`
 - Buttons: `Copy link` · `Copy code` · `Share` · `Create a new link` · `Stop sharing`
 - After copying: `Copied`
 - New link confirmation: `Create a new link?` / `The old link stops working right away. Anyone using it will need the new one.`
@@ -205,6 +206,7 @@ Section title: `Sharing`
 - Empty list: `Nobody has used the link yet.`
 - Failed list: `Can't load the list right now.` with `Try again`
 - Remove a viewer: `Remove`
+- Delete a viewer: `Delete` / `Delete viewer?` / `This permanently removes the viewer binding. The person can pair again with the link.`
 
 Viewer rows never carry a name, because the server does not have one. Showing
 when the pairing happened is honest. Inventing a device nickname is not.
