@@ -15,7 +15,7 @@ import { fetchPairedStatus } from '../src/lib/status';
 function response(state: string) {
   return {
     paired: true,
-    display_name: 'Mohit',
+    display_name: 'Owner',
     state,
     call_okay: false,
     last_seen_at: '2026-08-08T08:47:15.350809+00:00',

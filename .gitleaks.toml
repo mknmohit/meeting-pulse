@@ -35,5 +35,12 @@ paths = [
   '''(^|/)viewer/\.astro/''',
   '''(^|/)supabase/\.temp/''',
   '''(^|/)supabase/\.branches/''',
-  '''(^|/)\.superpowers/''',
+  '''(^|/)landing/''',
+]
+
+# Test fixtures are intentional shape matches, not real secrets.
+regexes = [
+  '''(^|[^A-Za-z0-9])1234567890([^A-Za-z0-9]|$)''',
+  '''(^|[^A-Za-z0-9])ABCDEFGHJK([^A-Za-z0-9]|$)''',
+  '''(^|[^A-Za-z0-9])12345-67890([^A-Za-z0-9]|$)''',
 ]

@@ -11,7 +11,7 @@ struct RedactorTests {
     let pairingCode = ["ABCDE", "FGHJK"].joined(separator: "-")
     let recoveryPhrase = ["ABCDE", "FGHJK", "MNPQR", "STVWX", "YZ012", "3"]
       .joined(separator: "-")
-    let email = ["wife", "example.com"].joined(separator: "@")
+    let email = ["partner", "example.com"].joined(separator: "@")
     let supabaseURL = "https://" + String(repeating: "a", count: 20) + ".supabase.co"
     let dirty = """
       https://meet.google.com/abc-defg-hij \(email) \(pairingCode)

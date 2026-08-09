@@ -44,8 +44,8 @@ the viewer can leave the meeting state.
 1. **Persistent pairing code plus share link.** Reuse the current pairing
    table and RPC surface, remove automatic expiry, and place the normalized
    code in a fragment such as `VIEWER_ORIGIN/#code=CODE`. This gives the
-   simplest wife-facing flow while retaining manual code entry as a fallback.
-   The code is a bearer secret until rotation.
+   simplest viewer-facing flow while retaining manual code entry as a
+   fallback. The code is a bearer secret until rotation.
 2. **Persistent pairing code only.** This has the smallest surface area, but
    requires manual entry again after browser storage is cleared and does not
    provide a convenient share action.

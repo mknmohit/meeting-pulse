@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issues
+    url: ./SECURITY.md
+    about: Report vulnerabilities privately. Do not file a public issue.
+  - name: Discussions
+    url: https://github.com/mknmohit/meeting-pulse/discussions
+    about: Questions, design ideas, and "how do I…" that are not bugs or features.

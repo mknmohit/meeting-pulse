@@ -1,0 +1,52 @@
+name: Feature
+description: Propose a behaviour change. Keep the scope small.
+labels: ["enhancement"]
+body:
+  - id: summary
+    type: input
+    attributes:
+      label: One-line summary
+      placeholder: Allow the viewer to subscribe to multiple owners.
+    validations:
+      required: true
+  - id: user
+    type: dropdown
+    attributes:
+      label: Primary user
+      options:
+        - Owner (macOS app)
+        - Viewer (web)
+        - Both
+    validations:
+      required: true
+  - id: problem
+    type: textarea
+    attributes:
+      label: Problem
+      description: What is the user trying to do today, and what stops them?
+    validations:
+      required: true
+  - id: proposal
+    type: textarea
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
+  - id: privacy
+    type: textarea
+    attributes:
+      label: Privacy boundary
+      description: |
+        Which constraint from PRODUCT.md applies? If the proposal weakens the
+        privacy boundary, explain why and propose the smallest change.
+    validations:
+      required: true
+  - id: scope
+    type: textarea
+    attributes:
+      label: Smallest complete change
+      description: |
+        List the surfaces the change touches (macOS app, viewer, schema,
+        RPCs, copy, docs) and the order to ship them in.
+    validations:
+      required: true

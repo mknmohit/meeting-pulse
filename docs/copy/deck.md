@@ -8,9 +8,9 @@ Implementations import from here: `viewer/src/lib/copy.ts` and `MPSupport/String
 
 ## Who is reading, and how they feel
 
-**The viewer.** She is standing near a closed door with a phone in her hand, mildly impatient, half-distracted. She wants one word. She does not want to be taught anything, does not want an apology, and will not read a second paragraph.
+**The viewer.** The viewer is standing near a closed door with a phone in hand, mildly impatient, half-distracted. The viewer wants one word. The viewer does not want to be taught anything, does not want an apology, and will not read a second paragraph.
 
-**The owner.** He is technical, he installed this once, and he wants to forget it exists. The only moments he reads anything are the permission request (mild alarm at a scary-sounding permission), the recovery phrase (needs to understand the stakes in one sentence), and the delete confirmation (needs to know exactly what he is about to lose).
+**The owner.** The owner is technical, installed this once, and wants to forget it exists. The only moments the owner reads anything are the permission request (mild alarm at a scary-sounding permission), the recovery phrase (needs to understand the stakes in one sentence), and the delete confirmation (needs to know exactly what is about to be lost).
 
 Two rules follow from that, and they govern every line below. Say the thing in the words you would use across a kitchen table. Every failure message names what to do next and never blames the reader.
 
@@ -26,13 +26,13 @@ Two rules follow from that, and they govern every line below. Say the thing in t
 | busy, calls okay | pennant | `{Name} is in Meeting, but it's fine to ring through` / `In Meeting, but it's fine to ring through` | `He said to go ahead and interrupt.` |
 | every other fresh, stale, or unsupported result | bare mast | `Meeting status unavailable` | `Check again before you call.` |
 | offline | bare mast | `Meeting status unavailable` | `Connect to the internet, then check again.` |
-| not paired | bare mast | `Not connected` | `Open the viewer link or enter the code he shared.` |
+| not paired | bare mast | `Not connected` | `Open the viewer link or enter the code the owner shared.` |
 
 Only the two busy rows take `{Name}` in the headline. The other three do not, and
 the name is shown in a separate line beneath the plate instead.
 
-The neutral line is intentional. The page never tells her that the owner is
-free when the Mac cannot provide a trustworthy meeting signal.
+The neutral line is intentional. The page never tells the viewer that the
+owner is free when the Mac cannot provide a trustworthy meeting signal.
 
 ## The chalked rail
 
@@ -278,7 +278,8 @@ Three steps. Each one ends with the reader having done something.
    - While waiting: `Waiting...` Once granted: `Accessibility is on.`
 3. `Send this to whoever needs it.` / `They open the link and see one word. They do not need an account, and they cannot see anything else.` / `Create the link` / `Do this later` / `Open Meeting Pulse`
 
-Step 2 advances by itself the moment permission is granted. He should be able to
+Step 2 advances by itself the moment permission is granted. The owner should be
+able to
 grant it in System Settings and find the app already on step 3 when he switches
 back.
 

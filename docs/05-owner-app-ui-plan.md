@@ -218,9 +218,9 @@ that survives a long build.
 //  only the ground and rail follow the system. Native macOS chrome everywhere
 //  else: system controls, system font, system materials, no custom scrollbars.
 //
-//  STORY: He opens this maybe four times ever. He wants to know it is working,
-//  send her the link, and close it. He leaves believing the Mac cannot see
-//  anything it should not.
+//  STORY: The owner opens this maybe four times ever. The owner wants to know
+//  it is working, send the viewer the link, and close it. The owner leaves
+//  believing the Mac cannot see anything it should not.
 //
 //  FIRST VIEWPORT: A 288pt left column. Top two thirds is the enamel plate: the
 //  day-shape, the state word, the supporting line, exactly the viewer's board.
@@ -242,10 +242,11 @@ The mast is the product. Meeting Pulse publishes one word. Putting that word
 permanently on screen, in the same lettering and the same paint she sees, does
 three things a settings tab cannot:
 
-1. It answers the only question he ever has, before he clicks anything.
-2. It teaches the fail-closed rule by demonstration. He sets himself available,
-   and the plate still reads `Meeting status unavailable`, because that is the
-   truth of what she sees. No paragraph explains this as well as watching it.
+1. It answers the only question the owner ever has, before clicking anything.
+2. It teaches the fail-closed rule by demonstration. The owner sets themselves
+   available, and the plate still reads `Meeting status unavailable`, because
+   that is the truth of what the viewer sees. No paragraph explains this as
+   well as watching it.
 3. It bounds the privacy claim visually. Everything on the plate is everything
    that leaves the Mac. There is nothing else to show.
 
@@ -277,24 +278,24 @@ So the mast renders **two registers, stacked, never merged**:
   - `busy` and calls not okay → cone, storm plate, `In a meeting`
   - `busy` and calls okay → pennant, amber plate, `In Meeting, but it's fine to ring through`
   - everything else → bare mast, bare plate, `Meeting status unavailable`
-- **The chalk line under the plate** shows what he needs, which the plate
-  cannot say: `Busy for another 12 minutes`, `Watching automatically`,
+- **The chalk line under the plate** shows what the owner needs, which the
+  plate cannot say: `Busy for another 12 minutes`, `Watching automatically`,
   `Waiting for Accessibility permission`, `Can't reach the server. Retrying.`
 
 The fourth viewer face, `unpaired`, is not owner-reachable. It describes a
-viewer device that has not entered a code, which is a property of her phone, not
-of his Mac. Do not model it.
+viewer device that has not entered a code, which is a property of the viewer's
+phone, not of the Mac. Do not model it.
 
 Two failure modes to avoid, both of which produce an app that looks finished and
 lies:
 
 1. **Giving `available` a green plate.** `--plate-clear` (`#10614A`) exists in
    `tokens.css` and is referenced by no rule in `board.css`. It is dead paint.
-   If you use it, the owner sees a confident green board while his wife's page
-   reads `Meeting status unavailable`.
+   If you use it, the owner sees a confident green board while the viewer's
+   page reads `Meeting status unavailable`.
 2. **Treating calls-are-okay as an accent on top of the busy face.** It replaces
    the face. Cone becomes pennant, storm becomes amber, and the headline changes
-   completely. A brass flag stuck on a red plate is not what she sees.
+   completely. A brass flag stuck on a red plate is not what the viewer sees.
 
 ---
 
@@ -1144,7 +1145,7 @@ real. Build it first, get it right, then build the sections around it.
 232 is a minimum, not a fixed height, and the code below uses `minHeight` for
 that reason. The paddings add up to 208 before either text is laid out, so a
 single headline line already brings it to roughly 244, and the named `callOkay`
-variant (`Mohit is in Meeting, but it's fine to ring through`) wraps to three
+variant (`Avery is in a meeting, but it's fine to ring through`) wraps to three
 lines at this width. Pinning the height would clip it.
 
 The plate growing is fine. It sits at the top of a 288pt column with a `Spacer`
@@ -1823,8 +1824,8 @@ This Mac
 
   Your name
   ┌──────────────────────────────────────────────────────┐
-  │ Name          [ Mohit                            ]   │
-  │               Shown on the page as "Mohit is in a    │
+  │ Name          [ Avery                            ]   │
+  │               Shown on the page as "Avery is in a    │
   │               meeting". Leave it blank to stay       │
   │               unnamed.                               │
   └──────────────────────────────────────────────────────┘
@@ -2073,9 +2074,9 @@ Three steps. No more. Every step ends with the user having done one thing.
 
 **This step advances itself.** Subscribe to `PermissionCoordinator.changes`; the
 moment permission is granted, wait 700ms so the change is legible, then advance
-to step 3 with the transition in §10 item M18. He should be able to grant
-permission in System Settings and find the app already on the next step when he
-switches back. Do not make him come back and click Continue.
+to step 3 with the transition in §10 item M18. The owner should be able to
+grant permission in System Settings and find the app already on the next step
+when they switch back. Do not make the owner come back and click Continue.
 
 Provide a `Skip for now` link in `.secondary` at the bottom. Skipping is
 allowed; the Watch section will carry the banner until it is resolved.
@@ -2562,8 +2563,8 @@ Two rules for the conformance in the app target:
 - Every method that can fail sets `store.lastError` with a specific case. Never
   the blanket network string (defect D3).
 - Every method that changes published state updates the store **before**
-  awaiting the network, then reconciles. He toggles Calls-are-okay and the
-  pennant rises immediately; if the publish fails, the rail says so. The
+  awaiting the network, then reconciles. The owner toggles Calls-are-okay and
+  the pennant rises immediately; if the publish fails, the rail says so. The
   interface should never wait on a round trip to acknowledge a click.
 
 ### 11.3 Value types
@@ -3032,7 +3033,7 @@ The plate is one element, not five:
 
 ```swift
 .accessibilityElement(children: .ignore)
-.accessibilityLabel(headline)            // "Mohit is in a meeting"
+.accessibilityLabel(headline)            // "Avery is in a meeting"
 .accessibilityValue(face.supporting(isOnline: isOnline))  // "Better to wait."
 .accessibilityHint(reasonLine)           // "Busy for another 12 minutes"
 ```
@@ -3480,8 +3481,8 @@ mapping between them is neither obvious nor one to one. Three ways to get it
 wrong, in descending order of likelihood:
 
 1. Mapping `State` to `PlateFace` one to one and giving `available` a green
-   plate. The owner then sees a confident "Available" board while his wife's
-   page reads `Meeting status unavailable`.
+   plate. The owner then sees a confident "Available" board while the
+   viewer's page reads `Meeting status unavailable`.
 2. Treating calls-are-okay as a decoration on the busy face rather than as its
    own face with its own shape, plate, and headline.
 3. Drawing the pennant as the mast plus a flag. The viewer draws a bare pole

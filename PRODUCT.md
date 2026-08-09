@@ -18,27 +18,27 @@ Decided in the specification, not delegated.
 
 ## Users
 
-**The owner.** Works from home on a Mac. Spends the day in Google Meet calls in Chrome and Slack Huddles in the native Slack app. He installs the app once, grants Accessibility permission, and then wants to never think about it again. He is technical. He is the only person who ever sees the menu-bar surface.
+**The owner.** Works from home on a Mac. Spends the day in Google Meet calls in Chrome and Slack Huddles in the native Slack app. The owner installs the app once, grants Accessibility permission, and then wants to never think about it again. The owner is technical. The owner is the only person who ever sees the menu-bar surface.
 
-**The viewer.** The owner's wife, at home in the same house. She is not technical and does not want to be. She opens one page on her phone to answer a single question: can I call him right now, or is he on a call? She checks it in the two seconds before she would have knocked on the door. She may check it fifteen times a day or twice a week. She will not read instructions, will not troubleshoot, and will abandon the product permanently if it is ever confidently wrong.
+**The viewer.** A paired person who is not technical and does not want to be. The viewer opens one page on a phone to answer a single question: is the owner on a call right now? The viewer checks it in the two seconds before reaching out. The viewer may check it many times a day or twice a week. The viewer will not read instructions, will not troubleshoot, and will abandon the product permanently if it is ever confidently wrong.
 
-The viewer is the primary user of the web surface. Everything on that page is for her.
+The viewer is the primary user of the web surface. Everything on that page is for the viewer.
 
 ## Product Purpose
 
-Meeting Pulse answers one question for one person: is he on a call right now?
+Meeting Pulse answers one question for one viewer: is the owner on a call right now?
 
 The macOS app watches Chrome and Slack through Accessibility APIs and publishes a single word to a private page. The owner can also set the state by hand for a chosen duration, and can flag "you can call anyway" while busy.
 
-Success is that she stops guessing and stops interrupting meetings, and that he stops being interrupted without ever having to update anything manually.
+Success is that the viewer stops guessing and stops interrupting meetings, and that the owner stops being interrupted without ever having to update anything manually.
 
-Failure is a confident wrong answer. A page that says Available while he is in a meeting is worse than no product, because it destroys the trust that makes her check at all. The system is designed to fail closed: anything unknown, stale, or permission-blocked becomes "Status unavailable", never a guessed "Available".
+Failure is a confident wrong answer. A page that says Available while the owner is in a meeting is worse than no product, because it destroys the trust that makes the viewer check at all. The system is designed to fail closed: anything unknown, stale, or permission-blocked becomes "Status unavailable", never a guessed "Available".
 
 ## Positioning
 
 A local macOS agent that detects arbitrary Google Meet calls in Chrome and native Slack Huddles without an extension, a bot, OAuth, or calendar access, and publishes only an availability state.
 
-Neighboring products cannot truthfully copy this combination. Calendar-based status is wrong for impromptu calls. Slack status covers only Slack. Meet APIs cover only scheduled Meet events the API can see. The detection happens on the owner's own machine by reading window structure, which is why it works for any call he joins by any means.
+Neighboring products cannot truthfully copy this combination. Calendar-based status is wrong for impromptu calls. Slack status covers only Slack. Meet APIs cover only scheduled Meet events the API can see. The detection happens on the owner's own machine by reading window structure, which is why it works for any call the owner joins by any means.
 
 ## Constraints
 
@@ -46,7 +46,7 @@ These are product truth, not implementation preference. They must survive every 
 
 **The privacy boundary is the product.** Only these values ever leave the Mac: the state (`available`, `busy`, `unavailable`), a `call_okay` boolean, an optional owner display name of at most 80 characters, and freshness timestamps. Never a meeting title, URL, participant, platform, duration, microphone or camera state, audio, video, screenshot, or screen content. Screen Recording permission is never requested.
 
-**The viewer must never learn how the state was produced.** "Busy" must look identical whether it came from a detected meeting or from the owner pressing Set Busy. Override metadata and device identifiers are not readable by the viewer. Revealing that he manually set Busy is more socially loaded than the meeting data the product refuses to send.
+**The viewer must never learn how the state was produced.** "Busy" must look identical whether it came from a detected meeting or from the owner pressing Set Busy. Override metadata and device identifiers are not readable by the viewer. Revealing that the owner manually set Busy is more socially loaded than the meeting data the product refuses to send.
 
 **Fail closed, always.** Unknown detector state, missing permission, or a heartbeat older than three minutes renders "Status unavailable", never "Available".
 

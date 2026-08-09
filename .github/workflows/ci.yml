@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  viewer:
+    name: Viewer (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: viewer/pnpm-lock.yaml
+      - name: Install
+        working-directory: viewer
+        run: pnpm install --frozen-lockfile
+      - name: CI env
+        working-directory: viewer
+        run: cp .env.ci .env
+      - name: Headers
+        working-directory: viewer
+        run: pnpm run headers
+      - name: Type check
+        working-directory: viewer
+        run: pnpm run check
+      - name: Lint
+        working-directory: viewer
+        run: pnpm run lint
+      - name: Test
+        working-directory: viewer
+        run: pnpm test
+      - name: Format check
+        working-directory: viewer
+        run: pnpm run format:check
+      - name: Build
+        working-directory: viewer
+        run: pnpm run build
+      - name: Verify CI env refused by viewer
+        working-directory: viewer
+        run: |
+          if grep -RIl --include='*.js' --include='*.mjs' "ci000000000000000000" dist public 2>/dev/null; then
+            echo "::error::Built bundle leaks CI placeholder values."
+            exit 1
+          fi
+
+  swift:
+    name: Swift packages (${{ matrix.package }})
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [MPCore, MPSupport, MPDetection, MPSync, MPUI]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+      - name: Show Xcode
+        run: xcodebuild -version
+      - name: Test ${{ matrix.package }}
+        working-directory: mac-app/Packages/${{ matrix.package }}
+        run: swift test
+
+  repo-lint:
+    name: Repo lint
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ripgrep
+        run: brew install ripgrep
+      - name: Swift copy and code lint
+        run: make lint
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

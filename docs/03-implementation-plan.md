@@ -1485,7 +1485,7 @@ public enum StatusReducer {
     public static func reduce(_ input: ReducerInput) -> EffectiveStatus {
 
         // STEP 1 — an explicit user action beats everything, including a
-        // permission failure. He asserted this deliberately and we honour it.
+        // permission failure. The owner asserted this deliberately and we honour it.
         if let ov = input.override, ov.isActive(at: input.monotonicNow) {
             return .init(state: ov.state, callOkay: input.callOkay,
                          isOverridden: true, reason: .manualOverride)
@@ -1896,7 +1896,7 @@ Publishes on: effective-state change · override change · `call_okay` change ·
 
 ```swift
 let dirty = """
-https://meet.google.com/abc-defg-hij  wife@example.com  ABCDE-FGHJK
+https://meet.google.com/abc-defg-hij  partner@example.com  ABCDE-FGHJK
 ABCDE-FGHJK-MNPQR-STVWX-YZ012-3  eyJhbGciOi.eyJzdWIi.sig
 a1b2c3d4-0000-0000-0000-000000000000  https://abcdefghijklmnopqrst.supabase.co
 Standup with Priya
@@ -2033,7 +2033,7 @@ Built to §4. The state is the page.
 nameEl.textContent = status.displayName ?? "";
 nameEl.hidden = !status.displayName;
 
-// "He said it's fine to interrupt" appears only when busy AND call_okay.
+// "He said to go ahead and interrupt." appears only when busy AND call_okay.
 pennant.hidden = !(display === "busy" && status.callOkay);
 ```
 
@@ -2054,9 +2054,9 @@ The viewer's identity lives in script-writable storage, and iOS Safari's ITP evi
 
 We accept this and design for it rather than pretending it away. Recorded in `docs/decisions/0004`.
 
-- Eviction renders the **pairing screen with a calm explanation**, not an error: `This device was signed out. Ask him for a new code.` No red, no apology, no jargon.
-- After a successful pairing, the page offers Add to Home Screen guidance on iOS. A home-screen web app has a more durable storage bucket and, more importantly, she will actually open it, and regular interaction is what prevents eviction in the first place.
-- Re-pairing takes about twenty seconds: he clicks Create pairing code, reads her ten characters, she types them. He is in the next room.
+- Eviction renders the **pairing screen with a calm explanation**, not an error: `This device was signed out. Ask the owner for a new code.` No red, no apology, no jargon.
+- After a successful pairing, the page offers Add to Home Screen guidance on iOS. A home-screen web app has a more durable storage bucket and, more importantly, the viewer will actually open it, and regular interaction is what prevents eviction in the first place.
+- Re-pairing takes about twenty seconds: the owner clicks Create pairing code, reads the viewer's ten characters, and the viewer types them. The owner is in the next room.
 - A `manifest.webmanifest` with `display: standalone`, a maskable icon, and the correct theme colour per scheme.
 - **Acceptance test:** clear all site data, reload, and confirm the pairing screen appears with the right copy and no console error.
 

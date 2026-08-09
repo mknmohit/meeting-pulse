@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/viewer"
+    schedule:
+      interval: "weekly"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+    ignore:
+      # Supabase JS is pinned to the major used by the deployed viewer; review
+      # breaking changes before bumping.
+      - dependency-name: "@supabase/supabase-js"
+      - dependency-name: "astro"

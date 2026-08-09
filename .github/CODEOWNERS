@@ -1,0 +1,19 @@
+# Default owners for everything not matched below.
+*                                       @mknmohit
+
+# macOS owner app — Swift, Accessibility, code signing.
+/mac-app/                               @mknmohit
+/mac-app/Tools/                         @mknmohit
+
+# Viewer (Astro / TypeScript).
+/viewer/                                @mknmohit
+
+# Backend (Supabase schema, RLS, RPCs, tests).
+/supabase/                              @mknmohit
+
+# Privacy, security, and release process.
+/SECURITY.md                            @mknmohit
+/CONTRIBUTING.md                        @mknmohit
+/docs/setup/release.md                  @mknmohit
+/docs/02-meetingpulse-spec.md           @mknmohit
+/docs/03-implementation-plan.md         @mknmohit

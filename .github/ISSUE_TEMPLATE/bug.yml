@@ -1,0 +1,70 @@
+name: Bug
+description: Something is broken or behaves incorrectly.
+labels: ["bug"]
+body:
+  - id: summary
+    type: input
+    attributes:
+      label: One-line summary
+      placeholder: Viewer shows "Available" while owner is in a Slack huddle.
+    validations:
+      required: true
+  - id: surface
+    type: dropdown
+    attributes:
+      label: Surface
+      options:
+        - macOS owner app
+        - Viewer (web)
+        - Supabase / database
+        - Build / release tooling
+        - Documentation
+    validations:
+      required: true
+  - id: repro
+    type: textarea
+    attributes:
+      label: Reproduction
+      placeholder: |
+        1. Start a Google Meet in Chrome
+        2. Open the menu-bar app
+        3. Observe state
+      render: markdown
+    validations:
+      required: true
+  - id: expected
+    type: textarea
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - id: actual
+    type: textarea
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - id: privacy
+    type: textarea
+    attributes:
+      label: Privacy check
+      description: |
+        Confirm no meeting title, URL, participant, audio, video, screenshot,
+        or screen content is needed to reproduce. If it is, stop and read
+        SECURITY.md before posting.
+      value: |
+        Reproduction uses no meeting content beyond the public "in meeting" affordance.
+    validations:
+      required: true
+  - id: logs
+    type: textarea
+    attributes:
+      label: Relevant logs or diagnostics
+      description: |
+        Paste from a redacted diagnostics export. Never paste pairing codes,
+        recovery phrases, Supabase sessions, or meeting content.
+  - id: env
+    type: input
+    attributes:
+      label: Environment
+      placeholder: macOS 14.6, Xcode 16.2, build 0.0.1

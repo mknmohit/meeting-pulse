@@ -17,7 +17,7 @@
 
 ## 1. Summary
 
-Meeting Pulse is a lightweight native macOS menu-bar application that detects whether its owner is currently in a Google Meet call in Chrome or a Slack Huddle in the native Slack app. It publishes only a small availability state to a paired Supabase backend. A private web page, opened by the owner's wife, reads that state periodically.
+Meeting Pulse is a lightweight native macOS menu-bar application that detects whether its owner is currently in a Google Meet call in Chrome or a Slack Huddle in the native Slack app. It publishes only a small availability state to a paired Supabase backend. A private web page, opened by the viewer, reads that state periodically.
 
 The project is open source. Deployment configuration is injectable, secrets stay out of source control, and tooling is reproducible and reviewable.
 
@@ -35,7 +35,7 @@ Busy/Available state.
 
 *(Unchanged from v1 §2.)*
 
-The owner uses Google Meet in Chrome and Slack Huddles in the native Slack app for nearly all meetings. His wife needs a low-friction way to decide whether calling is appropriate. The first stage is a private personal utility, not a public SaaS. It should be small, inexpensive, privacy-preserving, and structured so it can later become a couples/family availability product.
+The owner uses Google Meet in Chrome and Slack Huddles in the native Slack app for nearly all meetings. The viewer needs a low-friction way to decide whether calling is appropriate. The first stage is a single-owner utility, not a public SaaS. It should be small, inexpensive, privacy-preserving, and structured so it can later become a couples/family availability product.
 
 A preliminary market scan found adjacent features but no obvious product matching this exact combination: arbitrary Chrome Google Meet participation, native Slack Huddles, a macOS local agent, and a private family-facing status page. Google Calendar and Slack statuses remain platform-specific, and official APIs do not reliably provide a single instant cross-platform signal for every call the user joins. This is a product hypothesis, not a claim that no competitor exists; broader validation is required before commercialization.
 

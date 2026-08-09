@@ -45,7 +45,7 @@ These collide in real, common situations:
 | Manual "Set Busy" active, Accessibility revoked | — | unavailable | busy | **undefined** |
 | Chrome not running, Slack not running | — | — | — | **undefined** |
 
-Worse, the "fail closed" principle in Goal 10 ("never a guessed `Available`") is violated by the naive reading of rule 3: downgrading a **confirmed busy** to `unavailable` because an *unrelated* source is unreadable produces a *less* safe answer for the viewer, not a safer one. The whole point is that the wife should not call during a meeting; `unavailable` invites her to call and check.
+Worse, the "fail closed" principle in Goal 10 ("never a guessed `Available`") is violated by the naive reading of rule 3: downgrading a **confirmed busy** to `unavailable` because an *unrelated* source is unreadable produces a *less* safe answer for the viewer, not a safer one. The whole point is that the viewer should not call during a meeting; `unavailable` invites the viewer to call and check.
 
 **Fix (v2 §6.4):** a single, ordered, total function. Precedence: `override > confirmed busy > unknown > available`. Written as an explicit decision table with all 4×4 source-pair combinations enumerated, so it is directly testable.
 
