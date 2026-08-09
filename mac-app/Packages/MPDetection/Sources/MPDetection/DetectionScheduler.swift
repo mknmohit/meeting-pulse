@@ -76,11 +76,14 @@ public actor DetectionScheduler {
   private let meet: any MeetingDetector
   private let slack: any MeetingDetector
   private let permissionProbe: any PermissionProbe
+  private let spaceChanges: any SpaceChangeSource
   private var tuning: DetectionTuning
   private var timer: DispatchSourceTimer?
   private var scheduledInterval: Duration?
   private var meetTask: Task<Void, Never>?
   private var slackTask: Task<Void, Never>?
+  private var spaceTask: Task<Void, Never>?
+  private var spaceResampleTask: Task<Void, Never>?
   private var running = false
   private var meetSettler = ObservationSettler()
   private var slackSettler = ObservationSettler()
@@ -93,11 +96,13 @@ public actor DetectionScheduler {
     meet: any MeetingDetector,
     slack: any MeetingDetector,
     permissionProbe: any PermissionProbe = AccessibilityPermissionProbe(),
-    tuning: DetectionTuning = DetectionTuning()
+    tuning: DetectionTuning = DetectionTuning(),
+    spaceChanges: any SpaceChangeSource = WorkspaceSpaceChangeSource()
   ) {
     self.meet = meet
     self.slack = slack
     self.permissionProbe = permissionProbe
+    self.spaceChanges = spaceChanges
     self.tuning = tuning
     var continuation: AsyncStream<SchedulerReading>.Continuation?
     readings = AsyncStream { continuation = $0 }
@@ -120,6 +125,13 @@ public actor DetectionScheduler {
     slackTask = Task { [weak self] in
       for await value in slackReadings {
         _ = await self?.ingest(source: .slackHuddle, value: value)
+      }
+    }
+    let spaceChanges = spaceChanges.changes
+    self.spaceChanges.start()
+    spaceTask = Task { [weak self] in
+      for await _ in spaceChanges {
+        await self?.handleSpaceChange()
       }
     }
     await meet.start()
@@ -145,8 +157,13 @@ public actor DetectionScheduler {
     scheduledInterval = nil
     meetTask?.cancel()
     slackTask?.cancel()
+    spaceTask?.cancel()
+    spaceResampleTask?.cancel()
     meetTask = nil
     slackTask = nil
+    spaceTask = nil
+    spaceResampleTask = nil
+    spaceChanges.stop()
     await meet.stop()
     await slack.stop()
   }
@@ -193,6 +210,35 @@ public actor DetectionScheduler {
       }
     }
     scheduleTimer()
+  }
+
+  private func handleSpaceChange() async {
+    guard running else {
+      return
+    }
+    await meet.spaceDidChange()
+    await slack.spaceDidChange()
+    spaceResampleTask?.cancel()
+    spaceResampleTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: .milliseconds(300))
+      } catch {
+        return
+      }
+      guard !Task.isCancelled else {
+        return
+      }
+      await self?.tick()
+      do {
+        try await Task.sleep(for: .milliseconds(700))
+      } catch {
+        return
+      }
+      guard !Task.isCancelled else {
+        return
+      }
+      await self?.tick()
+    }
   }
 
   private func ingest(

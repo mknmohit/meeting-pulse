@@ -83,6 +83,68 @@ struct MeetLatchTests {
   }
 
   @Test
+  func transitionGraceMaintainsActiveWhenAnchorIsOffSpace() {
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [],
+        visibility: .transitionGrace
+      ),
+      now: now.advanced(by: .seconds(5)),
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    #expect(result == .active)
+    #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
+  func expiredSpaceVisibilityBecomesUnknownInsteadOfInactive() {
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [],
+        visibility: .unavailable
+      ),
+      now: now.advanced(by: .seconds(30)),
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    #expect(result == .unknown)
+    #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
   func incompleteScanWithoutLiveAnchorIsUnknown() {
     var latch = MeetLatch()
     let anchor = anchor(at: now)

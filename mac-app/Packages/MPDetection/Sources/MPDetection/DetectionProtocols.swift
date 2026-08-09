@@ -45,6 +45,60 @@ public protocol AXEventSource: Sendable {
   func stopObserving(pid: pid_t) async
 }
 
+public protocol SpaceChangeSource: Sendable {
+  var changes: AsyncStream<Void> { get }
+  func start()
+  func stop()
+}
+
+public final class WorkspaceSpaceChangeSource: SpaceChangeSource, @unchecked Sendable {
+  public let changes: AsyncStream<Void>
+
+  private let workspace: NSWorkspace
+  private let lock = NSLock()
+  private let continuation: AsyncStream<Void>.Continuation
+  private var observer: NSObjectProtocol?
+
+  public init(workspace: NSWorkspace = .shared) {
+    self.workspace = workspace
+    var continuation: AsyncStream<Void>.Continuation?
+    changes = AsyncStream(bufferingPolicy: .bufferingNewest(1)) {
+      continuation = $0
+    }
+    self.continuation = continuation!
+  }
+
+  deinit {
+    stop()
+    continuation.finish()
+  }
+
+  public func start() {
+    lock.lock()
+    defer { lock.unlock() }
+    guard observer == nil else {
+      return
+    }
+    observer = workspace.notificationCenter.addObserver(
+      forName: NSWorkspace.activeSpaceDidChangeNotification,
+      object: workspace,
+      queue: nil
+    ) { [weak self] _ in
+      self?.continuation.yield(())
+    }
+  }
+
+  public func stop() {
+    lock.lock()
+    let observer = self.observer
+    self.observer = nil
+    lock.unlock()
+    if let observer {
+      workspace.notificationCenter.removeObserver(observer)
+    }
+  }
+}
+
 public struct WorkspaceAppDiscovery: AppDiscovery {
   public init() {}
 
@@ -76,6 +130,7 @@ public protocol MeetingDetector: Actor {
   func stop() async
   func invalidate() async
   func requestSample() async
+  func spaceDidChange() async
   var currentObservation: SourceObservation { get }
   var health: DetectorHealth { get }
   var observationStream: AsyncStream<SourceObservation> { get }

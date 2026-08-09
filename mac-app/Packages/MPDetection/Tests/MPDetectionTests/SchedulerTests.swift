@@ -51,7 +51,8 @@ struct SchedulerTests {
     let scheduler = DetectionScheduler(
       meet: meet,
       slack: slack,
-      permissionProbe: GrantedPermission()
+      permissionProbe: GrantedPermission(),
+      spaceChanges: EmptySpaceChangeSource()
     )
     let readings = await scheduler.readings
 
@@ -79,7 +80,8 @@ struct SchedulerTests {
     let scheduler = DetectionScheduler(
       meet: meet,
       slack: slack,
-      permissionProbe: GrantedPermission()
+      permissionProbe: GrantedPermission(),
+      spaceChanges: EmptySpaceChangeSource()
     )
     let readings = await scheduler.readings
     await scheduler.start()
@@ -92,10 +94,64 @@ struct SchedulerTests {
 
     await scheduler.stop()
   }
+
+  @Test
+  func spaceChangeTriggersSettledResamples() async throws {
+    let spaceChanges = TestSpaceChangeSource()
+    let meet = BootstrapDetector(
+      sourceIdentifier: .googleMeet,
+      initialObservation: .active
+    )
+    let slack = BootstrapDetector(
+      sourceIdentifier: .slackHuddle,
+      initialObservation: .sourceAbsent
+    )
+    let scheduler = DetectionScheduler(
+      meet: meet,
+      slack: slack,
+      permissionProbe: GrantedPermission(),
+      spaceChanges: spaceChanges
+    )
+
+    await scheduler.start()
+    spaceChanges.emit()
+    try await Task.sleep(for: .milliseconds(1_100))
+
+    #expect(await meet.spaceChangeCount == 1)
+    #expect(await meet.sampleCount >= 3)
+    await scheduler.stop()
+  }
 }
 
 private struct GrantedPermission: PermissionProbe {
   let isTrusted = true
+}
+
+private final class EmptySpaceChangeSource: SpaceChangeSource, @unchecked Sendable {
+  let changes: AsyncStream<Void> = AsyncStream { _ in }
+
+  func start() {}
+
+  func stop() {}
+}
+
+private final class TestSpaceChangeSource: SpaceChangeSource, @unchecked Sendable {
+  let changes: AsyncStream<Void>
+  private let continuation: AsyncStream<Void>.Continuation
+
+  init() {
+    var continuation: AsyncStream<Void>.Continuation?
+    changes = AsyncStream { continuation = $0 }
+    self.continuation = continuation!
+  }
+
+  func start() {}
+
+  func stop() {}
+
+  func emit() {
+    continuation.yield(())
+  }
 }
 
 private actor BootstrapDetector: MeetingDetector {
@@ -104,6 +160,8 @@ private actor BootstrapDetector: MeetingDetector {
   private let sampleObservation: SourceObservation?
   private var observation: SourceObservation = .unknown
   private var continuation: AsyncStream<SourceObservation>.Continuation?
+  private(set) var sampleCount = 0
+  private(set) var spaceChangeCount = 0
 
   let observationStream: AsyncStream<SourceObservation>
 
@@ -141,8 +199,13 @@ private actor BootstrapDetector: MeetingDetector {
   }
 
   func requestSample() async {
+    sampleCount += 1
     if let sampleObservation {
       observation = sampleObservation
     }
+  }
+
+  func spaceDidChange() async {
+    spaceChangeCount += 1
   }
 }

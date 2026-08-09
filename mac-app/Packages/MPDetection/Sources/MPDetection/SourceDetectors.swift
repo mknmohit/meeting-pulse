@@ -16,6 +16,8 @@ public actor GoogleMeetDetector: MeetingDetector {
   private let eventSource: any AXEventSource
   private let monotonic: any Monotonic
   private var latch = MeetLatch()
+  private var visibility = DetectionVisibility.authoritative
+  private var visibilityGraceDeadline: ContinuousClock.Instant?
   private var generation: UInt64 = 0
   private var samplingTask: Task<MeetSample, Never>?
   private var eventTask: Task<Void, Never>?
@@ -76,6 +78,8 @@ public actor GoogleMeetDetector: MeetingDetector {
     eventTask = nil
     samplingTask?.cancel()
     samplingTask = nil
+    visibility = .authoritative
+    visibilityGraceDeadline = nil
     for pid in observedPIDs {
       await eventSource.stopObserving(pid: pid)
     }
@@ -86,7 +90,17 @@ public actor GoogleMeetDetector: MeetingDetector {
     samplingTask?.cancel()
     samplingTask = nil
     latch = MeetLatch()
+    visibility = .authoritative
+    visibilityGraceDeadline = nil
     publish(.unknown, health: .permissionDenied)
+  }
+
+  public func spaceDidChange() async {
+    guard currentObservation == .active || !latch.activeAnchors.isEmpty else {
+      return
+    }
+    visibility = .transitionGrace
+    visibilityGraceDeadline = monotonic.now().advanced(by: .seconds(20))
   }
 
   public func requestSample() async {
@@ -118,12 +132,45 @@ public actor GoogleMeetDetector: MeetingDetector {
       publish(.unknown, health: .permissionDenied)
       return
     }
+    let now = monotonic.now()
+    let visibility = resolvedVisibility(for: sample.evidence, now: now)
+    let evidence = MeetLatch.Evidence(
+      chromeRunning: sample.evidence.chromeRunning,
+      scanCompleted: sample.evidence.scanCompleted,
+      confirmedSessions: sample.evidence.confirmedSessions,
+      liveAnchors: sample.evidence.liveAnchors,
+      visibility: visibility
+    )
     let observation = latch.apply(
-      sample.evidence,
-      now: monotonic.now(),
+      evidence,
+      now: now,
       maxLatchDuration: .seconds(14_400)
     )
     publish(observation, health: sample.health)
+  }
+
+  private func resolvedVisibility(
+    for evidence: MeetLatch.Evidence,
+    now: ContinuousClock.Instant
+  ) -> DetectionVisibility {
+    guard evidence.chromeRunning else {
+      visibility = .authoritative
+      visibilityGraceDeadline = nil
+      return .authoritative
+    }
+    if !evidence.confirmedSessions.isEmpty {
+      visibility = .authoritative
+      visibilityGraceDeadline = nil
+      return .authoritative
+    }
+    if visibility == .transitionGrace,
+      let deadline = visibilityGraceDeadline,
+      now >= deadline
+    {
+      visibility = .unavailable
+      visibilityGraceDeadline = nil
+    }
+    return visibility
   }
 
   private func publish(_ observation: SourceObservation, health: DetectorHealth) {
@@ -224,6 +271,10 @@ public actor SlackHuddleDetector: MeetingDetector {
   private let permissionProbe: any PermissionProbe
   private let elementTree: any AXElementTree
   private let eventSource: any AXEventSource
+  private let monotonic: any Monotonic
+  private var latch = SlackHuddleLatch()
+  private var visibility = DetectionVisibility.authoritative
+  private var visibilityGraceDeadline: ContinuousClock.Instant?
   private var generation: UInt64 = 0
   private var samplingTask: Task<SlackSample, Never>?
   private var eventTask: Task<Void, Never>?
@@ -240,12 +291,14 @@ public actor SlackHuddleDetector: MeetingDetector {
     appDiscovery: any AppDiscovery = WorkspaceAppDiscovery(),
     permissionProbe: any PermissionProbe = AccessibilityPermissionProbe(),
     elementTree: any AXElementTree = AXRunLoopHost.shared,
-    eventSource: any AXEventSource = AXRunLoopHost.shared
+    eventSource: any AXEventSource = AXRunLoopHost.shared,
+    monotonic: any Monotonic = SystemMonotonicClock()
   ) {
     self.appDiscovery = appDiscovery
     self.permissionProbe = permissionProbe
     self.elementTree = elementTree
     self.eventSource = eventSource
+    self.monotonic = monotonic
     var continuation: AsyncStream<SourceObservation>.Continuation?
     observationStream = AsyncStream { continuation = $0 }
     self.continuation = continuation!
@@ -282,6 +335,9 @@ public actor SlackHuddleDetector: MeetingDetector {
     eventTask = nil
     samplingTask?.cancel()
     samplingTask = nil
+    latch = SlackHuddleLatch()
+    visibility = .authoritative
+    visibilityGraceDeadline = nil
     for pid in observedPIDs {
       await eventSource.stopObserving(pid: pid)
     }
@@ -291,7 +347,18 @@ public actor SlackHuddleDetector: MeetingDetector {
   public func invalidate() async {
     samplingTask?.cancel()
     samplingTask = nil
+    latch = SlackHuddleLatch()
+    visibility = .authoritative
+    visibilityGraceDeadline = nil
     publish(.unknown, health: .permissionDenied)
+  }
+
+  public func spaceDidChange() async {
+    guard currentObservation == .active || !latch.activeAnchors.isEmpty else {
+      return
+    }
+    visibility = .transitionGrace
+    visibilityGraceDeadline = monotonic.now().advanced(by: .seconds(20))
   }
 
   public func requestSample() async {
@@ -305,7 +372,8 @@ public actor SlackHuddleDetector: MeetingDetector {
       await Self.gather(
         apps: apps,
         permissionProbe: permissionProbe,
-        elementTree: elementTree
+        elementTree: elementTree,
+        monotonic: monotonic
       )
     }
     samplingTask = task
@@ -314,7 +382,58 @@ public actor SlackHuddleDetector: MeetingDetector {
       return
     }
     samplingTask = nil
-    publish(sample.observation, health: sample.health)
+    let now = monotonic.now()
+    let visibility = resolvedVisibility(for: sample.evidence, now: now)
+    let evidence = SlackHuddleLatch.Evidence(
+      slackRunning: sample.evidence.slackRunning,
+      scanCompleted: sample.evidence.scanCompleted,
+      huddleWindowPresent: sample.evidence.huddleWindowPresent,
+      confirmedSessions: sample.evidence.confirmedSessions,
+      visibility: visibility
+    )
+    publish(
+      latch.apply(
+        evidence,
+        now: now,
+        maxLatchDuration: .seconds(14_400)
+      ),
+      health: sample.health
+    )
+  }
+
+  private func resolvedVisibility(
+    for evidence: SlackHuddleLatch.Evidence,
+    now: ContinuousClock.Instant
+  ) -> DetectionVisibility {
+    guard evidence.slackRunning else {
+      visibility = .authoritative
+      visibilityGraceDeadline = nil
+      return .authoritative
+    }
+    if !evidence.confirmedSessions.isEmpty {
+      visibility = .authoritative
+      visibilityGraceDeadline = nil
+      return .authoritative
+    }
+    if visibility == .authoritative,
+      !evidence.huddleWindowPresent,
+      !latch.activeAnchors.isEmpty
+    {
+      visibility = .recreationGrace
+      visibilityGraceDeadline = now.advanced(by: .seconds(20))
+    }
+    if let deadline = visibilityGraceDeadline, now >= deadline {
+      switch visibility {
+      case .transitionGrace:
+        visibility = .unavailable
+      case .recreationGrace:
+        visibility = .authoritative
+      case .authoritative, .unavailable:
+        break
+      }
+      visibilityGraceDeadline = nil
+    }
+    return visibility
   }
 
   private func publish(_ observation: SourceObservation, health: DetectorHealth) {
@@ -329,23 +448,35 @@ public actor SlackHuddleDetector: MeetingDetector {
   private static func gather(
     apps: [RunningApp],
     permissionProbe: any PermissionProbe,
-    elementTree: any AXElementTree
+    elementTree: any AXElementTree,
+    monotonic: any Monotonic
   ) async -> SlackSample {
     guard permissionProbe.isTrusted else {
       return SlackSample(
-        observation: .unknown,
+        evidence: .init(
+          slackRunning: !apps.isEmpty,
+          scanCompleted: false,
+          huddleWindowPresent: false,
+          confirmedSessions: []
+        ),
         health: .permissionDenied
       )
     }
     guard !apps.isEmpty else {
       return SlackSample(
-        observation: .sourceAbsent,
+        evidence: .init(
+          slackRunning: false,
+          scanCompleted: true,
+          huddleWindowPresent: false,
+          confirmedSessions: []
+        ),
         health: .absent
       )
     }
 
-    var sawActive = false
     var scanCompleted = true
+    var huddleWindowPresent = false
+    var confirmedSessions = Set<SlackHuddleLatch.Anchor>()
     var health: DetectorHealth = .ok
     for app in apps {
       do {
@@ -355,7 +486,14 @@ public actor SlackHuddleDetector: MeetingDetector {
           maxElements: 3_000
         )
         scanCompleted = scanCompleted && snapshot.scanCompleted
-        sawActive = sawActive || SlackSelectors.hasActiveHuddle(in: snapshot)
+        huddleWindowPresent =
+          huddleWindowPresent || !SlackSelectors.huddleWindows(in: snapshot).isEmpty
+        confirmedSessions.formUnion(
+          SlackSelectors.activeAnchors(
+            in: snapshot,
+            confirmedAt: monotonic.now()
+          )
+        )
         if !snapshot.scanCompleted {
           health = .degraded(DiagnosticCode(rawValue: "SLACK_SCAN_INCOMPLETE"))
         }
@@ -369,7 +507,12 @@ public actor SlackHuddleDetector: MeetingDetector {
     }
 
     return SlackSample(
-      observation: sawActive ? .active : (scanCompleted ? .inactive : .unknown),
+      evidence: .init(
+        slackRunning: true,
+        scanCompleted: scanCompleted,
+        huddleWindowPresent: huddleWindowPresent,
+        confirmedSessions: confirmedSessions
+      ),
       health: health
     )
   }
@@ -382,7 +525,7 @@ private struct MeetSample: Sendable {
 }
 
 private struct SlackSample: Sendable {
-  let observation: SourceObservation
+  let evidence: SlackHuddleLatch.Evidence
   let health: DetectorHealth
 }
 

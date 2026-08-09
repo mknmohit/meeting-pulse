@@ -190,4 +190,22 @@ public enum SlackSelectors {
   public static func hasActiveHuddle(in snapshot: AXSnapshot) -> Bool {
     huddleWindows(in: snapshot).contains(where: hasHuddleControls)
   }
+
+  public static func activeAnchors(
+    in snapshot: AXSnapshot,
+    confirmedAt: ContinuousClock.Instant
+  ) -> Set<SlackHuddleLatch.Anchor> {
+    Set(
+      huddleWindows(in: snapshot).compactMap { window in
+        guard hasHuddleControls(window), let windowID = window.windowID else {
+          return nil
+        }
+        return SlackHuddleLatch.Anchor(
+          processIdentifier: snapshot.processIdentifier,
+          windowID: windowID,
+          confirmedAt: confirmedAt
+        )
+      }
+    )
+  }
 }

@@ -49,6 +49,81 @@ struct DetectorTests {
     #expect(await detector.currentObservation == .unknown)
     #expect(await detector.health == .permissionDenied)
   }
+
+  @Test
+  func spaceChangeKeepsMeetActiveUntilVisibilityGraceExpires() async {
+    let clock = TestMonotonic()
+    let detector = GoogleMeetDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        meetSnapshot(active: true),
+        meetSnapshot(active: false),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    await detector.spaceDidChange()
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    clock.advance(by: .seconds(21))
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .unknown)
+  }
+
+  @Test
+  func spaceChangeKeepsSlackHuddleActiveUntilVisibilityGraceExpires() async {
+    let clock = TestMonotonic()
+    let detector = SlackHuddleDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        slackSnapshot(active: true),
+        slackSnapshot(active: false),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    await detector.spaceDidChange()
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    clock.advance(by: .seconds(21))
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .unknown)
+  }
+
+  @Test
+  func slackWindowRecreationGraceStillEndsAnActualHuddle() async {
+    let clock = TestMonotonic()
+    let detector = SlackHuddleDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        slackSnapshot(active: true),
+        slackSnapshot(active: false),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    clock.advance(by: .seconds(21))
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .inactive)
+  }
 }
 
 private struct StaticDiscovery: AppDiscovery {
@@ -93,6 +168,23 @@ private final class DelayedTree: AXElementTree, @unchecked Sendable {
   }
 }
 
+private final class TestMonotonic: Monotonic, @unchecked Sendable {
+  private let lock = NSLock()
+  private var instant = ContinuousClock().now
+
+  func now() -> ContinuousClock.Instant {
+    lock.withLock { instant }
+  }
+
+  func sleep(until: ContinuousClock.Instant) async throws {}
+
+  func advance(by duration: Duration) {
+    lock.withLock {
+      instant = instant.advanced(by: duration)
+    }
+  }
+}
+
 private func meetSnapshot(active: Bool) -> AXSnapshot {
   let controls: [AXNode] =
     active
@@ -126,6 +218,35 @@ private func meetSnapshot(active: Bool) -> AXSnapshot {
       role: "AXApplication",
       children: [node(role: "AXWindow", windowID: 7, children: [webArea, tab])]
     )
+  )
+}
+
+private func slackSnapshot(active: Bool) -> AXSnapshot {
+  let huddleChildren: [AXNode] =
+    active
+    ? [
+      node(role: "AXWebArea", title: "Huddle: test", windowID: 8),
+      node(role: "AXToolbar", description: "Huddle window actions"),
+      node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
+    ]
+    : []
+  let windows: [AXNode] =
+    active
+    ? [
+      node(
+        role: "AXWindow",
+        subrole: "AXStandardWindow",
+        title: "Huddle: test",
+        windowID: 8,
+        children: huddleChildren
+      )
+    ]
+    : []
+  return AXSnapshot(
+    capturedAt: Date(),
+    processIdentifier: 42,
+    scanCompleted: true,
+    root: node(role: "AXApplication", children: windows)
   )
 }
 
