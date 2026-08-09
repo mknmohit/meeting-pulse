@@ -3,12 +3,15 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import Breadcrumbs from "../../components/Breadcrumbs.astro";
 import DocsNav from "../../components/DocsNav.astro";
 import ScreenshotFigure from "../../components/ScreenshotFigure.astro";
+
+const viewerUrl = import.meta.env.PUBLIC_VIEWER_URL ?? "";
 ---
 
 <BaseLayout
   title="Pair a Meeting Pulse viewer"
   description="Create a private Meeting Pulse viewer link from Station and share it with the person who needs to check your meeting status."
   canonicalPath="/docs/pairing/"
+  viewerUrl={viewerUrl}
 >
   <div class="docs-layout">
     <DocsNav />
@@ -45,6 +48,18 @@ import ScreenshotFigure from "../../components/ScreenshotFigure.astro";
         Open the link in a browser. The viewer shows the current state and
         makes unavailable or disconnected conditions explicit.
       </p>
+      {viewerUrl && (
+        <p>
+          <a
+            class="button button--accent"
+            href={viewerUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open the viewer
+          </a>
+        </p>
+      )}
       <p><a class="link-arrow" href="/docs/troubleshooting/">Understand viewer states</a></p>
 
       <div class="callout">

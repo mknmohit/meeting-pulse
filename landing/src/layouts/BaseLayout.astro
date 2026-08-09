@@ -14,6 +14,7 @@ interface Props {
   image?: string;
   noindex?: boolean;
   schema?: SchemaObject | SchemaObject[];
+  viewerUrl?: string;
 }
 
 const {
@@ -23,7 +24,12 @@ const {
   image = "/images/product-screens/meeting-pulse-station-watch-meeting-light.jpg",
   noindex = false,
   schema,
+  viewerUrl,
 } = Astro.props;
+
+const resolvedViewerUrl =
+  viewerUrl ?? import.meta.env.PUBLIC_VIEWER_URL ?? "";
+const navViewerUrl = resolvedViewerUrl || undefined;
 
 const siteUrl = Astro.site ?? new URL("http://localhost:4321");
 const canonical = new URL(canonicalPath, siteUrl).toString();
@@ -41,6 +47,15 @@ const websiteSchema = {
   "@type": "WebSite",
   name: "Meeting Pulse",
   url: siteUrl.toString(),
+  ...(resolvedViewerUrl
+    ? {
+        potentialAction: {
+          "@type": "ViewAction",
+          target: resolvedViewerUrl,
+          name: "Open the Meeting Pulse viewer",
+        },
+      }
+    : {}),
 };
 ---
 
@@ -96,7 +111,7 @@ const websiteSchema = {
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <Header />
+    <Header viewerUrl={navViewerUrl} />
     <main class="site-main" id="main">
       <div class="site-shell">
         <slot />

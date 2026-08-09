@@ -1,6 +1,12 @@
 ---
 import ThemeToggle from "./ThemeToggle.astro";
 
+interface Props {
+  viewerUrl?: string;
+}
+
+const { viewerUrl } = Astro.props;
+
 const productLinks = [
   { href: "/features/", label: "Features" },
   { href: "/how-it-works/", label: "How it works" },
@@ -51,6 +57,16 @@ const isCurrent = (href: string) =>
         GitHub
       </a>
       <ThemeToggle />
+      {viewerUrl && (
+        <a
+          class="button"
+          href={viewerUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open viewer
+        </a>
+      )}
       <a class="button button--accent" href="/download/">Download</a>
       <button
         class="nav-menu-toggle"
@@ -80,6 +96,17 @@ const isCurrent = (href: string) =>
     >
       GitHub
     </a>
+    {viewerUrl && (
+      <a
+        class="button"
+        href={viewerUrl}
+        target="_blank"
+        rel="noreferrer"
+        data-menu-link
+      >
+        Open viewer
+      </a>
+    )}
     <a class="button button--accent" href="/download/" data-menu-link>Download</a>
   </div>
 </header>

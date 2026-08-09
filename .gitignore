@@ -11,6 +11,10 @@ viewer/.env
 viewer/.env.local
 !viewer/.env.example
 !viewer/.env.ci
+landing/.env
+landing/.env.local
+!landing/.env.example
+!landing/.env.ci
 
 **/*.p12
 **/*.mobileprovision

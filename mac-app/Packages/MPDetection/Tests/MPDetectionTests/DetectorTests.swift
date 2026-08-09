@@ -123,6 +123,9 @@ struct DetectorTests {
     clock.advance(by: .seconds(21))
     await detector.requestSample()
     #expect(await detector.currentObservation == .inactive)
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .inactive)
   }
 }
 

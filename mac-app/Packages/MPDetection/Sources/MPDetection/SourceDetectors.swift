@@ -275,6 +275,7 @@ public actor SlackHuddleDetector: MeetingDetector {
   private var latch = SlackHuddleLatch()
   private var visibility = DetectionVisibility.authoritative
   private var visibilityGraceDeadline: ContinuousClock.Instant?
+  private var recreationGraceConsumed = false
   private var generation: UInt64 = 0
   private var samplingTask: Task<SlackSample, Never>?
   private var eventTask: Task<Void, Never>?
@@ -338,6 +339,7 @@ public actor SlackHuddleDetector: MeetingDetector {
     latch = SlackHuddleLatch()
     visibility = .authoritative
     visibilityGraceDeadline = nil
+    recreationGraceConsumed = false
     for pid in observedPIDs {
       await eventSource.stopObserving(pid: pid)
     }
@@ -350,6 +352,7 @@ public actor SlackHuddleDetector: MeetingDetector {
     latch = SlackHuddleLatch()
     visibility = .authoritative
     visibilityGraceDeadline = nil
+    recreationGraceConsumed = false
     publish(.unknown, health: .permissionDenied)
   }
 
@@ -359,6 +362,7 @@ public actor SlackHuddleDetector: MeetingDetector {
     }
     visibility = .transitionGrace
     visibilityGraceDeadline = monotonic.now().advanced(by: .seconds(20))
+    recreationGraceConsumed = false
   }
 
   public func requestSample() async {
@@ -408,16 +412,19 @@ public actor SlackHuddleDetector: MeetingDetector {
     guard evidence.slackRunning else {
       visibility = .authoritative
       visibilityGraceDeadline = nil
+      recreationGraceConsumed = false
       return .authoritative
     }
     if !evidence.confirmedSessions.isEmpty {
       visibility = .authoritative
       visibilityGraceDeadline = nil
+      recreationGraceConsumed = false
       return .authoritative
     }
     if visibility == .authoritative,
       !evidence.huddleWindowPresent,
-      !latch.activeAnchors.isEmpty
+      !latch.activeAnchors.isEmpty,
+      !recreationGraceConsumed
     {
       visibility = .recreationGrace
       visibilityGraceDeadline = now.advanced(by: .seconds(20))
@@ -428,6 +435,7 @@ public actor SlackHuddleDetector: MeetingDetector {
         visibility = .unavailable
       case .recreationGrace:
         visibility = .authoritative
+        recreationGraceConsumed = true
       case .authoritative, .unavailable:
         break
       }

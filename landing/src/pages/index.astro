@@ -3,6 +3,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import ScreenshotFigure from "../components/ScreenshotFigure.astro";
 import StatusPill from "../components/StatusPill.astro";
 
+const viewerUrl = import.meta.env.PUBLIC_VIEWER_URL ?? "";
+
 const schemas = [
   {
     "@context": "https://schema.org",
@@ -22,6 +24,7 @@ const schemas = [
   description="Meeting Pulse tells one person when to call you. A privacy-first macOS menu-bar app paired with a private viewer."
   canonicalPath="/"
   schema={schemas}
+  viewerUrl={viewerUrl}
 >
   <div class="home-shell">
     <section class="hero">
@@ -231,6 +234,40 @@ const schemas = [
         </article>
       </div>
     </section>
+
+    {viewerUrl && (
+      <section class="section section-rule reveal" style="--i: 6">
+        <div class="section-head section-head--split">
+          <div>
+            <p class="eyebrow">Try the viewer</p>
+            <h2>See the signal from the other side.</h2>
+          </div>
+          <p>
+            Open the live viewer in a browser tab. It loads without an account,
+            reads the current state, and shows unavailable plainly when the
+            owner’s signal is missing.
+          </p>
+        </div>
+        <div class="button-row">
+          <a
+            class="button button--accent"
+            href={viewerUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open the viewer
+          </a>
+          <a class="button" href="/docs/pairing/">Read pairing docs</a>
+        </div>
+        <p class="callout" style="margin-top: var(--space-xl)">
+          <strong>The viewer link is private.</strong>
+          <span>
+            It only opens for a paired viewer. Pairing happens inside the owner
+            app on macOS.
+          </span>
+        </p>
+      </section>
+    )}
 
     <aside class="sticky-cta reveal" style="--i: 7">
       <p>Ready to stop guessing?</p>
