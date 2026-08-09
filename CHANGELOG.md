@@ -14,6 +14,10 @@ open-source distribution.
   back to the originating Space with the same Chrome tab already selected.
 - Adds bounded Slack Huddle start and stop debouncing so short Slack window
   recreation and microphone-warm periods do not flap the busy state.
+- Hardens Slack Huddle end detection by tracking whether the start-of-meeting
+  recreation grace has already been consumed in the current visible session,
+  so a second window recreation after the latch has settled can no longer
+  re-arm a busy state that already ended.
 - Rewrites the AX snapshot reconstruction so nested descendants retain their
   parent relationship, restoring the tab, window, and control nodes the
   selectors need on Chromium and Slack trees.
@@ -45,6 +49,8 @@ open-source distribution.
   menu-bar, onboarding, pairing, recovery, diagnostics, and Station windows,
   and the viewer call-okay, couple-mode, named-meeting, offline, pairing, and
   status-unavailable states.
+- Adds a `PUBLIC_VIEWER_URL` setting and an "Open viewer" header button so the
+  landing site links directly to the live viewer origin.
 
 ### Open source preparation
 
@@ -71,12 +77,12 @@ open-source distribution.
 
 ### Release assets
 
-The assets below were rebuilt from commit `c583d48`:
+The assets below were rebuilt from commit `386f7a3`:
 
 | Architecture | Downloadable asset | SHA-256 |
 |---|---|---|
-| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg` | `74890b22edd70237d414d2be86cd34935d4229b8f2bff8a880cc8b56745392b1` |
-| Intel (`x86_64`) | `Meeting-Pulse-0.0.2-Intel-x86_64.dmg` | `aeaecdc0791b62867cea3409a4bf16744b779f0d5b4a975df85e65d5a9e946c4` |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg` | `beb906b88ef381d5ec606f806754ec778feaf809d1b7bc448e9ed7b7db667997` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.2-Intel-x86_64.dmg` | `32785acc97637360cce0063ffd504f6848227ab0813c323bcb9aee9ff4df1d1e` |
 
 Both images are compressed, ad-hoc signed, and verified with `hdiutil`.
 
