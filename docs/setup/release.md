@@ -36,7 +36,7 @@ toolchain supports the requested target. They:
 - disable testability and debug-information generation;
 - strip the installed product and dead code;
 - add no analytics or telemetry to the release build;
-- patch the built bundle to version `0.0.1` and build `1`;
+- patch the built bundle to version `0.0.2` and build `1`;
 - ad-hoc sign and verify the app;
 - create and verify a compressed DMG; and
 - replace `/Applications/Meeting Pulse.app` only after all checks pass.
@@ -44,16 +44,16 @@ toolchain supports the requested target. They:
 The assets are:
 
 ```text
-build/dmg/Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg
-build/dmg/Meeting-Pulse-0.0.1-Intel-x86_64.dmg
+build/dmg/Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg
+build/dmg/Meeting-Pulse-0.0.2-Intel-x86_64.dmg
 ```
 
-The refreshed `0.0.1` assets built from commit `ae347e2` are:
+The refreshed `0.0.2` assets built from commit `c583d48` are:
 
 | Architecture | File | SHA-256 |
 |---|---|---|
-| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg` | `3e6ab802652985ceef5714430e50da83b8602b330354620a4cf1562135c2bc94` |
-| Intel (`x86_64`) | `Meeting-Pulse-0.0.1-Intel-x86_64.dmg` | `e980014ea28624167c39fa4d747563ce50a96f589f1e0d2090fadeb343a78b77` |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg` | `74890b22edd70237d414d2be86cd34935d4229b8f2bff8a880cc8b56745392b1` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.2-Intel-x86_64.dmg` | `aeaecdc0791b62867cea3409a4bf16744b779f0d5b4a975df85e65d5a9e946c4` |
 
 Both assets pass `hdiutil verify` and contain only their named target
 architecture.
@@ -77,18 +77,18 @@ Do not describe these artifacts as notarized or trusted releases.
 
 ## Draft GitHub release
 
-The draft `v0.0.1` release uses the current committed `HEAD`, not uncommitted
+The draft `v0.0.2` release uses the current committed `HEAD`, not uncommitted
 working-tree changes. After building and verifying both assets, a maintainer
 can create it with:
 
 ```sh
-gh release create v0.0.1 \
+gh release create v0.0.2 \
   --draft \
   --target HEAD \
-  --title "Meeting Pulse 0.0.1" \
+  --title "Meeting Pulse 0.0.2" \
   --notes-file CHANGELOG.md \
-  build/dmg/Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg \
-  build/dmg/Meeting-Pulse-0.0.1-Intel-x86_64.dmg
+  build/dmg/Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg \
+  build/dmg/Meeting-Pulse-0.0.2-Intel-x86_64.dmg
 ```
 
 The release notes must retain the ad-hoc/no-notarization warning.

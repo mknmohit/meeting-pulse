@@ -5,7 +5,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 APP_NAME="Meeting Pulse"
 APP_BUNDLE="$APP_NAME.app"
 PROJECT="$ROOT/mac-app/MeetingPulse.xcodeproj"
-VERSION="${MP_RELEASE_VERSION:-0.0.1}"
+VERSION="${MP_RELEASE_VERSION:-0.0.2}"
 BUILD_NUMBER="${MP_RELEASE_BUILD_NUMBER:-1}"
 INSTALL="${MP_RELEASE_INSTALL:-1}"
 
@@ -35,8 +35,8 @@ case "$TARGET_ARCH" in
 esac
 
 case "$VERSION" in
-  0.0.1) ;;
-  *) fail "unsupported release version '$VERSION'; expected 0.0.1." ;;
+  0.0.1|0.0.2) ;;
+  *) fail "unsupported release version '$VERSION'; expected 0.0.1 or 0.0.2." ;;
 esac
 
 if [ ! -f "$ROOT/mac-app/Config.xcconfig" ]; then

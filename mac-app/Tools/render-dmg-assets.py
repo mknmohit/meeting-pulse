@@ -26,7 +26,7 @@ APP_PATH = Path(
         str(ROOT / "build" / "local-arm64-release" / "Build" / "Products" / "Release" / f"{APP_NAME}.app"),
     )
 )
-VERSION = os.environ.get("MP_DMG_VERSION", "0.0.1")
+VERSION = os.environ.get("MP_DMG_VERSION", "0.0.2")
 ARCH_LABEL = os.environ.get("MP_DMG_ARCH_LABEL", "")
 ARROW_FROM_X, ARROW_FROM_Y = 200, 195
 ARROW_TO_X, ARROW_TO_Y = 410, 195
