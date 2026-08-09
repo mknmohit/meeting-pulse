@@ -7,6 +7,11 @@ public struct StatusControlSection: View {
   private let actions: any PulseActions
   @SwiftUI.State private var customHours: Int
   @SwiftUI.State private var customMinutes: Int
+  // Capture the schedule anchor once at first appearance so the
+  // TimelineView's `now`-driven schedule is stable across re-renders. The
+  // timeline still ticks every 30 s internally, but the schedule itself
+  // is not recreated on every `body` evaluation.
+  @SwiftUI.State private var scheduleAnchor: Date = .now
 
   public init(store: PulseStore, actions: any PulseActions) {
     _store = Bindable(wrappedValue: store)
@@ -24,7 +29,7 @@ public struct StatusControlSection: View {
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
 
-        TimelineView(.periodic(from: .now, by: 30)) { context in
+        TimelineView(.periodic(from: scheduleAnchor, by: 30)) { context in
           VStack(alignment: .leading, spacing: MPSpace.hair) {
             HStack(spacing: MPSpace.tight) {
               Text(currentStatusLabel)

@@ -1,0 +1,92 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+import ScreenshotFigure from "../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Meeting Pulse is open source"
+  description="Read the Meeting Pulse source, product decisions, support paths, and MIT license on GitHub."
+  canonicalPath="/open-source/"
+>
+  <PageIntro
+    eyebrow="Open source"
+    title="The status signal is small. The project is open."
+    description="Meeting Pulse is MIT licensed. The native owner app, static viewer, product specification, and support paths live in the open."
+  >
+    <div class="button-row" style="margin-top: var(--space-lg)">
+      <a
+        class="button button--accent"
+        href="https://github.com/mknmohit/meeting-pulse"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open GitHub
+      </a>
+      <a class="button" href="/docs/">Read docs</a>
+    </div>
+  </PageIntro>
+
+  <section class="page-section">
+    <div class="split-section">
+      <div>
+        <p class="eyebrow">What is in the repo</p>
+        <h2>Product, viewer, and the decisions around them.</h2>
+      </div>
+      <div class="split-section__body">
+        <ul class="checklist">
+          <li><span>Native macOS owner app.</span></li>
+          <li><span>Static Astro viewer.</span></li>
+          <li><span>Product specification and public architecture notes.</span></li>
+          <li><span>Issue templates, support guidance, and contribution docs.</span></li>
+        </ul>
+        <p>
+          Read the repository before relying on a claim. Meeting Pulse is being
+          built with its boundaries visible, including where detection still
+          needs to earn confidence.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="section-head section-head--split">
+      <div>
+        <p class="eyebrow">A public posture</p>
+        <h2>Privacy claims should be inspectable.</h2>
+      </div>
+      <p>
+        The project avoids hiding its important behavior behind a marketing
+        sentence. Start with the source, the product spec, security guidance,
+        and issue tracker.
+      </p>
+    </div>
+    <ScreenshotFigure
+      light="/images/product-screens/meeting-pulse-station-privacy-light.jpg"
+      dark="/images/product-screens/meeting-pulse-station-privacy-dark.jpg"
+      alt="Meeting Pulse Station privacy settings"
+      caption="The owner can review the privacy boundary in the app."
+    />
+  </section>
+
+  <section class="page-section">
+    <div class="button-row">
+      <a
+        class="button button--accent"
+        href="https://github.com/mknmohit/meeting-pulse/issues/new?template=bug.yml"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Report a bug
+      </a>
+      <a
+        class="button"
+        href="https://github.com/mknmohit/meeting-pulse/discussions"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Join discussions
+      </a>
+    </div>
+  </section>
+</BaseLayout>

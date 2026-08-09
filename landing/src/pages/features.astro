@@ -1,0 +1,127 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+import ScreenshotFigure from "../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Meeting Pulse features | Private status for macOS"
+  description="See how Meeting Pulse detects supported meetings, shares a private viewer, handles manual status, and stays honest about unavailable states."
+  canonicalPath="/features/"
+>
+  <PageIntro
+    eyebrow="Features"
+    title="One signal, with enough context to trust it."
+    description="Meeting Pulse keeps the owner’s controls on the Mac and gives viewers the small answer they came for."
+  >
+    <div class="button-row" style="margin-top: var(--space-lg)">
+      <a class="button button--accent" href="/download/">Download for macOS</a>
+      <a class="button" href="/privacy/">Read privacy</a>
+    </div>
+  </PageIntro>
+
+  <section class="page-section">
+    <div class="split-section">
+      <div>
+        <p class="eyebrow">01 · Detection</p>
+        <h2>Automatic when it can be. Clear when it cannot.</h2>
+      </div>
+      <div class="split-section__body">
+        <ScreenshotFigure
+          light="/images/product-screens/meeting-pulse-diagnostics-window-light.jpg"
+          dark="/images/product-screens/meeting-pulse-diagnostics-window-dark.jpg"
+          alt="Meeting Pulse diagnostics window showing detection health"
+          caption="Diagnostics stay with the owner, where they can be acted on."
+        />
+        <p>
+          The owner app uses macOS Accessibility APIs to detect Google Meet in
+          Chrome and native Slack Huddles. It does not need a browser extension,
+          Slack bot, OAuth, calendar access, or Screen Recording.
+        </p>
+        <div class="callout">
+          <strong>Detection is not a promise to guess.</strong>
+          <p>
+            If a permission is missing or a state is uncertain, the product
+            keeps that uncertainty visible.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="split-section">
+      <div>
+        <p class="eyebrow">02 · Controls</p>
+        <h2>Automatic status plus a human override.</h2>
+      </div>
+      <div class="split-section__body">
+        <ScreenshotFigure
+          light="/images/product-screens/meeting-pulse-station-watch-call-okay-light.jpg"
+          dark="/images/product-screens/meeting-pulse-station-watch-call-okay-dark.jpg"
+          alt="Meeting Pulse Station showing manual status and call okay controls"
+          caption="Station keeps manual controls and call okay close to the owner."
+        />
+        <p>
+          Set Busy or Available for a duration when the owner knows more than
+          the detector can. A separate Call okay signal lets someone tell the
+          viewer that a call can still come through.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="split-section">
+      <div>
+        <p class="eyebrow">03 · Private viewer</p>
+        <h2>A link for the person checking in.</h2>
+      </div>
+      <div class="split-section__body">
+        <ScreenshotFigure
+          light="/images/product-screens/meeting-pulse-viewer-pairing-light.jpg"
+          dark="/images/product-screens/meeting-pulse-viewer-pairing-dark.jpg"
+          alt="Meeting Pulse viewer pairing screen"
+          caption="Pair a browser viewer from Station."
+          width={1280}
+          height={577}
+        />
+        <p>
+          The viewer opens on a phone or laptop. It shows the availability
+          state, optional owner name, and call-okay copy. It does not expose
+          meeting titles, URLs, participants, or meeting content.
+        </p>
+        <a class="link-arrow" href="/docs/pairing/">Read pairing docs</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="section-head">
+      <p class="eyebrow">04 · Trust states</p>
+      <h2>Unavailable is part of the feature set.</h2>
+      <p>
+        Offline, revoked, malformed, and stale states have their own language.
+        The viewer does not quietly turn a missing signal into permission to
+        interrupt.
+      </p>
+    </div>
+    <div class="feature-grid">
+      <article class="feature-card">
+        <span class="card-kicker">Stale</span>
+        <h3>Say when the signal is old.</h3>
+        <p>Viewers can tell the difference between a current state and a status that needs attention.</p>
+      </article>
+      <article class="feature-card">
+        <span class="card-kicker">Offline</span>
+        <h3>Keep “not connected” visible.</h3>
+        <p>Network or pairing problems get a direct message and a next step.</p>
+      </article>
+      <article class="feature-card">
+        <span class="card-kicker">Revoked</span>
+        <h3>Give the owner control of access.</h3>
+        <p>Viewer links can be managed from Station rather than living forever by accident.</p>
+      </article>
+    </div>
+  </section>
+</BaseLayout>

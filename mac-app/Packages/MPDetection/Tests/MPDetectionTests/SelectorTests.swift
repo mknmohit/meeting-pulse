@@ -38,6 +38,33 @@ struct SelectorTests {
     #expect(SlackSelectors.hasActiveHuddle(in: snapshot))
     #expect(!SlackSelectors.hasActiveHuddle(in: slackSnapshot(active: false)))
   }
+
+  @Test
+  func slackAcceptsCaseInsensitiveHuddleLabels() {
+    let snapshot = slackSnapshot(
+      active: true,
+      title: "huddle: test",
+      leaveDescription: "leave huddle"
+    )
+    #expect(SlackSelectors.hasActiveHuddle(in: snapshot))
+  }
+
+  @Test
+  func descendantTraversalPreservesNestedSiblings() {
+    let root = node(
+      role: "AXApplication",
+      children: [
+        node(
+          role: "AXGroup",
+          children: [node(role: "AXButton", description: "nested")]
+        ),
+        node(role: "AXWindow", title: "second"),
+      ]
+    )
+    var roles: [String?] = []
+    root.forEachDescendant { roles.append($0.role) }
+    #expect(roles == ["AXGroup", "AXButton", "AXWindow"])
+  }
 }
 
 private let now = ContinuousClock().now
@@ -87,18 +114,25 @@ private func meetBackgroundSnapshot() -> AXSnapshot {
   return snapshot(children: [node(role: "AXWindow", windowID: 7, children: [webArea, tab])])
 }
 
-private func slackSnapshot(active: Bool) -> AXSnapshot {
+private func slackSnapshot(
+  active: Bool,
+  title: String = "Huddle: test",
+  leaveDescription: String = "Leave Huddle",
+  includeToolbar: Bool = true
+) -> AXSnapshot {
+  let toolbar: [AXNode] =
+    includeToolbar
+    ? [
+      node(role: "AXToolbar", description: "Huddle window actions"),
+      node(role: "AXToolbar", description: "Huddles actions"),
+    ]
+    : []
   let children: [AXNode] =
     active
     ? [
-      node(
-        role: "AXWebArea",
-        title: "Huddle: test",
-        windowID: 8
-      ),
-      node(role: "AXToolbar", description: "Huddle window actions"),
-      node(role: "AXToolbar", description: "Huddles actions"),
-      node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
+      node(role: "AXWebArea", title: title, windowID: 8),
+    ] + toolbar + [
+      node(role: "AXButton", roleDescription: "button", description: leaveDescription),
     ]
     : []
   let main = node(
@@ -111,7 +145,7 @@ private func slackSnapshot(active: Bool) -> AXSnapshot {
     active
     ? [
       node(
-        role: "AXWindow", subrole: "AXStandardWindow", title: "Huddle: test", windowID: 8,
+        role: "AXWindow", subrole: "AXStandardWindow", title: title, windowID: 8,
         children: children), main,
     ]
     : [main]

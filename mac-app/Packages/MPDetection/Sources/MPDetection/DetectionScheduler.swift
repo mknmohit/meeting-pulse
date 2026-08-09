@@ -78,6 +78,7 @@ public actor DetectionScheduler {
   private let permissionProbe: any PermissionProbe
   private var tuning: DetectionTuning
   private var timer: DispatchSourceTimer?
+  private var scheduledInterval: Duration?
   private var meetTask: Task<Void, Never>?
   private var slackTask: Task<Void, Never>?
   private var running = false
@@ -109,20 +110,30 @@ public actor DetectionScheduler {
     }
     running = true
     accessibilityGranted = permissionProbe.isTrusted
-    await meet.start()
-    await slack.start()
     let meetReadings = await meet.observationStream
     let slackReadings = await slack.observationStream
     meetTask = Task { [weak self] in
       for await value in meetReadings {
-        await self?.ingest(source: .googleMeet, value: value)
+        _ = await self?.ingest(source: .googleMeet, value: value)
       }
     }
     slackTask = Task { [weak self] in
       for await value in slackReadings {
-        await self?.ingest(source: .slackHuddle, value: value)
+        _ = await self?.ingest(source: .slackHuddle, value: value)
       }
     }
+    await meet.start()
+    await slack.start()
+    _ = ingest(
+      source: .googleMeet,
+      value: await meet.currentObservation,
+      emitReading: false
+    )
+    _ = ingest(
+      source: .slackHuddle,
+      value: await slack.currentObservation,
+      emitReading: false
+    )
     emit()
     await tick()
   }
@@ -131,6 +142,7 @@ public actor DetectionScheduler {
     running = false
     timer?.cancel()
     timer = nil
+    scheduledInterval = nil
     meetTask?.cancel()
     slackTask?.cancel()
     meetTask = nil
@@ -146,6 +158,7 @@ public actor DetectionScheduler {
 
   public func updateTuning(_ tuning: DetectionTuning) {
     self.tuning = tuning
+    scheduledInterval = nil
     scheduleTimer()
   }
 
@@ -165,19 +178,44 @@ public actor DetectionScheduler {
     if trusted {
       await meet.requestSample()
       await slack.requestSample()
+      let meetChanged = ingest(
+        source: .googleMeet,
+        value: await meet.currentObservation,
+        emitReading: false
+      )
+      let slackChanged = ingest(
+        source: .slackHuddle,
+        value: await slack.currentObservation,
+        emitReading: false
+      )
+      if meetChanged || slackChanged {
+        emit()
+      }
     }
     scheduleTimer()
   }
 
-  private func ingest(source: SourceID, value: SourceObservation) {
+  private func ingest(
+    source: SourceID,
+    value: SourceObservation,
+    emitReading: Bool = true
+  ) -> Bool {
+    let previous: SourceObservation
+    let next: SourceObservation
     switch source {
     case .googleMeet:
-      _ = meetSettler.apply(value, settleCount: tuning.endSettleCount)
+      previous = meetSettler.value
+      next = meetSettler.apply(value, settleCount: tuning.endSettleCount)
     case .slackHuddle:
-      _ = slackSettler.apply(value, settleCount: tuning.endSettleCount)
+      previous = slackSettler.value
+      next = slackSettler.apply(value, settleCount: tuning.endSettleCount)
     }
-    emit()
+    let changed = previous != next
+    if emitReading && changed {
+      emit()
+    }
     scheduleTimer()
+    return changed
   }
 
   private func emit() {
@@ -194,11 +232,14 @@ public actor DetectionScheduler {
     guard running else {
       return
     }
-    timer?.cancel()
     let interval =
       meetSettler.value == .active || slackSettler.value == .active
       ? tuning.activeSampleInterval
       : tuning.idleSampleInterval
+    guard timer == nil || scheduledInterval != interval else {
+      return
+    }
+    timer?.cancel()
     let source = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
     let nanoseconds = Int(clamping: max(interval.nanoseconds, 1))
     let leeway = Int(clamping: max(tuning.timerLeeway.nanoseconds, 0))
@@ -214,6 +255,7 @@ public actor DetectionScheduler {
       }
     }
     timer = source
+    scheduledInterval = interval
     source.resume()
   }
 }

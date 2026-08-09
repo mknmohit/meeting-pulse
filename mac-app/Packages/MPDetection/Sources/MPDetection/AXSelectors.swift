@@ -1,3 +1,4 @@
+import CoreGraphics
 import MPCore
 
 public enum ChromeFamily {
@@ -8,38 +9,84 @@ public enum SlackFamily {
   public static let bundleIDs = ["com.tinyspeck.slackmacgap"]
 }
 
+private func normalizedAXText(_ value: String?) -> String {
+  value?
+    .split(whereSeparator: { $0.isWhitespace })
+    .joined(separator: " ")
+    .lowercased() ?? ""
+}
+
+private func matchesAXText(_ value: String?, _ candidates: Set<String>) -> Bool {
+  candidates.contains(normalizedAXText(value))
+}
+
+private enum AXLabels {
+  static let callControls: Set<String> = ["call controls"]
+  static let leaveCall: Set<String> = ["leave call"]
+  static let shareScreen: Set<String> = ["share screen"]
+  static let huddleActions: Set<String> = ["huddle window actions", "huddles actions"]
+  static let leaveHuddle: Set<String> = ["leave huddle"]
+}
+
+private func tabLabel(_ node: AXNode) -> String? {
+  if let description = node.description, !description.isEmpty {
+    return description
+  }
+  return node.title
+}
+
 public enum MeetSelectors {
   public static func isMeetWebArea(_ node: AXNode) -> Bool {
-    node.role == "AXWebArea"
-      && node.roleDescription == "HTML content"
-      && node.title?.hasPrefix("Meet -") == true
+    guard
+      node.role == "AXWebArea"
+        && normalizedAXText(node.roleDescription) == "html content"
+    else {
+      return false
+    }
+    let title = normalizedAXText(node.title)
+    return title == "meet" || title.hasPrefix("meet -") || title.hasPrefix("meet:")
   }
 
   public static func hasCallControls(_ node: AXNode) -> Bool {
-    let descendants = node.descendants
-    let hasRegion = descendants.contains {
-      $0.role == "AXGroup"
-        && $0.subrole == "AXLandmarkRegion"
-        && $0.roleDescription == "region"
-        && $0.description == "Call controls"
-    }
-    let controls = Set(
-      descendants.compactMap { child -> String? in
-        guard child.role == "AXButton", child.roleDescription == "button" else {
-          return nil
-        }
-        return child.description
+    var hasRegion = false
+    var hasLeave = false
+    var hasShare = false
+    node.forEachDescendant { child in
+      if child.role == "AXGroup"
+        && child.subrole == "AXLandmarkRegion"
+        && normalizedAXText(child.roleDescription) == "region"
+        && matchesAXText(child.description, AXLabels.callControls)
+      {
+        hasRegion = true
       }
-    )
-    return hasRegion && controls.isSuperset(of: ["Leave call", "Share screen"])
+      guard
+        child.role == "AXButton"
+          && normalizedAXText(child.roleDescription) == "button"
+      else {
+        return
+      }
+      if matchesAXText(child.description, AXLabels.leaveCall) {
+        hasLeave = true
+      }
+      if matchesAXText(child.description, AXLabels.shareScreen) {
+        hasShare = true
+      }
+    }
+    return hasRegion && hasLeave && hasShare
   }
 
   public static func tabEntries(in snapshot: AXSnapshot) -> [AXNode] {
-    snapshot.root.descendants.filter {
-      $0.role == "AXRadioButton"
-        && $0.subrole == "AXTabButton"
-        && $0.description?.hasPrefix("Meet -") == true
+    var entries: [AXNode] = []
+    snapshot.root.forEachDescendant { node in
+      guard node.role == "AXRadioButton", node.subrole == "AXTabButton" else {
+        return
+      }
+      let label = normalizedAXText(tabLabel(node))
+      if label == "meet" || label.hasPrefix("meet -") || label.hasPrefix("meet:") {
+        entries.append(node)
+      }
     }
+    return entries
   }
 
   public static func strongAnchors(
@@ -47,17 +94,23 @@ public enum MeetSelectors {
     confirmedAt: ContinuousClock.Instant
   ) -> Set<MeetLatch.Anchor> {
     let tabs = tabEntries(in: snapshot)
+    var webAreas: [AXNode] = []
+    snapshot.root.forEachDescendant { node in
+      if isMeetWebArea(node) && hasCallControls(node) {
+        webAreas.append(node)
+      }
+    }
     return Set(
-      snapshot.root.descendants.compactMap { webArea in
-        guard isMeetWebArea(webArea), hasCallControls(webArea), let windowID = webArea.windowID,
-          let title = webArea.title
-        else {
+      webAreas.compactMap { webArea in
+        guard let windowID = webArea.windowID, let title = webArea.title else {
           return nil
         }
+        let normalizedTitle = normalizedAXText(title)
         guard
           let tab = tabs.first(where: {
-            $0.windowID == windowID && $0.description?.hasPrefix(title) == true
-          }), let tabDescription = tab.description
+            $0.windowID == windowID
+              && normalizedAXText(tabLabel($0)).hasPrefix(normalizedTitle)
+          }), let tabDescription = tabLabel(tab)
         else {
           return nil
         }
@@ -77,17 +130,18 @@ public enum MeetSelectors {
     let tabs = tabEntries(in: snapshot)
     let liveTabIdentities: Set<String> = Set(
       tabs.compactMap { tab in
-        guard let description = tab.description, let windowID = tab.windowID else {
+        guard let description = tabLabel(tab), let windowID = tab.windowID else {
           return nil
         }
         return "\(windowID):\(CrockfordBase32.sha256Hex(description))"
       }
     )
-    let liveWindowIDs = Set(
-      snapshot.root.descendants.compactMap { node in
-        node.role == "AXWindow" ? node.windowID : nil
+    var liveWindowIDs = Set<CGWindowID>()
+    snapshot.root.forEachDescendant { node in
+      if node.role == "AXWindow", let windowID = node.windowID {
+        liveWindowIDs.insert(windowID)
       }
-    )
+    }
     return Set(
       anchors.filter {
         liveWindowIDs.contains($0.windowID)
@@ -99,23 +153,36 @@ public enum MeetSelectors {
 
 public enum SlackSelectors {
   public static func huddleWindows(in snapshot: AXSnapshot) -> [AXNode] {
-    snapshot.root.descendants.filter {
-      $0.role == "AXWindow"
-        && $0.subrole == "AXStandardWindow"
-        && $0.title?.hasPrefix("Huddle:") == true
+    var windows: [AXNode] = []
+    snapshot.root.forEachDescendant { node in
+      guard node.role == "AXWindow", node.subrole == "AXStandardWindow" else {
+        return
+      }
+      if normalizedAXText(node.title).hasPrefix("huddle:") {
+        windows.append(node)
+      }
     }
+    return windows
   }
 
   public static func hasHuddleControls(_ window: AXNode) -> Bool {
-    let descendants = window.descendants
-    let hasToolbar = descendants.contains {
-      $0.role == "AXToolbar"
-        && ($0.description == "Huddle window actions" || $0.description == "Huddles actions")
-    }
-    let hasLeave = descendants.contains {
-      $0.role == "AXButton"
-        && $0.roleDescription == "button"
-        && $0.description?.caseInsensitiveCompare("Leave Huddle") == .orderedSame
+    var hasToolbar = false
+    var hasLeave = false
+    window.forEachDescendant { child in
+      if child.role == "AXToolbar"
+        && matchesAXText(
+          child.description,
+          AXLabels.huddleActions
+        )
+      {
+        hasToolbar = true
+      }
+      if child.role == "AXButton"
+        && normalizedAXText(child.roleDescription) == "button"
+        && matchesAXText(child.description, AXLabels.leaveHuddle)
+      {
+        hasLeave = true
+      }
     }
     return hasToolbar && hasLeave
   }

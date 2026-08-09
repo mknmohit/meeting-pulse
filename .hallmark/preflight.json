@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-09",
+  "framework": "Astro 5 static build",
+  "fontStack": "No existing stack; introduced Space Grotesk + IBM Plex Sans + IBM Plex Mono",
+  "palette": "No existing tokens; introduced cool Cobalt OKLCH tokens with light and dark modes",
+  "motion": "No existing motion library; CSS reveal and state transitions only",
+  "spacing": "No existing scale; introduced 4pt semantic spacing tokens",
+  "preserved": [
+    "Existing product screenshot assets in landing/public/images/product-screens"
+  ],
+  "introduced": [
+    "Workbench macrostructure",
+    "N5 floating navigation",
+    "Ft5 statement footer",
+    "Responsive theme persistence",
+    "Shared SEO and JSON-LD layout"
+  ]
+}

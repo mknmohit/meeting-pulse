@@ -1,0 +1,85 @@
+---
+import ThemeToggle from "./ThemeToggle.astro";
+
+const productLinks = [
+  { href: "/features/", label: "Features" },
+  { href: "/how-it-works/", label: "How it works" },
+  { href: "/privacy/", label: "Privacy" },
+];
+
+const learnLinks = [
+  { href: "/docs/", label: "Docs" },
+  { href: "/faq/", label: "FAQ" },
+];
+
+const currentPath = Astro.url.pathname;
+const isCurrent = (href: string) =>
+  currentPath === href || (href !== "/" && currentPath.startsWith(href));
+---
+
+<header>
+  <nav class="nav-pill" aria-label="Primary navigation">
+    <a class="wordmark" href="/" aria-label="Meeting Pulse home">
+      <span class="wordmark-mark" aria-hidden="true">
+        <img src="/meeting-pulse-logo.svg" alt="" width="28" height="28" />
+      </span>
+      <span>Meeting Pulse</span>
+    </a>
+
+    <ul class="nav-links">
+      {
+        productLinks.map((link) => (
+          <li>
+            <a href={link.href} aria-current={isCurrent(link.href) ? "page" : undefined}>
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
+      <li>
+        <a href="/docs/" aria-current={isCurrent("/docs/") ? "page" : undefined}>Docs</a>
+      </li>
+    </ul>
+
+    <div class="nav-actions">
+      <a
+        class="nav-github"
+        href="https://github.com/mknmohit/meeting-pulse"
+        target="_blank"
+        rel="noreferrer"
+      >
+        GitHub
+      </a>
+      <ThemeToggle />
+      <a class="button button--accent" href="/download/">Download</a>
+      <button
+        class="nav-menu-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+        data-menu-toggle
+      >
+        Menu
+      </button>
+    </div>
+  </nav>
+
+  <div class="mobile-nav" id="mobile-nav" hidden data-mobile-nav>
+    {
+      [...productLinks, ...learnLinks].map((link) => (
+        <a href={link.href} aria-current={isCurrent(link.href) ? "page" : undefined} data-menu-link>
+          {link.label}
+        </a>
+      ))
+    }
+    <a
+      href="https://github.com/mknmohit/meeting-pulse"
+      target="_blank"
+      rel="noreferrer"
+      data-menu-link
+    >
+      GitHub
+    </a>
+    <a class="button button--accent" href="/download/" data-menu-link>Download</a>
+  </div>
+</header>

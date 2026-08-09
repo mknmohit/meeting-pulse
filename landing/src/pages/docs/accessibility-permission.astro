@@ -1,0 +1,53 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import DocsNav from "../../components/DocsNav.astro";
+import ScreenshotFigure from "../../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Why Meeting Pulse needs Accessibility permission"
+  description="Meeting Pulse uses macOS Accessibility APIs for local detection. Learn what the permission enables and what the viewer never receives."
+  canonicalPath="/docs/accessibility-permission/"
+>
+  <div class="docs-layout">
+    <DocsNav />
+    <article class="docs-content">
+      <Breadcrumbs items={[{ href: "/", label: "Home" }, { href: "/docs/", label: "Docs" }, { label: "Accessibility permission" }]} />
+      <p class="eyebrow">Permissions</p>
+      <h1>Accessibility permission is for local detection.</h1>
+      <p class="lede" style="margin-top: var(--space-xl)">
+        macOS guards Accessibility access because it can expose information on
+        a computer. Meeting Pulse asks for it to inspect supported app states
+        on the owner’s Mac.
+      </p>
+
+      <h2>What it enables</h2>
+      <ul>
+        <li>Looking for supported meeting states in the owner’s local apps.</li>
+        <li>Showing the owner what Station currently knows.</li>
+        <li>Failing closed when the state cannot be trusted.</li>
+      </ul>
+
+      <h2>What it does not mean</h2>
+      <ul>
+        <li>It does not publish meeting titles, URLs, or participants to a viewer.</li>
+        <li>It does not record audio or video.</li>
+        <li>It does not use screenshots, OCR, or Screen Recording.</li>
+        <li>It does not replace the owner’s judgment with a guessed “available” state.</li>
+      </ul>
+
+      <ScreenshotFigure
+        light="/images/product-screens/meeting-pulse-station-watch-permission-light.jpg"
+        dark="/images/product-screens/meeting-pulse-station-watch-permission-dark.jpg"
+        alt="Meeting Pulse Station showing the Accessibility permission state"
+        caption="The permission boundary is part of the owner setup."
+      />
+
+      <div class="callout">
+        <strong>Review the source before granting access.</strong>
+        <p><a class="link-arrow" href="/open-source/">Open the project on GitHub</a></p>
+      </div>
+    </article>
+  </div>
+</BaseLayout>

@@ -1,0 +1,110 @@
+---
+import "../styles/global.css";
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+
+interface SchemaObject {
+  [key: string]: unknown;
+}
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath?: string;
+  image?: string;
+  noindex?: boolean;
+  schema?: SchemaObject | SchemaObject[];
+}
+
+const {
+  title,
+  description,
+  canonicalPath = Astro.url.pathname,
+  image = "/images/product-screens/meeting-pulse-station-watch-meeting-light.jpg",
+  noindex = false,
+  schema,
+} = Astro.props;
+
+const siteUrl = Astro.site ?? new URL("http://localhost:4321");
+const canonical = new URL(canonicalPath, siteUrl).toString();
+const socialImage = new URL(image, siteUrl).toString();
+const schemaItems = schema ? (Array.isArray(schema) ? schema : [schema]) : [];
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Meeting Pulse",
+  url: siteUrl.toString(),
+  sameAs: ["https://github.com/mknmohit/meeting-pulse"],
+};
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "Meeting Pulse",
+  url: siteUrl.toString(),
+};
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f5f8fb" />
+    <meta name="color-scheme" content="light dark" />
+    {noindex && <meta name="robots" content="noindex,nofollow,noarchive" />}
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Meeting Pulse" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:alt" content="Meeting Pulse product interface" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+    <title>{title}</title>
+    <script is:inline>
+      (() => {
+        const key = "meeting-pulse-theme";
+        let saved = "";
+        try {
+          saved = window.localStorage.getItem(key) || "";
+        } catch {
+          saved = "";
+        }
+        const theme =
+          saved === "dark" || saved === "light"
+            ? saved
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(organizationSchema)}></script>
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(websiteSchema)}></script>
+    {
+      schemaItems.map((item) => (
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(item)}></script>
+      ))
+    }
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Header />
+    <main class="site-main" id="main">
+      <div class="site-shell">
+        <slot />
+      </div>
+    </main>
+    <Footer />
+    <script>
+      import "../scripts/site.ts";
+    </script>
+  </body>
+</html>

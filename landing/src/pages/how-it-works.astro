@@ -1,0 +1,117 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+import ScreenshotFigure from "../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="How Meeting Pulse works | From Mac to private viewer"
+  description="Follow Meeting Pulse from local meeting detection to a private browser viewer, including pairing, polling, and unavailable states."
+  canonicalPath="/how-it-works/"
+>
+  <PageIntro
+    eyebrow="How it works"
+    title="A short path from the owner’s Mac to one useful answer."
+    description="Meeting Pulse is deliberately split into two surfaces: the owner app does the observing, and the viewer does the reading."
+  >
+    <div class="button-row" style="margin-top: var(--space-lg)">
+      <a class="button button--accent" href="/download/">Start with the Mac app</a>
+      <a class="button" href="/privacy/">What stays private</a>
+    </div>
+  </PageIntro>
+
+  <section class="page-section">
+    <div class="workflow">
+      <article class="workflow-step">
+        <span class="workflow-step__index">01</span>
+        <div class="workflow-step__copy">
+          <h3>Install Station</h3>
+          <p>
+            The owner installs the native macOS app and grants the Accessibility
+            permission needed for supported detection.
+          </p>
+          <a class="link-arrow" href="/docs/install-macos/">Install guide</a>
+        </div>
+        <div class="workflow-step__visual">
+          <ScreenshotFigure
+            light="/images/product-screens/meeting-pulse-onboarding-window-light.jpg"
+            dark="/images/product-screens/meeting-pulse-onboarding-window-dark.jpg"
+            alt="Meeting Pulse onboarding window on macOS"
+            caption="Setup starts in Station."
+            width={1120}
+            height={400}
+          />
+        </div>
+      </article>
+      <article class="workflow-step">
+        <span class="workflow-step__index">02</span>
+        <div class="workflow-step__copy">
+          <h3>Watch a supported meeting state</h3>
+          <p>
+            Station observes the supported call surfaces locally. It does not
+            upload meeting content or turn the browser into a sensor.
+          </p>
+          <a class="link-arrow" href="/docs/accessibility-permission/">Why Accessibility?</a>
+        </div>
+        <div class="workflow-step__visual">
+          <ScreenshotFigure
+            light="/images/product-screens/meeting-pulse-station-watch-available-light.jpg"
+            dark="/images/product-screens/meeting-pulse-station-watch-available-dark.jpg"
+            alt="Meeting Pulse Station showing an available state"
+            caption="The owner can see what the detector knows."
+          />
+        </div>
+      </article>
+      <article class="workflow-step">
+        <span class="workflow-step__index">03</span>
+        <div class="workflow-step__copy">
+          <h3>Pair the person who needs to know</h3>
+          <p>
+            Station creates a private viewer path. The person checking in opens
+            that link on a phone or laptop without creating an account.
+          </p>
+          <a class="link-arrow" href="/docs/pairing/">Pair a viewer</a>
+        </div>
+        <div class="workflow-step__visual">
+          <ScreenshotFigure
+            light="/images/product-screens/meeting-pulse-station-sharing-viewers-light.jpg"
+            dark="/images/product-screens/meeting-pulse-station-sharing-viewers-dark.jpg"
+            alt="Meeting Pulse Station showing paired viewers"
+            caption="The owner chooses who gets the link."
+          />
+        </div>
+      </article>
+      <article class="workflow-step">
+        <span class="workflow-step__index">04</span>
+        <div class="workflow-step__copy">
+          <h3>Read the state, not the story</h3>
+          <p>
+            The viewer checks the current signal periodically. If the signal is
+            stale or unavailable, the viewer says so instead of guessing.
+          </p>
+          <a class="link-arrow" href="/docs/troubleshooting/">Troubleshooting states</a>
+        </div>
+        <div class="workflow-step__visual">
+          <ScreenshotFigure
+            light="/images/product-screens/meeting-pulse-viewer-status-unavailable-light.jpg"
+            dark="/images/product-screens/meeting-pulse-viewer-status-unavailable-dark.jpg"
+            alt="Meeting Pulse viewer showing unavailable meeting status"
+            caption="“Meeting status unavailable” is an honest answer."
+            width={1280}
+            height={577}
+          />
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="callout">
+      <strong>Meeting Pulse is not a realtime presence system.</strong>
+      <p>
+        The owner heartbeat and viewer polling are periodic. That is why
+        freshness and unavailable states are part of the product language.
+      </p>
+    </div>
+  </section>
+</BaseLayout>

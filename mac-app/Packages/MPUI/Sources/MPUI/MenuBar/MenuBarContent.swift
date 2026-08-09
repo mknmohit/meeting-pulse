@@ -14,11 +14,19 @@ public struct MenuBarContent: View {
   public var body: some View {
     Text(store.plateHeadline)
       .font(MPFont.rowLabel)
-    TimelineView(.periodic(from: .now, by: 30)) { context in
-      Text(store.reasonLine(at: context.date, presentation: .menuBar))
-        .font(MPFont.caption)
-        .foregroundStyle(.secondary)
-    }
+    // The reason line is rendered without `TimelineView`. A `TimelineView`
+    // in a `MenuBarExtra` body is a known crash trigger on macOS: the
+    // periodic schedule combined with `MenuBehavior.menuNeedsUpdate`'s
+    // re-entry path produces a render loop that exhausts the main thread's
+    // stack guard within ~85 frames
+    // (`EXC_BAD_ACCESS / KERN_PROTECTION_FAILURE` inside
+    // `ViewRendererHost.render`). The menu is open for a few seconds at a
+    // time, so a static text snapshot of the reason line is sufficient —
+    // any countdown will be re-read the next time the user opens the menu,
+    // when SwiftUI re-evaluates the body against the latest store state.
+    Text(store.reasonLine(at: .now, presentation: .menuBar))
+      .font(MPFont.caption)
+      .foregroundStyle(.secondary)
     Divider()
 
     Menu {
@@ -79,8 +87,8 @@ public struct MenuBarContent: View {
 
   private var callsOkayBinding: Binding<Bool> {
     Binding(
-      get: { store.callsOkay },
-      set: { value in
+      get: { [store] in store.callsOkay },
+      set: { [store, actions] value in
         store.callsOkay = value
         Task { await actions.setCallsOkay(value) }
       }

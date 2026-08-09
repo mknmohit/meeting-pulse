@@ -1,0 +1,81 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+import ScreenshotFigure from "../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Privacy-first meeting status | Meeting Pulse"
+  description="Meeting Pulse uses macOS Accessibility permission for local detection and shares a small status with a private viewer, not meeting content."
+  canonicalPath="/privacy/"
+>
+  <PageIntro
+    eyebrow="Privacy"
+    title="The viewer gets a signal, not a window into the meeting."
+    description="Meeting Pulse needs permission to detect a supported state on the owner’s Mac. The public surface is intentionally much smaller."
+  >
+    <div class="button-row" style="margin-top: var(--space-lg)">
+      <a class="button button--accent" href="/docs/accessibility-permission/">Why permission?</a>
+      <a class="button" href="/open-source/">Inspect the project</a>
+    </div>
+  </PageIntro>
+
+  <section class="page-section">
+    <div class="dark-panel">
+      <div>
+        <p class="eyebrow">The boundary</p>
+        <h2>Permission for the owner app. Restraint for the viewer.</h2>
+        <p class="lede">
+          The owner app can inspect supported app state through macOS
+          Accessibility APIs. The viewer only needs to know whether to call.
+        </p>
+      </div>
+      <ul class="boundary-list">
+        <li><span>Meeting titles and URLs are not shown to viewers.</span></li>
+        <li><span>Participants, audio, video, screenshots, OCR, and screen contents are not uploaded.</span></li>
+        <li><span>Meeting Pulse does not require a browser extension, Slack bot, OAuth, or calendar access.</span></li>
+        <li><span>When the product cannot trust a state, it displays unavailable.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="split-section">
+      <div>
+        <p class="eyebrow">What permission does</p>
+        <h2>It lets Station look for supported call states.</h2>
+      </div>
+      <div class="split-section__body">
+        <ScreenshotFigure
+          light="/images/product-screens/meeting-pulse-station-privacy-light.jpg"
+          dark="/images/product-screens/meeting-pulse-station-privacy-dark.jpg"
+          alt="Meeting Pulse Station privacy settings"
+          caption="Privacy settings are visible from Station."
+        />
+        <p>
+          macOS protects Accessibility access because it can expose information
+          on a computer. Meeting Pulse asks for that access for a narrow reason:
+          to detect the supported meeting state the owner wants to share.
+        </p>
+        <p>
+          Read the repository and the project’s security guidance before
+          installing. If the product changes its data boundary, the public
+          explanation should change with it.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="section-head">
+      <p class="eyebrow">What the viewer can know</p>
+      <h2>Small enough to understand at a glance.</h2>
+    </div>
+    <ul class="checklist">
+      <li><span>In a meeting</span></li>
+      <li><span>In a meeting, but it’s fine to ring through</span></li>
+      <li><span>Meeting status unavailable</span></li>
+      <li><span>Not connected</span></li>
+    </ul>
+  </section>
+</BaseLayout>

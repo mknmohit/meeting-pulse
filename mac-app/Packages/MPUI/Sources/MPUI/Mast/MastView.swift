@@ -4,6 +4,11 @@ public struct MastView: View {
   private let store: PulseStore
   private let actions: any PulseActions
   @Environment(\.mpIncreaseContrast) private var increaseContrast
+  // Capture the schedule anchor once at first appearance so the
+  // TimelineView's `now`-driven schedule is stable across re-renders. The
+  // timeline still ticks every 30 s internally, but the schedule itself
+  // is not recreated on every `body` evaluation.
+  @SwiftUI.State private var scheduleAnchor: Date = .now
 
   public init(store: PulseStore, actions: any PulseActions) {
     self.store = store
@@ -19,7 +24,7 @@ public struct MastView: View {
         supporting: store.plateSupporting
       )
 
-      TimelineView(.periodic(from: .now, by: 30)) { context in
+      TimelineView(.periodic(from: scheduleAnchor, by: 30)) { context in
         Text(store.reasonLine(at: context.date))
           .font(MPFont.chalkLine)
           .foregroundStyle(reasonColor)

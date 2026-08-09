@@ -1,0 +1,27 @@
+---
+const links = [
+  { href: "/docs/", label: "Docs home" },
+  { href: "/docs/install-macos/", label: "Install on macOS" },
+  { href: "/docs/accessibility-permission/", label: "Accessibility permission" },
+  { href: "/docs/pairing/", label: "Pair a viewer" },
+  { href: "/docs/recovery/", label: "Recovery" },
+  { href: "/docs/troubleshooting/", label: "Troubleshooting" },
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<aside class="docs-nav" aria-label="Documentation">
+  <a class="docs-nav__title" href="/docs/">Meeting Pulse docs</a>
+  <ul class="docs-nav__links">
+    {
+      links.map((link) => (
+        <li>
+          <a href={link.href} aria-current={currentPath === link.href ? "page" : undefined}>
+            {link.label}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</aside>

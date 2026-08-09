@@ -233,6 +233,9 @@ final class MeetingPulseAppDelegate: NSObject, NSApplicationDelegate {
         if !terminationTask.isCancelled {
           NSLog("Meeting Pulse: graceful quit exceeded watchdog; forcing terminate.")
           terminationTask.cancel()
+          // Force-terminate so the app does not hang in `.terminateLater`
+          // when the graceful quit fails to complete in time.
+          NSApp.reply(toApplicationShouldTerminate: true)
         }
       }
       await terminationTask.value
@@ -1131,9 +1134,15 @@ struct MenuBarView: View {
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
-    TimelineView(.periodic(from: .now, by: 30)) { context in
-      Text(model.menuBarStatusLine(at: context.date))
-    }
+    // Render the status line without `TimelineView`. A `TimelineView` in a
+    // `MenuBarExtra` body is a known crash trigger on macOS: the periodic
+    // schedule combined with `MenuBehavior.menuNeedsUpdate`'s re-entry
+    // path produces a render loop that exhausts the main thread's stack
+    // guard within ~85 frames
+    // (`EXC_BAD_ACCESS / KERN_PROTECTION_FAILURE` inside
+    // `ViewRendererHost.render`). The menu only stays open for a few
+    // seconds, so a static snapshot of the status line is sufficient.
+    Text(model.menuBarStatusLine(at: .now))
       .confirmationDialog(
         MPString.thisMac.deleteTitle,
         isPresented: $model.showingDeleteConfirmation,

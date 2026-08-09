@@ -1,0 +1,46 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import DocsNav from "../../components/DocsNav.astro";
+---
+
+<BaseLayout
+  title="Meeting Pulse docs | Install, pair, and troubleshoot"
+  description="Practical Meeting Pulse docs for macOS installation, Accessibility permission, pairing a viewer, recovery, and unavailable states."
+  canonicalPath="/docs/"
+>
+  <div class="docs-layout">
+    <DocsNav />
+    <article class="docs-content">
+      <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Docs" }]} />
+      <p class="eyebrow">Documentation</p>
+      <h1>Use the owner app. Share the smallest useful signal.</h1>
+      <p class="lede" style="margin-top: var(--space-xl)">
+        These pages cover the public setup path for Meeting Pulse. They explain
+        what the app needs, what the viewer shows, and what to do when the
+        signal is unavailable.
+      </p>
+
+      <h2>Start here</h2>
+      <ul>
+        <li><a class="link-arrow" href="/docs/install-macos/">Install Meeting Pulse on macOS</a></li>
+        <li><a class="link-arrow" href="/docs/accessibility-permission/">Understand Accessibility permission</a></li>
+        <li><a class="link-arrow" href="/docs/pairing/">Pair a private viewer</a></li>
+      </ul>
+
+      <h2>When something looks wrong</h2>
+      <ul>
+        <li><a class="link-arrow" href="/docs/troubleshooting/">Read the state and troubleshoot it</a></li>
+        <li><a class="link-arrow" href="/docs/recovery/">Recover the owner setup</a></li>
+      </ul>
+
+      <div class="callout">
+        <strong>Meeting Pulse is not a realtime system.</strong>
+        <p>
+          A viewer can be stale or disconnected. The product uses explicit
+          unavailable states instead of silently assuming someone is free.
+        </p>
+      </div>
+    </article>
+  </div>
+</BaseLayout>

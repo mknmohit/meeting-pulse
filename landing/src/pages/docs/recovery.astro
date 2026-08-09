@@ -1,0 +1,52 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import DocsNav from "../../components/DocsNav.astro";
+import ScreenshotFigure from "../../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Meeting Pulse recovery guide"
+  description="Recover a Meeting Pulse owner setup, review recovery options, and keep viewer access under the owner’s control."
+  canonicalPath="/docs/recovery/"
+>
+  <div class="docs-layout">
+    <DocsNav />
+    <article class="docs-content">
+      <Breadcrumbs items={[{ href: "/", label: "Home" }, { href: "/docs/", label: "Docs" }, { label: "Recovery" }]} />
+      <p class="eyebrow">Recovery</p>
+      <h1>Keep a way back into the owner setup.</h1>
+      <p class="lede" style="margin-top: var(--space-xl)">
+        Recovery is for the owner. It helps you restore control of the Station
+        setup without turning a viewer link into a second owner account.
+      </p>
+
+      <h2>Before you need it</h2>
+      <ul>
+        <li>Keep the recovery information in a private place.</li>
+        <li>Do not paste it into a public issue, screenshot, or chat.</li>
+        <li>Review viewer access when moving to a new Mac.</li>
+      </ul>
+
+      <h2>When moving to another Mac</h2>
+      <p>
+        Follow the recovery flow shown by the current release. Recheck
+        Accessibility permission on the new Mac, verify the owner state in
+        Station, and confirm that the intended viewer still has access.
+      </p>
+      <ScreenshotFigure
+        light="/images/product-screens/meeting-pulse-recovery-window-light.jpg"
+        dark="/images/product-screens/meeting-pulse-recovery-window-dark.jpg"
+        alt="Meeting Pulse recovery window"
+        caption="Recovery keeps ownership separate from viewer access."
+      />
+
+      <h2>If recovery does not work</h2>
+      <p>
+        Check the release notes and open a support discussion with the smallest
+        amount of diagnostic information needed to reproduce the problem.
+      </p>
+      <p><a class="link-arrow" href="/open-source/">Find support and issue links</a></p>
+    </article>
+  </div>
+</BaseLayout>

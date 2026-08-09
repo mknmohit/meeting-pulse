@@ -17,15 +17,6 @@ public struct AXNode: Codable, Equatable, Sendable {
   public let childCount: Int
   public let windowID: CGWindowID?
   public let children: [AXNode]
-  /// Pre-flattened descendant list. The previous implementation recomputed
-  /// this on every access via `children + children.flatMap(\.descendants)`,
-  /// yielding O(N^2) work over a 5,000-element Chrome accessibility tree and
-  /// allocating tens of megabytes of transient arrays per snapshot. Selectors
-  /// call `descendants` 4+ times per sample, which made this the single
-  /// biggest memory hotspot. The list is now built once at node construction
-  /// (iterative DFS, single allocation) and stored for the lifetime of the
-  /// snapshot.
-  public let descendants: [AXNode]
 
   private enum CodingKeys: String, CodingKey {
     case role, subrole, roleDescription, identifier, title, description, value,
@@ -60,7 +51,6 @@ public struct AXNode: Codable, Equatable, Sendable {
     self.childCount = childCount
     self.windowID = windowID
     self.children = children
-    self.descendants = AXNode.flatten(children: children)
   }
 
   public init(from decoder: Decoder) throws {
@@ -77,9 +67,7 @@ public struct AXNode: Codable, Equatable, Sendable {
     self.focused = try c.decodeIfPresent(Bool.self, forKey: .focused)
     self.childCount = try c.decode(Int.self, forKey: .childCount)
     self.windowID = try c.decodeIfPresent(CGWindowID.self, forKey: .windowID)
-    let decodedChildren = try c.decode([AXNode].self, forKey: .children)
-    self.children = decodedChildren
-    self.descendants = AXNode.flatten(children: decodedChildren)
+    self.children = try c.decode([AXNode].self, forKey: .children)
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -99,23 +87,25 @@ public struct AXNode: Codable, Equatable, Sendable {
     try c.encode(children, forKey: .children)
   }
 
-  private static func flatten(children: [AXNode]) -> [AXNode] {
-    guard !children.isEmpty else {
-      return []
-    }
-    var totalCount = 0
-    for child in children {
-      totalCount += 1 + child.descendants.count
-    }
-    var result: [AXNode] = []
-    result.reserveCapacity(totalCount)
-    var stack: [AXNode] = children.reversed()
+  /// Visits descendants without retaining a second copy of the tree.
+  public func forEachDescendant(_ visit: (AXNode) -> Void) {
+    var stack = Array(children.reversed())
     while let node = stack.popLast() {
-      result.append(node)
+      visit(node)
       if !node.children.isEmpty {
         stack.append(contentsOf: node.children.reversed())
       }
     }
+  }
+
+  /// Compatibility accessor for callers that need a materialized list.
+  ///
+  /// Selectors use `forEachDescendant` so normal detection scans do not
+  /// allocate or retain a flattened tree.
+  public var descendants: [AXNode] {
+    var result: [AXNode] = []
+    result.reserveCapacity(children.count)
+    forEachDescendant { result.append($0) }
     return result
   }
 }
@@ -180,93 +170,137 @@ func makeSnapshot(
     root: root
   )
 }
+// Iterative, depth-limited accessibility tree walk.
+//
+// The previous implementation rebuilt this graph with recursion and retained
+// a flattened copy of every subtree. Chromium-based hosts can expose large,
+// deeply nested trees, so the scan now keeps only bounded payload and parent
+// metadata until the final value tree is assembled.
+//
+// Algorithm: collect a bounded flat graph, then assemble the value tree.
+//
+// Pass 1 walks the tree in pre-order using an explicit work stack,
+// reading attributes and pushing children in reverse (so they visit in
+// source order). Each visit records a payload and parent-index entry.
+// Stops at `maxDepth` and `maxElements`.
+//
+// Each work item carries its parent index, so siblings and nested
+// descendants cannot be confused during assembly. The final recursion is
+// bounded by the depth cap and only builds the immutable value tree.
+//
+// `AXNode` is a struct with `let` fields; assembly creates each value once.
+
+private struct Payload {
+  let role: String?
+  let subrole: String?
+  let roleDescription: String?
+  let identifier: String?
+  let title: String?
+  let description: String?
+  let value: String?
+  let help: String?
+  let enabled: Bool?
+  let focused: Bool?
+  let childCount: Int
+  let windowID: CGWindowID?
+}
+
+private struct WorkItem {
+  let element: AXUIElement
+  let remainingDepth: Int
+  let parentIndex: Int
+}
 
 private func makeNode(
-  _ element: AXUIElement,
+  _ rootElement: AXUIElement,
   remainingDepth: Int,
   maxElements: Int,
   elementCount: inout Int,
   scanCompleted: inout Bool
 ) throws -> AXNode {
-  guard elementCount < maxElements else {
-    throw AXSnapshotError.treeTooLarge
-  }
-  elementCount += 1
-  let role = attribute(
-    element,
-    kAXRoleAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let subrole = attribute(
-    element,
-    kAXSubroleAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let roleDescription = attribute(
-    element,
-    kAXRoleDescriptionAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let identifier = attribute(
-    element,
-    kAXIdentifierAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let title = attribute(
-    element,
-    kAXTitleAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let description = attribute(
-    element,
-    kAXDescriptionAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let value = attribute(
-    element,
-    kAXValueAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let help = attribute(
-    element,
-    kAXHelpAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let enabled = boolAttribute(
-    element,
-    kAXEnabledAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let focused = boolAttribute(
-    element,
-    kAXFocusedAttribute as String,
-    scanCompleted: &scanCompleted
-  )
-  let childrenResult = copyAttribute(element, kAXChildrenAttribute as String)
-  if childrenResult.0 != .success
-    && childrenResult.0 != .noValue
-    && childrenResult.0 != .attributeUnsupported
-    && !benignChildrenFailure(role: stringValue(role), error: childrenResult.0)
-  {
-    scanCompleted = false
-  }
-  let childElements = (childrenResult.1 as? [AXUIElement]) ?? []
-  let children: [AXNode]
-  if remainingDepth > 0 {
-    children = try childElements.enumerated().map { _, child in
-      try makeNode(
-        child,
-        remainingDepth: remainingDepth - 1,
-        maxElements: maxElements,
-        elementCount: &elementCount,
-        scanCompleted: &scanCompleted
-      )
+  // ----- Pass 1: pre-order DFS, record placeholders and metadata -----
+
+  var payloads: [Payload] = []
+  payloads.reserveCapacity(min(maxElements, 4096))
+  var childIndices: [[Int]] = []
+  childIndices.reserveCapacity(min(maxElements, 4096))
+
+  var work: [WorkItem] = []
+  work.reserveCapacity(256)
+  work.append(WorkItem(element: rootElement, remainingDepth: remainingDepth, parentIndex: -1))
+
+  while let item = work.popLast() {
+    guard payloads.count < maxElements else {
+      throw AXSnapshotError.treeTooLarge
     }
-  } else {
-    children = []
+
+    let myIndex = payloads.count
+    elementCount += 1
+    let childrenResult = copyAttribute(item.element, kAXChildrenAttribute as String)
+    let childElements = (childrenResult.1 as? [AXUIElement]) ?? []
+    let payload = readPayload(
+      element: item.element,
+      childCount: childElements.count,
+      scanCompleted: &scanCompleted
+    )
+    if childrenResult.0 != .success
+      && childrenResult.0 != .noValue
+      && childrenResult.0 != .attributeUnsupported
+      && !benignChildrenFailure(role: payload.role, error: childrenResult.0)
+    {
+      scanCompleted = false
+    }
+
+    payloads.append(payload)
+    childIndices.append([])
+    if item.parentIndex >= 0 {
+      childIndices[item.parentIndex].append(myIndex)
+    }
+
+    let canDescend = item.remainingDepth > 0 && !childElements.isEmpty
+    if !canDescend {
+      continue
+    }
+
+    // Push children in reverse so they are visited in source order.
+    for child in childElements.reversed() {
+      work.append(WorkItem(
+        element: child,
+        remainingDepth: item.remainingDepth - 1,
+        parentIndex: myIndex
+      ))
+    }
   }
 
-  return AXNode(
+  guard !payloads.isEmpty else {
+    throw AXSnapshotError.unreadable(-1)
+  }
+
+  func assemble(_ index: Int) -> AXNode {
+    let children = childIndices[index].map(assemble)
+    let payload = payloads[index]
+    return makeNode(payload: payload, children: children)
+  }
+
+  return assemble(0)
+}
+
+private func readPayload(
+  element: AXUIElement,
+  childCount: Int,
+  scanCompleted: inout Bool
+) -> Payload {
+  let role = attribute(element, kAXRoleAttribute as String, scanCompleted: &scanCompleted)
+  let subrole = attribute(element, kAXSubroleAttribute as String, scanCompleted: &scanCompleted)
+  let roleDescription = attribute(element, kAXRoleDescriptionAttribute as String, scanCompleted: &scanCompleted)
+  let identifier = attribute(element, kAXIdentifierAttribute as String, scanCompleted: &scanCompleted)
+  let title = attribute(element, kAXTitleAttribute as String, scanCompleted: &scanCompleted)
+  let description = attribute(element, kAXDescriptionAttribute as String, scanCompleted: &scanCompleted)
+  let value = attribute(element, kAXValueAttribute as String, scanCompleted: &scanCompleted)
+  let help = attribute(element, kAXHelpAttribute as String, scanCompleted: &scanCompleted)
+  let enabled = boolAttribute(element, kAXEnabledAttribute as String, scanCompleted: &scanCompleted)
+  let focused = boolAttribute(element, kAXFocusedAttribute as String, scanCompleted: &scanCompleted)
+  return Payload(
     role: stringValue(role),
     subrole: stringValue(subrole),
     roleDescription: stringValue(roleDescription),
@@ -277,8 +311,25 @@ private func makeNode(
     help: stringValue(help),
     enabled: enabled,
     focused: focused,
-    childCount: childElements.count,
-    windowID: windowID(for: element),
+    childCount: childCount,
+    windowID: windowID(for: element)
+  )
+}
+
+private func makeNode(payload: Payload, children: [AXNode]) -> AXNode {
+  AXNode(
+    role: payload.role,
+    subrole: payload.subrole,
+    roleDescription: payload.roleDescription,
+    identifier: payload.identifier,
+    title: payload.title,
+    description: payload.description,
+    value: payload.value,
+    help: payload.help,
+    enabled: payload.enabled,
+    focused: payload.focused,
+    childCount: payload.childCount,
+    windowID: payload.windowID,
     children: children
   )
 }

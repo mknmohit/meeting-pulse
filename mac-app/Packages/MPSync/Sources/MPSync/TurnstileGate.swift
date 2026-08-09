@@ -132,7 +132,13 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
 
   public var view: WKWebView {
     guard let webView else {
-      fatalError("The Turnstile provider has been shut down.")
+      // The provider has been shut down. Returning a placeholder WKWebView
+      // instead of crashing lets SwiftUI re-render gracefully (the
+      // Turnstile view is hidden behind a sheet/scrim once we have a
+      // token, and the recovery flow recreates the provider on demand).
+      assertionFailure("The Turnstile provider has been shut down.")
+      let placeholder = WKWebView(frame: .zero)
+      return placeholder
     }
     return webView
   }

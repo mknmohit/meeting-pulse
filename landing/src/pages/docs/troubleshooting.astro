@@ -1,0 +1,67 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import DocsNav from "../../components/DocsNav.astro";
+import ScreenshotFigure from "../../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Meeting Pulse troubleshooting"
+  description="Troubleshoot Meeting Pulse permission, stale, offline, revoked, and unavailable viewer states without guessing what the signal means."
+  canonicalPath="/docs/troubleshooting/"
+>
+  <div class="docs-layout">
+    <DocsNav />
+    <article class="docs-content">
+      <Breadcrumbs items={[{ href: "/", label: "Home" }, { href: "/docs/", label: "Docs" }, { label: "Troubleshooting" }]} />
+      <p class="eyebrow">Troubleshooting</p>
+      <h1>Read the state before you fix the state.</h1>
+      <p class="lede" style="margin-top: var(--space-xl)">
+        Meeting Pulse uses explicit messages so a missing or stale signal does
+        not look like permission to interrupt.
+      </p>
+
+      <h2>“Meeting status unavailable”</h2>
+      <p>
+        The viewer cannot trust a current state. Check that Station is running,
+        the owner Mac is connected, and Accessibility permission is still
+        granted.
+      </p>
+
+      <h2>“Not connected”</h2>
+      <p>
+        The viewer is not connected to the paired owner state. Reopen the
+        private link and check the viewer entry in Station.
+      </p>
+
+      <h2>The state looks old</h2>
+      <p>
+        Meeting Pulse updates periodically rather than continuously. If the
+        timestamp is stale, treat the state as unavailable and check Station.
+      </p>
+
+      <h2>The detector is not seeing a supported call</h2>
+      <p>
+        Confirm the app is supported by the current release and that the owner
+        app has the required permission. Manual Busy or Available controls can
+        cover a moment the detector cannot observe.
+      </p>
+      <ScreenshotFigure
+        light="/images/product-screens/meeting-pulse-diagnostics-window-light.jpg"
+        dark="/images/product-screens/meeting-pulse-diagnostics-window-dark.jpg"
+        alt="Meeting Pulse diagnostics window"
+        caption="Diagnostics help the owner see what Station can determine."
+      />
+
+      <div class="callout">
+        <strong>Still stuck?</strong>
+        <p>
+          Share a focused bug report with the release version and the state
+          you saw. Keep private viewer links and recovery information out of
+          public issues.
+        </p>
+        <p><a class="link-arrow" href="/open-source/">Open support links</a></p>
+      </div>
+    </article>
+  </div>
+</BaseLayout>

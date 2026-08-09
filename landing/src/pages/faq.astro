@@ -1,0 +1,90 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+
+const questions = [
+  {
+    question: "What does Meeting Pulse tell a viewer?",
+    answer:
+      "The viewer shows a small availability state such as “In a meeting,” “Call okay,” “Meeting status unavailable,” or “Not connected.” It does not show meeting titles, URLs, participants, audio, video, or screen contents.",
+  },
+  {
+    question: "Does Meeting Pulse read my calendar?",
+    answer:
+      "No. Calendar access is not required. Meeting Pulse detects supported call states through macOS Accessibility APIs on the owner’s Mac.",
+  },
+  {
+    question: "Does it record my meetings?",
+    answer:
+      "No. Meeting Pulse does not use Screen Recording, screenshots, OCR, audio, or video for this product surface.",
+  },
+  {
+    question: "Which meeting apps are supported?",
+    answer:
+      "The current product is designed around Google Meet in Chrome and native Slack Huddles. Read the release notes and project documentation for the current implementation boundaries.",
+  },
+  {
+    question: "Why does the app need Accessibility permission?",
+    answer:
+      "The owner app uses macOS Accessibility APIs to look for supported application states. The permission is for local detection, not for publishing the contents of a meeting.",
+  },
+  {
+    question: "Is the viewer realtime?",
+    answer:
+      "No. The owner and viewer exchange updates periodically. Meeting Pulse makes stale and unavailable states visible so a viewer is not given false certainty.",
+  },
+  {
+    question: "Can the owner set a status manually?",
+    answer:
+      "Yes. The owner can use manual Busy or Available controls for a duration, and can set a separate Call okay signal.",
+  },
+  {
+    question: "Is Meeting Pulse open source?",
+    answer:
+      "Yes. The project is MIT licensed and its source, product decisions, issue tracker, and contribution paths are on GitHub.",
+  },
+];
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: questions.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: { "@type": "Answer", text: item.answer },
+  })),
+};
+---
+
+<BaseLayout
+  title="Meeting Pulse FAQ | Privacy, setup, and status"
+  description="Answers about Meeting Pulse permissions, supported meeting surfaces, private viewers, unavailable states, and open-source licensing."
+  canonicalPath="/faq/"
+  schema={faqSchema}
+>
+  <PageIntro
+    eyebrow="FAQ"
+    title="The questions worth answering before you install."
+    description="Meeting Pulse is small enough that the boundaries matter. Here they are in plain language."
+  >
+    <div class="button-row" style="margin-top: var(--space-lg)">
+      <a class="button button--accent" href="/download/">Download</a>
+      <a class="button" href="/open-source/">View source</a>
+    </div>
+  </PageIntro>
+
+  <section class="page-section">
+    <div class="faq-list">
+      {
+        questions.map((item) => (
+          <details class="faq-item">
+            <summary>{item.question}</summary>
+            <div class="faq-item__answer">
+              <p>{item.answer}</p>
+            </div>
+          </details>
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>

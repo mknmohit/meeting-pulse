@@ -1,0 +1,59 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import DocsNav from "../../components/DocsNav.astro";
+import ScreenshotFigure from "../../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Pair a Meeting Pulse viewer"
+  description="Create a private Meeting Pulse viewer link from Station and share it with the person who needs to check your meeting status."
+  canonicalPath="/docs/pairing/"
+>
+  <div class="docs-layout">
+    <DocsNav />
+    <article class="docs-content">
+      <Breadcrumbs items={[{ href: "/", label: "Home" }, { href: "/docs/", label: "Docs" }, { label: "Pair a viewer" }]} />
+      <p class="eyebrow">Sharing</p>
+      <h1>Pair the person who needs to know.</h1>
+      <p class="lede" style="margin-top: var(--space-xl)">
+        Station creates a private browser viewer path. The viewer is designed
+        for one quick glance on a phone or laptop, without asking the viewer to
+        create an account.
+      </p>
+
+      <h2>1. Open sharing in Station</h2>
+      <p>
+        From the owner app, open the sharing surface and create a viewer for
+        the person who should be able to check in.
+      </p>
+
+      <h2>2. Share the private link</h2>
+      <p>
+        Send the generated viewer link or pairing code through a channel you
+        trust. Treat it like access to a private status page.
+      </p>
+      <ScreenshotFigure
+        light="/images/product-screens/meeting-pulse-station-sharing-light.jpg"
+        dark="/images/product-screens/meeting-pulse-station-sharing-dark.jpg"
+        alt="Meeting Pulse Station sharing setup"
+        caption="Sharing starts from the owner’s Station window."
+      />
+
+      <h2>3. Check the viewer</h2>
+      <p>
+        Open the link in a browser. The viewer shows the current state and
+        makes unavailable or disconnected conditions explicit.
+      </p>
+      <p><a class="link-arrow" href="/docs/troubleshooting/">Understand viewer states</a></p>
+
+      <div class="callout">
+        <strong>Need to change access?</strong>
+        <p>
+          Use Station’s viewer management controls to rotate or revoke access
+          according to the current product behavior documented in the release.
+        </p>
+      </div>
+    </article>
+  </div>
+</BaseLayout>

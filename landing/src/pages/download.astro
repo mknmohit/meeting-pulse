@@ -1,0 +1,82 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageIntro from "../components/PageIntro.astro";
+import ScreenshotFigure from "../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Download Meeting Pulse for macOS"
+  description="Download Meeting Pulse from the project’s GitHub releases, then pair a private viewer from the native macOS owner app."
+  canonicalPath="/download/"
+>
+  <PageIntro
+    eyebrow="Download"
+    title="Start on the Mac. Share the answer from there."
+    description="Meeting Pulse is a native macOS owner app paired with a static browser viewer. Check the repository’s Releases page for the current artifact and notes."
+  >
+    <div class="button-row" style="margin-top: var(--space-lg)">
+      <a
+        class="button button--accent"
+        href="https://github.com/mknmohit/meeting-pulse/releases"
+        target="_blank"
+        rel="noreferrer"
+      >
+        View GitHub releases
+      </a>
+      <a class="button" href="/docs/install-macos/">Read install docs</a>
+    </div>
+  </PageIntro>
+
+  <section class="page-section">
+    <div class="split-section">
+      <div>
+        <p class="eyebrow">Before you install</p>
+        <h2>What the owner app expects.</h2>
+      </div>
+      <div class="split-section__body">
+        <ul class="checklist">
+          <li><span>macOS 14 or later.</span></li>
+          <li><span>A Mac that can run the native owner app.</span></li>
+          <li><span>Accessibility permission for supported detection.</span></li>
+          <li><span>A person who should receive the private viewer link.</span></li>
+        </ul>
+        <div class="callout">
+          <strong>Release status belongs to the release.</strong>
+          <p>
+            Read the GitHub release notes for the current signing, notarization,
+            architecture, and installation details. Do not rely on an old
+            download link.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="section-head section-head--split">
+      <div>
+        <p class="eyebrow">First launch</p>
+        <h2>Station is where the owner sets the boundary.</h2>
+      </div>
+      <p>
+        The setup flow explains permissions, connects the owner app, and leads
+        into pairing. The viewer itself stays a focused, browser-sized surface.
+      </p>
+    </div>
+    <ScreenshotFigure
+      light="/images/product-screens/meeting-pulse-onboarding-window-light.jpg"
+      dark="/images/product-screens/meeting-pulse-onboarding-window-dark.jpg"
+      alt="Meeting Pulse onboarding window for first launch"
+      caption="The first-run flow starts with a clear explanation."
+      width={1120}
+      height={400}
+    />
+  </section>
+
+  <section class="page-section">
+    <div class="button-row">
+      <a class="button button--accent" href="/docs/pairing/">Pair a private viewer</a>
+      <a class="button" href="/docs/troubleshooting/">Need help?</a>
+    </div>
+  </section>
+</BaseLayout>

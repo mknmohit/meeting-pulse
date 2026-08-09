@@ -1,0 +1,42 @@
+---
+interface Props {
+  light: string;
+  dark: string;
+  alt: string;
+  caption: string;
+  width?: number;
+  height?: number;
+  className?: string;
+  priority?: boolean;
+}
+
+const {
+  light,
+  dark,
+  alt,
+  caption,
+  width = 1880,
+  height = 1344,
+  className = "",
+  priority = false,
+} = Astro.props;
+---
+
+<figure class:list={["screenshot", className]}>
+  <div class="screenshot__surface">
+    <picture>
+      <img
+        src={light}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        data-theme-image
+        data-light-src={light}
+        data-dark-src={dark}
+      />
+    </picture>
+  </div>
+  <figcaption class="screenshot__caption">{caption}</figcaption>
+</figure>

@@ -1,0 +1,240 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import ScreenshotFigure from "../components/ScreenshotFigure.astro";
+import StatusPill from "../components/StatusPill.astro";
+
+const schemas = [
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Meeting Pulse",
+    applicationCategory: "ProductivityApplication",
+    operatingSystem: "macOS 14 or later",
+    description:
+      "A privacy-first macOS menu-bar app and private browser viewer for sharing a small meeting availability signal.",
+    url: "https://github.com/mknmohit/meeting-pulse",
+  },
+];
+---
+
+<BaseLayout
+  title="Private meeting status for macOS | Meeting Pulse"
+  description="Meeting Pulse tells one person when to call you. A privacy-first macOS menu-bar app paired with a private viewer."
+  canonicalPath="/"
+  schema={schemas}
+>
+  <div class="home-shell">
+    <section class="hero">
+      <div class="hero__copy reveal" style="--i: 0">
+        <p class="eyebrow">Private meeting status for macOS</p>
+        <h1>Know before you call.</h1>
+        <p class="lede">
+          Meeting Pulse tells one person when to call you. It watches the owner’s
+          Mac for a meeting, then shares a small status through a private viewer.
+        </p>
+        <div class="button-row">
+          <a class="button button--accent" href="/download/">Download for macOS</a>
+          <a class="button" href="/how-it-works/">See how it works</a>
+        </div>
+      </div>
+      <div class="hero__aside reveal" style="--i: 1">
+        <StatusPill label="In a meeting" />
+        <p>
+          No calendar event to maintain. No meeting title to publish. Just the
+          answer someone needs before they ring.
+        </p>
+        <a class="link-arrow" href="/privacy/">Read the privacy boundary</a>
+      </div>
+    </section>
+
+    <section class="hero__visual reveal" style="--i: 2" aria-label="Meeting Pulse owner app">
+      <ScreenshotFigure
+        light="/images/product-screens/meeting-pulse-station-watch-meeting-light.jpg"
+        dark="/images/product-screens/meeting-pulse-station-watch-meeting-dark.jpg"
+        alt="Meeting Pulse Station window showing that the owner is in a meeting"
+        caption="The owner sees the current signal in the Station window."
+        priority
+      />
+      <span class="visual-tag">Owner’s Mac · local detection</span>
+    </section>
+
+    <section class="section section--tight reveal" style="--i: 3">
+      <div class="section-head section-head--split">
+        <div>
+          <p class="eyebrow">Two surfaces, one answer</p>
+          <h2>The owner app stays close. The viewer stays simple.</h2>
+        </div>
+        <p>
+          Meeting Pulse has a native macOS surface for the owner and a private
+          browser viewer for the person checking in. They meet at one small,
+          readable signal.
+        </p>
+      </div>
+      <div class="proof-grid">
+        <ScreenshotFigure
+          light="/images/product-screens/meeting-pulse-station-sharing-light.jpg"
+          dark="/images/product-screens/meeting-pulse-station-sharing-dark.jpg"
+          alt="Meeting Pulse Station sharing settings for a private viewer"
+          caption="1 · Share a viewer link from Station."
+        />
+        <div>
+          <ScreenshotFigure
+            light="/images/product-screens/meeting-pulse-viewer-call-okay-light.jpg"
+            dark="/images/product-screens/meeting-pulse-viewer-call-okay-dark.jpg"
+            alt="Meeting Pulse private viewer showing that a call is okay"
+            caption="2 · The viewer answers before anyone interrupts."
+            width={1280}
+            height={577}
+          />
+          <div class="proof-note">
+            <StatusPill label="Call okay" tone="success" />
+            <strong>The viewer does not need the owner’s whole life to be useful.</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-rule reveal" style="--i: 4">
+      <div class="section-head">
+        <p class="eyebrow">The workflow</p>
+        <h2>Four quiet steps between “should I call?” and “go ahead.”</h2>
+      </div>
+      <div class="workflow">
+        <article class="workflow-step">
+          <span class="workflow-step__index">01</span>
+          <div class="workflow-step__copy">
+            <h3>Detect locally</h3>
+            <p>
+              Meeting Pulse uses macOS Accessibility APIs to detect supported
+              meeting states on the owner’s Mac.
+            </p>
+          </div>
+          <div class="workflow-step__visual">
+            <ScreenshotFigure
+              light="/images/product-screens/meeting-pulse-station-watch-meeting-light.jpg"
+              dark="/images/product-screens/meeting-pulse-station-watch-meeting-dark.jpg"
+              alt="Meeting Pulse Station showing an active meeting state"
+              caption="The signal begins on the owner’s Mac."
+            />
+          </div>
+        </article>
+        <article class="workflow-step">
+          <span class="workflow-step__index">02</span>
+          <div class="workflow-step__copy">
+            <h3>Publish the smallest useful signal</h3>
+            <p>
+              The viewer gets an availability state and optional call-okay
+              message, not a transcript of the meeting.
+            </p>
+          </div>
+          <div class="workflow-step__visual">
+            <ScreenshotFigure
+              light="/images/product-screens/meeting-pulse-station-sharing-viewers-light.jpg"
+              dark="/images/product-screens/meeting-pulse-station-sharing-viewers-dark.jpg"
+              alt="Meeting Pulse Station showing the private viewers list"
+              caption="The owner controls who has a viewer."
+            />
+          </div>
+        </article>
+        <article class="workflow-step">
+          <span class="workflow-step__index">03</span>
+          <div class="workflow-step__copy">
+            <h3>Check from a browser</h3>
+            <p>
+              A paired person opens a private link on a phone or laptop and
+              reads the current state without an account.
+            </p>
+          </div>
+          <div class="workflow-step__visual">
+            <ScreenshotFigure
+              light="/images/product-screens/meeting-pulse-viewer-meeting-named-light.jpg"
+              dark="/images/product-screens/meeting-pulse-viewer-meeting-named-dark.jpg"
+              alt="Meeting Pulse viewer showing an owner in a meeting"
+              caption="The viewer is built for one quick glance."
+              width={1280}
+              height={577}
+            />
+          </div>
+        </article>
+        <article class="workflow-step">
+          <span class="workflow-step__index">04</span>
+          <div class="workflow-step__copy">
+            <h3>Respect unavailable</h3>
+            <p>
+              If a signal is stale, uncertain, offline, or revoked, Meeting
+              Pulse says so. It does not turn uncertainty into “available.”
+            </p>
+          </div>
+          <div class="workflow-step__visual">
+            <ScreenshotFigure
+              light="/images/product-screens/meeting-pulse-viewer-offline-light.jpg"
+              dark="/images/product-screens/meeting-pulse-viewer-offline-dark.jpg"
+              alt="Meeting Pulse viewer showing a disconnected state"
+              caption="Unavailable is a real state, not a guess."
+              width={1280}
+              height={577}
+            />
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal" style="--i: 5">
+      <div class="dark-panel">
+        <div>
+          <p class="eyebrow">Privacy by boundary</p>
+          <h2>Permission for detection. Restraint for everything else.</h2>
+          <p class="lede">
+            Accessibility access lets the owner app understand supported call
+            states. It does not turn Meeting Pulse into a window on the meeting.
+          </p>
+        </div>
+        <ul class="boundary-list">
+          <li><span>Meeting titles, URLs, and participants stay out of the viewer.</span></li>
+          <li><span>Audio, video, screenshots, OCR, and screen contents are not uploaded.</span></li>
+          <li><span>No browser extension, Slack bot, OAuth, or calendar access is required.</span></li>
+          <li><span>The project is open source and MIT licensed.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section-rule reveal" style="--i: 6">
+      <div class="section-head section-head--split">
+        <div>
+          <p class="eyebrow">Built for the in-between moment</p>
+          <h2>Useful before it becomes another system to manage.</h2>
+        </div>
+        <p>
+          Keep the owner’s status close to the Mac. Give the viewer one link.
+          When the signal is missing, say that plainly and let the person
+          choose what to do next.
+        </p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="card-kicker">01 · Automatic</span>
+          <h3>Detect a supported call without a calendar habit.</h3>
+          <p>Google Meet in Chrome and native Slack Huddles are the first supported surfaces.</p>
+          <a class="link-arrow" href="/features/">Explore features</a>
+        </article>
+        <article class="feature-card">
+          <span class="card-kicker">02 · Manual</span>
+          <h3>Set Busy or Available when you need to take over.</h3>
+          <p>Manual controls cover the moments that automatic detection cannot know.</p>
+          <a class="link-arrow" href="/how-it-works/">See the workflow</a>
+        </article>
+        <article class="feature-card">
+          <span class="card-kicker">03 · Open</span>
+          <h3>Read the code, inspect the boundaries, and make it yours.</h3>
+          <p>Meeting Pulse is an MIT-licensed open-source project with its product decisions in the open.</p>
+          <a class="link-arrow" href="/open-source/">Visit the project</a>
+        </article>
+      </div>
+    </section>
+
+    <aside class="sticky-cta reveal" style="--i: 7">
+      <p>Ready to stop guessing?</p>
+      <a class="button button--accent" href="/download/">Get Meeting Pulse</a>
+    </aside>
+  </div>
+</BaseLayout>

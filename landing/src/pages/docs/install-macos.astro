@@ -1,0 +1,54 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import DocsNav from "../../components/DocsNav.astro";
+import ScreenshotFigure from "../../components/ScreenshotFigure.astro";
+---
+
+<BaseLayout
+  title="Install Meeting Pulse on macOS"
+  description="Install the Meeting Pulse native owner app, complete onboarding, and open Station on macOS."
+  canonicalPath="/docs/install-macos/"
+>
+  <div class="docs-layout">
+    <DocsNav />
+    <article class="docs-content">
+      <Breadcrumbs items={[{ href: "/", label: "Home" }, { href: "/docs/", label: "Docs" }, { label: "Install on macOS" }]} />
+      <p class="eyebrow">Getting started</p>
+      <h1>Install the owner app on macOS.</h1>
+      <p class="lede" style="margin-top: var(--space-xl)">
+        Meeting Pulse starts with a native macOS app called Station. It is the
+        place where the owner configures detection, controls, and viewers.
+      </p>
+
+      <h2>1. Get the current release</h2>
+      <p>
+        Use the project’s GitHub Releases page and read the release notes for
+        the current artifact, architecture, and signing details.
+      </p>
+      <p><a class="link-arrow" href="/download/">Open the download page</a></p>
+
+      <h2>2. Complete onboarding</h2>
+      <p>
+        Launch Station and follow the setup flow. The app explains why it needs
+        macOS Accessibility permission before asking for it.
+      </p>
+      <ScreenshotFigure
+        light="/images/product-screens/meeting-pulse-onboarding-window-light.jpg"
+        dark="/images/product-screens/meeting-pulse-onboarding-window-dark.jpg"
+        alt="Meeting Pulse onboarding window"
+        caption="Onboarding leads the owner through the first setup."
+        width={1120}
+        height={400}
+      />
+
+      <h2>3. Check the owner state</h2>
+      <p>
+        Station shows the state it can currently determine. If the detector is
+        uncertain or permissions are incomplete, keep the unavailable message
+        visible and continue with the troubleshooting guide.
+      </p>
+      <p><a class="link-arrow" href="/docs/troubleshooting/">Troubleshoot an unavailable state</a></p>
+    </article>
+  </div>
+</BaseLayout>

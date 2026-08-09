@@ -1,0 +1,40 @@
+---
+interface Props {
+  label: string;
+  tone?: "success" | "warning" | "muted";
+}
+
+const { label, tone = "success" } = Astro.props;
+---
+
+<span class:list={["status-pill", `status-pill--${tone}`]}>
+  <span aria-hidden="true"></span>
+  {label}
+</span>
+
+<style>
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--color-ink-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+
+  .status-pill > span {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--color-success);
+  }
+
+  .status-pill--warning > span {
+    background: var(--color-warning);
+  }
+
+  .status-pill--muted > span {
+    background: var(--color-muted);
+  }
+</style>
