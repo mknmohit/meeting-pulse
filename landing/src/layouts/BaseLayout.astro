@@ -21,7 +21,7 @@ const {
   title,
   description,
   canonicalPath = Astro.url.pathname,
-  image = "/images/product-screens/meeting-pulse-station-watch-meeting-light.jpg",
+  image = "/images/meeting-pulse-social-preview.png",
   noindex = false,
   schema,
   viewerUrl,
@@ -77,11 +77,21 @@ const websiteSchema = {
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={socialImage} />
-    <meta property="og:image:alt" content="Meeting Pulse product interface" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Meeting Pulse host app showing an in-meeting status beside a private guest viewer"
+    />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImage} />
+    <meta
+      name="twitter:image:alt"
+      content="Meeting Pulse host app showing an in-meeting status beside a private guest viewer"
+    />
     <title>{title}</title>
     <script is:inline>
       (() => {

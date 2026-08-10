@@ -13,15 +13,15 @@ const schemas = [
     applicationCategory: "ProductivityApplication",
     operatingSystem: "macOS 14 or later",
     description:
-      "A privacy-first macOS menu-bar app and private browser viewer for sharing a small meeting availability signal.",
+      "A privacy-first macOS menu-bar app that shares a small meeting signal with the one person who always rings you.",
     url: "https://github.com/mknmohit/meeting-pulse",
   },
 ];
 ---
 
 <BaseLayout
-  title="Private meeting status for macOS | Meeting Pulse"
-  description="Meeting Pulse tells one person when to call you. A privacy-first macOS menu-bar app paired with a private viewer."
+  title="Meeting Pulse | For the one person who always rings you"
+  description="A small macOS app that lets your partner, a parent, or a close friend see whether you're in a meeting, before they pick up the phone."
   canonicalPath="/"
   schema={schemas}
   viewerUrl={viewerUrl}
@@ -30,10 +30,11 @@ const schemas = [
     <section class="hero">
       <div class="hero__copy reveal" style="--i: 0">
         <p class="eyebrow">Private meeting status for macOS</p>
-        <h1>Know before you call.</h1>
+        <h1>For the one person who always rings.</h1>
         <p class="lede">
-          Meeting Pulse tells one person when to call you. It watches the owner’s
-          Mac for a meeting, then shares a small status through a private viewer.
+          Meeting Pulse is a small macOS app that shares a single "in a meeting"
+          or "call okay" with the partner, parent, or close friend who usually
+          rings you first.
         </p>
         <div class="button-row">
           <a class="button button--accent" href="/download/">Download for macOS</a>
@@ -43,33 +44,33 @@ const schemas = [
       <div class="hero__aside reveal" style="--i: 1">
         <StatusPill label="In a meeting" />
         <p>
-          No calendar event to maintain. No meeting title to publish. Just the
-          answer someone needs before they ring.
+          No calendar event to babysit. No meeting title to show. Just the
+          quiet answer the person who loves you needs before they ring.
         </p>
         <a class="link-arrow" href="/privacy/">Read the privacy boundary</a>
       </div>
     </section>
 
-    <section class="hero__visual reveal" style="--i: 2" aria-label="Meeting Pulse owner app">
+    <section class="hero__visual reveal" style="--i: 2" aria-label="Meeting Pulse host app">
       <ScreenshotFigure
         light="/images/product-screens/meeting-pulse-station-watch-meeting-light.jpg"
         dark="/images/product-screens/meeting-pulse-station-watch-meeting-dark.jpg"
-        alt="Meeting Pulse Station window showing that the owner is in a meeting"
-        caption="The owner sees the current signal in the Station window."
+        alt="Meeting Pulse Station window showing that the host is in a meeting"
+        caption="The host sees the current signal in the Station window."
         priority
       />
-      <span class="visual-tag">Owner’s Mac · local detection</span>
+      <span class="visual-tag">Host’s Mac · local detection</span>
     </section>
 
     <section class="section section--tight reveal" style="--i: 3">
       <div class="section-head section-head--split">
         <div>
           <p class="eyebrow">Two surfaces, one answer</p>
-          <h2>The owner app stays close. The viewer stays simple.</h2>
+          <h2>The host app stays close. The guest page stays simple.</h2>
         </div>
         <p>
-          Meeting Pulse has a native macOS surface for the owner and a private
-          browser viewer for the person checking in. They meet at one small,
+          Meeting Pulse has a native macOS surface for the host and a private
+          browser page for the guest. They meet at one small,
           readable signal.
         </p>
       </div>
@@ -91,7 +92,7 @@ const schemas = [
           />
           <div class="proof-note">
             <StatusPill label="Call okay" tone="success" />
-            <strong>The viewer does not need the owner’s whole life to be useful.</strong>
+            <strong>The guest page does not need the host’s whole life to be useful.</strong>
           </div>
         </div>
       </div>
@@ -109,7 +110,7 @@ const schemas = [
             <h3>Detect locally</h3>
             <p>
               Meeting Pulse uses macOS Accessibility APIs to detect supported
-              meeting states on the owner’s Mac.
+              meeting states on the host’s Mac.
             </p>
           </div>
           <div class="workflow-step__visual">
@@ -117,17 +118,17 @@ const schemas = [
               light="/images/product-screens/meeting-pulse-station-watch-meeting-light.jpg"
               dark="/images/product-screens/meeting-pulse-station-watch-meeting-dark.jpg"
               alt="Meeting Pulse Station showing an active meeting state"
-              caption="The signal begins on the owner’s Mac."
+              caption="The signal begins on the host’s Mac."
             />
           </div>
         </article>
         <article class="workflow-step">
           <span class="workflow-step__index">02</span>
           <div class="workflow-step__copy">
-            <h3>Publish the smallest useful signal</h3>
+            <h3>Share the answer</h3>
             <p>
-              The viewer gets an availability state and optional call-okay
-              message, not a transcript of the meeting.
+              The guest gets a single "in a meeting" or "call okay" — never the
+              meeting title, the URL, or who's on the call.
             </p>
           </div>
           <div class="workflow-step__visual">
@@ -135,25 +136,25 @@ const schemas = [
               light="/images/product-screens/meeting-pulse-station-sharing-viewers-light.jpg"
               dark="/images/product-screens/meeting-pulse-station-sharing-viewers-dark.jpg"
               alt="Meeting Pulse Station showing the private viewers list"
-              caption="The owner controls who has a viewer."
+              caption="The host controls who has a viewer."
             />
           </div>
         </article>
         <article class="workflow-step">
           <span class="workflow-step__index">03</span>
           <div class="workflow-step__copy">
-            <h3>Check from a browser</h3>
+            <h3>See if you're free</h3>
             <p>
-              A paired person opens a private link on a phone or laptop and
-              reads the current state without an account.
+              They open the private link on their phone or laptop. No account,
+              no app, no setup on their end.
             </p>
           </div>
           <div class="workflow-step__visual">
             <ScreenshotFigure
               light="/images/product-screens/meeting-pulse-viewer-meeting-named-light.jpg"
               dark="/images/product-screens/meeting-pulse-viewer-meeting-named-dark.jpg"
-              alt="Meeting Pulse viewer showing an owner in a meeting"
-              caption="The viewer is built for one quick glance."
+              alt="Meeting Pulse viewer showing a host in a meeting"
+              caption="The guest page is built for one quick glance."
               width={1280}
               height={577}
             />
@@ -162,10 +163,10 @@ const schemas = [
         <article class="workflow-step">
           <span class="workflow-step__index">04</span>
           <div class="workflow-step__copy">
-            <h3>Respect unavailable</h3>
+            <h3>Say when you don't know</h3>
             <p>
-              If a signal is stale, uncertain, offline, or revoked, Meeting
-              Pulse says so. It does not turn uncertainty into “available.”
+              If the signal is stale, offline, or revoked, the page says
+              "unavailable" plainly. It never turns uncertainty into "available."
             </p>
           </div>
           <div class="workflow-step__visual">
@@ -188,7 +189,7 @@ const schemas = [
           <p class="eyebrow">Privacy by boundary</p>
           <h2>Permission for detection. Restraint for everything else.</h2>
           <p class="lede">
-            Accessibility access lets the owner app understand supported call
+            Accessibility access lets the host app understand supported call
             states. It does not turn Meeting Pulse into a window on the meeting.
           </p>
         </div>
@@ -208,7 +209,7 @@ const schemas = [
           <h2>Useful before it becomes another system to manage.</h2>
         </div>
         <p>
-          Keep the owner’s status close to the Mac. Give the viewer one link.
+          Keep the host’s status close to the Mac. Give the guest one link.
           When the signal is missing, say that plainly and let the person
           choose what to do next.
         </p>
@@ -245,7 +246,7 @@ const schemas = [
           <p>
             Open the live viewer in a browser tab. It loads without an account,
             reads the current state, and shows unavailable plainly when the
-            owner’s signal is missing.
+            host’s signal is missing.
           </p>
         </div>
         <div class="button-row">
@@ -262,7 +263,7 @@ const schemas = [
         <p class="callout" style="margin-top: var(--space-xl)">
           <strong>The viewer link is private.</strong>
           <span>
-            It only opens for a paired viewer. Pairing happens inside the owner
+            It only opens for a paired viewer. Pairing happens inside the host
             app on macOS.
           </span>
         </p>
