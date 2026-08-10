@@ -77,7 +77,11 @@ open-source distribution.
 
 ### Release assets
 
-The assets below were rebuilt from commit `4e3c2e5`:
+The macOS app assets were rebuilt from commit `4e3c2e5` and verified against
+the current `41160d3` tree. No Swift, build, or asset-producing source has
+changed since the build, so the published DMGs remain the latest macOS app
+artifacts. The two intervening commits (`a11dea8`, `41160d3`) only update the
+landing-site copy, social preview image, and design documentation.
 
 | Architecture | Downloadable asset | SHA-256 |
 |---|---|---|

@@ -48,7 +48,11 @@ build/dmg/Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg
 build/dmg/Meeting-Pulse-0.0.2-Intel-x86_64.dmg
 ```
 
-The refreshed `0.0.2` assets built from commit `4e3c2e5` are:
+The macOS app assets were rebuilt from commit `4e3c2e5` and verified against
+the current `41160d3` tree. No Swift, build, or asset-producing source has
+changed since the build, so the published DMGs remain the latest macOS app
+artifacts. The two intervening commits (`a11dea8`, `41160d3`) only update the
+landing-site copy, social preview image, and design documentation.
 
 | Architecture | File | SHA-256 |
 |---|---|---|
