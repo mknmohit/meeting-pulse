@@ -48,12 +48,12 @@ build/dmg/Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg
 build/dmg/Meeting-Pulse-0.0.2-Intel-x86_64.dmg
 ```
 
-The refreshed `0.0.2` assets built from commit `386f7a3` are:
+The refreshed `0.0.2` assets built from commit `4e3c2e5` are:
 
 | Architecture | File | SHA-256 |
 |---|---|---|
-| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg` | `beb906b88ef381d5ec606f806754ec778feaf809d1b7bc448e9ed7b7db667997` |
-| Intel (`x86_64`) | `Meeting-Pulse-0.0.2-Intel-x86_64.dmg` | `32785acc97637360cce0063ffd504f6848227ab0813c323bcb9aee9ff4df1d1e` |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg` | `a7a0cb0eb1fdd1d1142bfd0ed591284402dd7455ef4387e5a981aaaa4cd48bb2` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.2-Intel-x86_64.dmg` | `cedd53cb1975ef49e212402a8a14c45a52f9b849f51fa8365833fe5f237bfe2c` |
 
 Both assets pass `hdiutil verify` and contain only their named target
 architecture.
