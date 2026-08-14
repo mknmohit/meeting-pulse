@@ -68,6 +68,65 @@ struct PairingRecoveryTests {
     #expect(secrets.values[.deviceID] != nil)
     #expect(secrets.values[.deviceInstanceNonce] != nil)
   }
+
+  @Test
+  func storedRecoveryPhraseRebindsAfterRecoveryHashConflict() async throws {
+    let transport = FakeTransport()
+    transport.shouldThrowRecoveryHashConflict = true
+    let secrets = InMemorySecrets()
+    let rawPhrase = String(repeating: "A", count: RecoveryPhraseFormat.length)
+    try secrets.save(
+      Data(rawPhrase.utf8),
+      for: .deviceRecoveryPhrase
+    )
+    let service = RecoveryService(transport: transport, secrets: secrets)
+
+    let registration = try await service.registerStoredDevice()
+
+    #expect(registration == transport.registration)
+    #expect(transport.reboundSecret == rawPhrase)
+    #expect(secrets.values[.deviceID] != nil)
+    #expect(secrets.values[.deviceInstanceNonce] != nil)
+  }
+
+  @Test
+  func recoveryHashConflictMatcherRequiresTheExpectedPostgresError() {
+    #expect(
+      SupabaseStatusTransport.isRecoveryHashConflict(
+        code: "23505",
+        message: #"duplicate key value violates unique constraint "devices_recovery_hash_key""#
+      )
+    )
+    #expect(
+      !SupabaseStatusTransport.isRecoveryHashConflict(
+        code: "23505",
+        message: #"duplicate key value violates unique constraint "devices_one_active_per_owner""#
+      )
+    )
+    #expect(
+      !SupabaseStatusTransport.isRecoveryHashConflict(
+        code: "23503",
+        message: #"duplicate key value violates unique constraint "devices_recovery_hash_key""#
+      )
+    )
+  }
+
+  @Test
+  func rebindResponseAcceptsTheSuccessfulRpcShape() throws {
+    let deviceID = "00000000-0000-0000-0000-000000000001"
+    let instanceNonce = "00000000-0000-0000-0000-000000000002"
+    let data = Data(
+      """
+      {"device_id":"\(deviceID)","instance_nonce":"\(instanceNonce)"}
+      """.utf8
+    )
+
+    let response = try JSONDecoder().decode(RebindResponse.self, from: data)
+
+    #expect(response.ok == nil)
+    #expect(response.deviceID == UUID(uuidString: deviceID))
+    #expect(response.instanceNonce == UUID(uuidString: instanceNonce))
+  }
 }
 
 private final class FakeTransport: StatusTransport, @unchecked Sendable {
@@ -76,11 +135,16 @@ private final class FakeTransport: StatusTransport, @unchecked Sendable {
     instanceNonce: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
   )
   var createdPairingHash: String?
+  var shouldThrowRecoveryHashConflict = false
+  var reboundSecret: String?
 
   func ensureSession() async throws {}
 
   func registerDevice(recoveryHash: String) async throws -> DeviceRegistration {
-    registration
+    if shouldThrowRecoveryHashConflict {
+      throw SupabaseStatusTransport.TransportError.recoveryHashConflict
+    }
+    return registration
   }
 
   func publish(_: StatusPayload, nonce: UUID) async throws -> PublishResult {
@@ -99,7 +163,10 @@ private final class FakeTransport: StatusTransport, @unchecked Sendable {
   func revokeViewer(_: UUID) async throws {}
   func deleteViewer(_: UUID) async throws {}
   func revokeAllViewers() async throws -> Int { 0 }
-  func rebindDevice(recoverySecret: String) async throws -> DeviceRegistration { registration }
+  func rebindDevice(recoverySecret: String) async throws -> DeviceRegistration {
+    reboundSecret = recoverySecret
+    return registration
+  }
   func deleteDevice() async throws {}
 }
 

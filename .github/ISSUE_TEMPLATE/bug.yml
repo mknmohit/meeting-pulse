@@ -67,4 +67,4 @@ body:
     type: input
     attributes:
       label: Environment
-      placeholder: macOS 14.6, Xcode 16.2, build 0.0.2
+      placeholder: macOS 14.6, Xcode 16.2, build 0.0.3

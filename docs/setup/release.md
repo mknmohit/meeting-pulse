@@ -36,7 +36,7 @@ toolchain supports the requested target. They:
 - disable testability and debug-information generation;
 - strip the installed product and dead code;
 - add no analytics or telemetry to the release build;
-- patch the built bundle to version `0.0.2` and build `1`;
+- patch the built bundle to version `0.0.3` and build `1`;
 - ad-hoc sign and verify the app;
 - create and verify a compressed DMG; and
 - replace `/Applications/Meeting Pulse.app` only after all checks pass.
@@ -44,20 +44,17 @@ toolchain supports the requested target. They:
 The assets are:
 
 ```text
-build/dmg/Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg
-build/dmg/Meeting-Pulse-0.0.2-Intel-x86_64.dmg
+build/dmg/Meeting-Pulse-0.0.3-Apple-Silicon-arm64.dmg
+build/dmg/Meeting-Pulse-0.0.3-Intel-x86_64.dmg
 ```
 
-The macOS app assets were rebuilt from commit `4e3c2e5` and verified against
-the current `41160d3` tree. No Swift, build, or asset-producing source has
-changed since the build, so the published DMGs remain the latest macOS app
-artifacts. The two intervening commits (`a11dea8`, `41160d3`) only update the
-landing-site copy, social preview image, and design documentation.
+The 0.0.3 macOS app assets were built from the release tree after the recovery
+startup fix and verified before publication.
 
 | Architecture | File | SHA-256 |
 |---|---|---|
-| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg` | `a7a0cb0eb1fdd1d1142bfd0ed591284402dd7455ef4387e5a981aaaa4cd48bb2` |
-| Intel (`x86_64`) | `Meeting-Pulse-0.0.2-Intel-x86_64.dmg` | `cedd53cb1975ef49e212402a8a14c45a52f9b849f51fa8365833fe5f237bfe2c` |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.3-Apple-Silicon-arm64.dmg` | `4f8b85afc7586989349c07fc01e86467b904e38014b8e6663c179c44cd17742c` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.3-Intel-x86_64.dmg` | `c1ac17730325d1d2eb2b7723d7905fbf7a5b768a72bb95d46d0dffda2669cf8b` |
 
 Both assets pass `hdiutil verify` and contain only their named target
 architecture.
@@ -79,20 +76,19 @@ xattr -dr com.apple.quarantine "/Applications/Meeting Pulse.app"
 
 Do not describe these artifacts as notarized or trusted releases.
 
-## Draft GitHub release
+## GitHub release
 
-The draft `v0.0.2` release uses the current committed `HEAD`, not uncommitted
+The `v0.0.3` release uses the current committed `HEAD`, not uncommitted
 working-tree changes. After building and verifying both assets, a maintainer
 can create it with:
 
 ```sh
-gh release create v0.0.2 \
-  --draft \
+gh release create v0.0.3 \
   --target HEAD \
-  --title "Meeting Pulse 0.0.2" \
+  --title "Meeting Pulse 0.0.3" \
   --notes-file CHANGELOG.md \
-  build/dmg/Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg \
-  build/dmg/Meeting-Pulse-0.0.2-Intel-x86_64.dmg
+  build/dmg/Meeting-Pulse-0.0.3-Apple-Silicon-arm64.dmg \
+  build/dmg/Meeting-Pulse-0.0.3-Intel-x86_64.dmg
 ```
 
 The release notes must retain the ad-hoc/no-notarization warning.

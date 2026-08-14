@@ -7,6 +7,7 @@ import PostgREST
 public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable {
   public enum TransportError: Error, Equatable, Sendable {
     case identityLost
+    case recoveryHashConflict
     case invalidRemoteResponse
     case remoteFailure(String)
   }
@@ -60,6 +61,9 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
         .single()
         .execute()
         .value
+    } catch let error as PostgrestError
+      where Self.isRecoveryHashConflict(code: error.code, message: error.message) {
+      throw TransportError.recoveryHashConflict
     } catch let error as PostgrestError where error.code == "23503" {
       throw TransportError.identityLost
     }
@@ -67,6 +71,10 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
       deviceID: response.deviceID,
       instanceNonce: response.instanceNonce
     )
+  }
+
+  static func isRecoveryHashConflict(code: String?, message: String) -> Bool {
+    code == "23505" && message.contains("devices_recovery_hash_key")
   }
 
   public func publish(_ payload: StatusPayload, nonce: UUID) async throws -> PublishResult {
@@ -145,7 +153,9 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
       .single()
       .execute()
       .value
-    guard response.ok, let deviceID = response.deviceID, let instanceNonce = response.instanceNonce
+    guard response.ok != false,
+      let deviceID = response.deviceID,
+      let instanceNonce = response.instanceNonce
     else {
       throw TransportError.remoteFailure(response.reason ?? "rebind_failed")
     }
@@ -312,8 +322,8 @@ private struct PublishResponse: Decodable {
   }
 }
 
-private struct RebindResponse: Decodable {
-  let ok: Bool
+struct RebindResponse: Decodable {
+  let ok: Bool?
   let reason: String?
   let deviceID: UUID?
   let instanceNonce: UUID?

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.0.3 - 2026-08-14
+
+Recovery startup hardening for anonymous auth identity changes.
+
+### macOS app
+
+- Detects the exact duplicate recovery-hash conflict caused when a stored
+  device is started with a replacement anonymous auth session.
+- Automatically uses the protected recovery rebind flow so the existing device
+  and viewer links are preserved.
+- Accepts the actual successful `rebind_device` response shape while still
+  requiring both returned device identifiers.
+
+### Tests and distribution
+
+- Adds regression coverage for duplicate recovery registration and successful
+  rebind response decoding.
+- Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts
+  are not notarized and require Finder's one-time Open action on a fresh Mac.
+
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+|---|---|---|
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.3-Apple-Silicon-arm64.dmg` | `4f8b85afc7586989349c07fc01e86467b904e38014b8e6663c179c44cd17742c` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.3-Intel-x86_64.dmg` | `c1ac17730325d1d2eb2b7723d7905fbf7a5b768a72bb95d46d0dffda2669cf8b` |
+
 ## 0.0.2 - 2026-08-10
 
 Cross-desktop meeting detection, detection reliability hardening, and the

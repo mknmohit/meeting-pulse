@@ -47,8 +47,8 @@ succeeds.
 The DMGs are written to:
 
 ```text
-build/dmg/Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg
-build/dmg/Meeting-Pulse-0.0.2-Intel-x86_64.dmg
+build/dmg/Meeting-Pulse-0.0.3-Apple-Silicon-arm64.dmg
+build/dmg/Meeting-Pulse-0.0.3-Intel-x86_64.dmg
 ```
 
 To create an artifact without replacing the installed app:

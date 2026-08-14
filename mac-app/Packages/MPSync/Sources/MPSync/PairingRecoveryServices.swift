@@ -134,11 +134,16 @@ public struct RecoveryService: Sendable {
       guard normalized.count == RecoveryPhraseFormat.length else {
         throw RecoveryServiceError.invalidStoredPhrase
       }
-      let registration = try await transport.registerDevice(
-        recoveryHash: CrockfordBase32.sha256Hex(normalized)
-      )
-      try save(registration)
-      return registration
+      do {
+        let registration = try await transport.registerDevice(
+          recoveryHash: CrockfordBase32.sha256Hex(normalized)
+        )
+        try save(registration)
+        return registration
+      } catch let error as SupabaseStatusTransport.TransportError
+        where error == .recoveryHashConflict {
+        return try await rebindDevice(recoverySecret: rawPhrase)
+      }
     }
   }
 
