@@ -23,7 +23,13 @@ private func matchesAXText(_ value: String?, _ candidates: Set<String>) -> Bool 
 private enum AXLabels {
   static let callControls: Set<String> = ["call controls"]
   static let leaveCall: Set<String> = ["leave call"]
-  static let shareScreen: Set<String> = ["share screen"]
+  static let presentationControls: Set<String> = [
+    "share screen",
+    "share your screen",
+    "present now",
+    "stop presenting",
+  ]
+  static let presentingSuffix = " is presenting"
   static let huddleActions: Set<String> = ["huddle window actions", "huddles actions"]
   static let leaveHuddle: Set<String> = ["leave huddle"]
 }
@@ -33,6 +39,15 @@ private func tabLabel(_ node: AXNode) -> String? {
     return description
   }
   return node.title
+}
+
+private func isPresentationControl(_ value: String?) -> Bool {
+  let normalized = normalizedAXText(value)
+  guard !normalized.isEmpty else {
+    return false
+  }
+  return AXLabels.presentationControls.contains(normalized)
+    || normalized.hasSuffix(AXLabels.presentingSuffix)
 }
 
 public enum MeetSelectors {
@@ -50,7 +65,7 @@ public enum MeetSelectors {
   public static func hasCallControls(_ node: AXNode) -> Bool {
     var hasRegion = false
     var hasLeave = false
-    var hasShare = false
+    var hasPresentationControl = false
     node.forEachDescendant { child in
       if child.role == "AXGroup"
         && child.subrole == "AXLandmarkRegion"
@@ -68,11 +83,11 @@ public enum MeetSelectors {
       if matchesAXText(child.description, AXLabels.leaveCall) {
         hasLeave = true
       }
-      if matchesAXText(child.description, AXLabels.shareScreen) {
-        hasShare = true
+      if isPresentationControl(child.description) {
+        hasPresentationControl = true
       }
     }
-    return hasRegion && hasLeave && hasShare
+    return hasRegion && hasLeave && hasPresentationControl
   }
 
   public static func tabEntries(in snapshot: AXSnapshot) -> [AXNode] {

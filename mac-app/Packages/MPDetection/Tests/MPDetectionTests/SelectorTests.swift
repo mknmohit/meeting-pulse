@@ -21,6 +21,47 @@ struct SelectorTests {
   }
 
   @Test
+  func meetAcceptsKnownPresentationControlLabels() {
+    for label in ["Share screen", "Share your screen", "Present now", "Stop presenting"] {
+      #expect(
+        MeetSelectors.strongAnchors(
+          in: meetSnapshot(presentationDescription: label),
+          confirmedAt: now
+        ).count == 1
+      )
+    }
+  }
+
+  @Test
+  func meetAcceptsDynamicPresenterStatusLabel() {
+    let snapshot = meetSnapshot(presentationDescription: "A presenter is presenting")
+
+    #expect(
+      MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).count == 1
+    )
+  }
+
+  @Test
+  func meetNormalizesPresentationLabels() {
+    let snapshot = meetSnapshot(
+      presentationDescription: "  SHARE   YOUR   SCREEN  "
+    )
+
+    #expect(
+      MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).count == 1
+    )
+  }
+
+  @Test
+  func meetDoesNotConfirmWithLeaveCallOnly() {
+    let snapshot = meetSnapshot(presentationDescription: nil)
+
+    #expect(
+      MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).isEmpty
+    )
+  }
+
+  @Test
   func meetTabLivenessSurvivesBackgroundedWebArea() {
     let snapshot = meetBackgroundSnapshot()
     let anchor = MeetLatch.Anchor(
@@ -69,17 +110,18 @@ struct SelectorTests {
 
 private let now = ContinuousClock().now
 
-private func meetSnapshot(includeControls: Bool) -> AXSnapshot {
-  let controls: [AXNode] =
-    includeControls
-    ? [
-      node(
-        role: "AXGroup", subrole: "AXLandmarkRegion", roleDescription: "region",
-        description: "Call controls"),
-      node(role: "AXButton", roleDescription: "button", description: "Leave call"),
-      node(role: "AXButton", roleDescription: "button", description: "Share screen"),
-    ]
-    : []
+private func meetSnapshot(presentationDescription: String?) -> AXSnapshot {
+  var controls: [AXNode] = [
+    node(
+      role: "AXGroup", subrole: "AXLandmarkRegion", roleDescription: "region",
+      description: "Call controls"),
+    node(role: "AXButton", roleDescription: "button", description: "Leave call"),
+  ]
+  if let presentationDescription {
+    controls.append(
+      node(role: "AXButton", roleDescription: "button", description: presentationDescription)
+    )
+  }
   let webArea = node(
     role: "AXWebArea",
     roleDescription: "HTML content",
@@ -95,6 +137,10 @@ private func meetSnapshot(includeControls: Bool) -> AXSnapshot {
     windowID: 7
   )
   return snapshot(children: [node(role: "AXWindow", windowID: 7, children: [webArea, tab])])
+}
+
+private func meetSnapshot(includeControls: Bool) -> AXSnapshot {
+  meetSnapshot(presentationDescription: includeControls ? "Share screen" : nil)
 }
 
 private func meetBackgroundSnapshot() -> AXSnapshot {

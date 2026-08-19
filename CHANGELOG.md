@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.0.4 - 2026-08-19
+
+Google Meet detection compatibility fix for calls where another participant is
+presenting.
+
+### macOS app
+
+- Recognizes Meet's presenter-status Accessibility control and known present or
+  share labels instead of requiring the exact `Share screen` label.
+- Retains the existing call-controls and `Leave call` confirmation requirements
+  so tab-only or title-only matches are still rejected.
+- Adds regression coverage for presenter-status, presentation-label variants,
+  normalization, and the leave-call-only negative case.
+
+### Privacy and distribution
+
+- No new permissions or privacy surface. Presentation labels are processed only
+  in memory and are never published, logged, or synchronized.
+- Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts are
+  not notarized and require Finder's one-time Open action on a fresh Mac.
+
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+|---|---|---|
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.4-Apple-Silicon-arm64.dmg` | `4e5dd0c0b00a8f1e622e6f779878823e53760cab25a9137077e469ed2efd2058` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.4-Intel-x86_64.dmg` | `2f2f0e86421defee718e7ab7fa32ce929cb2ca2c4aa1137f7a16e8bac30a5a13` |
+
 ## 0.0.3 - 2026-08-14
 
 Recovery startup hardening for anonymous auth identity changes.
