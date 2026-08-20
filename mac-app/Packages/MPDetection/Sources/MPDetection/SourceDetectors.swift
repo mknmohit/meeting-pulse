@@ -397,9 +397,7 @@ public actor SlackHuddleDetector: MeetingDetector {
     )
     publish(
       latch.apply(
-        evidence,
-        now: now,
-        maxLatchDuration: .seconds(14_400)
+        evidence
       ),
       health: sample.health
     )

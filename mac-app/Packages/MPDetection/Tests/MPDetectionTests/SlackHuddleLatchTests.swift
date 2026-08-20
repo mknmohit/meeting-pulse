@@ -14,9 +14,7 @@ struct SlackHuddleLatchTests {
         scanCompleted: true,
         huddleWindowPresent: true,
         confirmedSessions: [anchor]
-      ),
-      now: now,
-      maxLatchDuration: .seconds(14_400)
+      )
     )
 
     #expect(result == .active)
@@ -33,9 +31,7 @@ struct SlackHuddleLatchTests {
         scanCompleted: true,
         huddleWindowPresent: true,
         confirmedSessions: [anchor]
-      ),
-      now: now,
-      maxLatchDuration: .seconds(14_400)
+      )
     )
 
     let result = latch.apply(
@@ -45,9 +41,7 @@ struct SlackHuddleLatchTests {
         huddleWindowPresent: false,
         confirmedSessions: [],
         visibility: .transitionGrace
-      ),
-      now: now.advanced(by: .seconds(5)),
-      maxLatchDuration: .seconds(14_400)
+      )
     )
 
     #expect(result == .active)
@@ -64,20 +58,16 @@ struct SlackHuddleLatchTests {
         scanCompleted: true,
         huddleWindowPresent: true,
         confirmedSessions: [anchor]
-      ),
-      now: now,
-      maxLatchDuration: .seconds(14_400)
+      )
     )
 
     let result = latch.apply(
       .init(
         slackRunning: true,
         scanCompleted: true,
-        huddleWindowPresent: true,
+        huddleWindowPresent: false,
         confirmedSessions: []
-      ),
-      now: now.advanced(by: .seconds(5)),
-      maxLatchDuration: .seconds(14_400)
+      )
     )
 
     #expect(result == .inactive)
@@ -85,7 +75,34 @@ struct SlackHuddleLatchTests {
   }
 
   @Test
-  func expiredSpaceVisibilityBecomesUnknown() {
+  func longRunningHuddleRemainsActiveWithoutLatchExpiry() {
+    var latch = SlackHuddleLatch()
+    let anchor = anchor(at: now.advanced(by: .seconds(-14_401)))
+    _ = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: true,
+        confirmedSessions: [anchor]
+      )
+    )
+
+    let result = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: true,
+        confirmedSessions: [],
+        visibility: .authoritative
+      )
+    )
+
+    #expect(result == .active)
+    #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
+  func unavailableScanPreservesActiveHuddle() {
     var latch = SlackHuddleLatch()
     let anchor = anchor(at: now)
     _ = latch.apply(
@@ -94,24 +111,46 @@ struct SlackHuddleLatchTests {
         scanCompleted: true,
         huddleWindowPresent: true,
         confirmedSessions: [anchor]
-      ),
-      now: now,
-      maxLatchDuration: .seconds(14_400)
+      )
+    )
+
+    let result = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: false,
+        huddleWindowPresent: false,
+        confirmedSessions: [],
+        visibility: .unavailable
+      )
+    )
+
+    #expect(result == .active)
+    #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
+  func huddleWindowWithoutControlsPreservesActiveHuddle() {
+    var latch = SlackHuddleLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: true,
+        confirmedSessions: [anchor]
+      )
     )
 
     let result = latch.apply(
       .init(
         slackRunning: true,
         scanCompleted: true,
-        huddleWindowPresent: false,
-        confirmedSessions: [],
-        visibility: .unavailable
-      ),
-      now: now.advanced(by: .seconds(30)),
-      maxLatchDuration: .seconds(14_400)
+        huddleWindowPresent: true,
+        confirmedSessions: []
+      )
     )
 
-    #expect(result == .unknown)
+    #expect(result == .active)
     #expect(latch.activeAnchors == [anchor])
   }
 
@@ -125,9 +164,7 @@ struct SlackHuddleLatchTests {
         scanCompleted: true,
         huddleWindowPresent: true,
         confirmedSessions: [anchor]
-      ),
-      now: now,
-      maxLatchDuration: .seconds(14_400)
+      )
     )
 
     let result = latch.apply(
@@ -136,9 +173,7 @@ struct SlackHuddleLatchTests {
         scanCompleted: true,
         huddleWindowPresent: false,
         confirmedSessions: []
-      ),
-      now: now.advanced(by: .seconds(5)),
-      maxLatchDuration: .seconds(14_400)
+      )
     )
 
     #expect(result == .sourceAbsent)

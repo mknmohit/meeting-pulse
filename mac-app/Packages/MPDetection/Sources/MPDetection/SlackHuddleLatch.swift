@@ -48,10 +48,17 @@ public struct SlackHuddleLatch: Sendable {
     anchors
   }
 
+  // Preserve the previous call signature while ignoring the Meet-only expiry.
   public mutating func apply(
     _ evidence: Evidence,
-    now: ContinuousClock.Instant,
-    maxLatchDuration: Duration
+    now _: ContinuousClock.Instant,
+    maxLatchDuration _: Duration
+  ) -> SourceObservation {
+    apply(evidence)
+  }
+
+  public mutating func apply(
+    _ evidence: Evidence
   ) -> SourceObservation {
     if anchors.isEmpty {
       guard evidence.slackRunning else {
@@ -72,13 +79,6 @@ public struct SlackHuddleLatch: Sendable {
       return .sourceAbsent
     }
 
-    if anchors.contains(where: {
-      now >= $0.confirmedAt.advanced(by: maxLatchDuration)
-    }) {
-      anchors.removeAll()
-      return .unknown
-    }
-
     if !evidence.confirmedSessions.isEmpty {
       anchors = evidence.confirmedSessions
       return .active
@@ -88,13 +88,17 @@ public struct SlackHuddleLatch: Sendable {
     case .transitionGrace, .recreationGrace:
       return .active
     case .unavailable:
-      return .unknown
+      return .active
     case .authoritative:
       break
     }
 
     if !evidence.scanCompleted {
-      return .unknown
+      return .active
+    }
+
+    if evidence.huddleWindowPresent {
+      return .active
     }
 
     anchors.removeAll()

@@ -436,9 +436,15 @@ SAFETY VALVE
 2. Inspect the Slack window and relevant AX descendants.
 3. Confirm a live Huddle through a stable huddle-specific state, a dedicated huddle window, or a leave control.
 4. **Never** treat Slack being open, focused, active, or recently used as a Huddle.
-5. Detect end when the huddle-specific state and leave control disappear, or Slack exits.
-6. Any AX error or unrecognized structure → `unknown`.
-
+5. Detect end when an authoritative scan confirms that the dedicated Huddle
+   window is gone after recreation grace, or Slack exits.
+6. Before a Huddle is confirmed, any AX error or unrecognized structure →
+   `unknown`.
+7. After confirmation, the dedicated Huddle window is liveness evidence. The
+   Slack latch has no elapsed-time expiry; temporary control or AX-scan gaps
+   preserve `active`, and release requires authoritative end evidence after
+   recreation grace. The Meet latch's `maxLatchDuration` safety valve does not
+   apply to Slack Huddles.
 Slack is an Electron app, so AX exposure may be less stable than a native UI. **Spike S2** is a hard gate with the same discipline as S1; if no reliable signal exists, the detector must surface `unknown` and Slack becomes manual-only. Slack often uses a **separate huddle window**, which is usually more observable than in-tab content — check this first in S2.
 
 ### 7.5 Environment observation — **NEW (audit B13)**

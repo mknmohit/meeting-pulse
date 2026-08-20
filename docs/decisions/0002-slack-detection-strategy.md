@@ -56,8 +56,10 @@ that was not observed.
 
 ## Conservative boundaries
 
-The detector emits `.unknown` if the dedicated Huddle window or leave control
-cannot be read. It never treats an open, focused, minimized, or recently used
-Slack window as a Huddle. If a future Slack release removes the dedicated
-window signal, Slack becomes manual-only until another empirical spike finds a
-replacement.
+Before confirmation, an unreadable dedicated Huddle window or leave control
+produces `.unknown`. After confirmation, a readable dedicated window is
+liveness evidence, so a temporary control or AX-scan gap preserves `.active`
+until positive end evidence arrives. The detector never treats an open,
+focused, minimized, or recently used Slack window as a Huddle. If a future
+Slack release removes the dedicated window signal, Slack becomes manual-only
+until another empirical spike finds a replacement.

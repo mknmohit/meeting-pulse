@@ -99,7 +99,28 @@ struct DetectorTests {
 
     clock.advance(by: .seconds(21))
     await detector.requestSample()
-    #expect(await detector.currentObservation == .unknown)
+    #expect(await detector.currentObservation == .active)
+  }
+
+  @Test
+  func longRunningSlackHuddleRemainsActiveWhenControlsAreTemporarilyMissing() async {
+    let clock = TestMonotonic()
+    let detector = SlackHuddleDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        slackSnapshot(active: true),
+        slackSnapshot(windowPresent: true, controlsPresent: false),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
+    clock.advance(by: .seconds(14_401))
+    await detector.requestSample()
+
+    #expect(await detector.currentObservation == .active)
   }
 
   @Test
@@ -225,16 +246,26 @@ private func meetSnapshot(active: Bool) -> AXSnapshot {
 }
 
 private func slackSnapshot(active: Bool) -> AXSnapshot {
+  slackSnapshot(windowPresent: active, controlsPresent: active)
+}
+
+private func slackSnapshot(
+  windowPresent: Bool,
+  controlsPresent: Bool
+) -> AXSnapshot {
   let huddleChildren: [AXNode] =
-    active
+    windowPresent
     ? [
       node(role: "AXWebArea", title: "Huddle: test", windowID: 8),
-      node(role: "AXToolbar", description: "Huddle window actions"),
-      node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
-    ]
+    ] + (controlsPresent
+      ? [
+        node(role: "AXToolbar", description: "Huddle window actions"),
+        node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
+      ]
+      : [])
     : []
   let windows: [AXNode] =
-    active
+    windowPresent
     ? [
       node(
         role: "AXWindow",

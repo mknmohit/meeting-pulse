@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.0.5 - 2026-08-20
+
+Slack Huddle long-call detection fix.
+
+### macOS app
+
+- Keeps a confirmed Slack Huddle busy for its full duration instead of
+  expiring the detector latch after four hours.
+- Preserves the busy state through temporary Accessibility control and scan
+  gaps, while still releasing after authoritative Huddle end evidence.
+- Keeps the existing `In a meeting` menu-bar copy and Google Meet safety-valve
+  behavior unchanged.
+
+### Privacy and distribution
+
+- No new permissions, network requests, or privacy surface.
+- Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts
+  are not notarized and require Finder's one-time Open action on a fresh Mac.
+
 ## 0.0.4 - 2026-08-19
 
 Google Meet detection compatibility fix for calls where another participant is
