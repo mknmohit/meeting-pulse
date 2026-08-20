@@ -19,6 +19,13 @@ Slack Huddle long-call detection fix.
 - Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts
   are not notarized and require Finder's one-time Open action on a fresh Mac.
 
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+|---|---|---|
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.5-Apple-Silicon-arm64.dmg` | `7738b6cd81eb9db6e6982544e0ed995b4293ce6af7621e55895a5c1151e438ba` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.5-Intel-x86_64.dmg` | `7a0f155fc7951bff9f7c7d23ce6ef3c4c8b6b490a11d34f06b5fe722bc5ff3ea` |
+
 ## 0.0.4 - 2026-08-19
 
 Google Meet detection compatibility fix for calls where another participant is

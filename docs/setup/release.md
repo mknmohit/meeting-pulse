@@ -36,7 +36,7 @@ toolchain supports the requested target. They:
 - disable testability and debug-information generation;
 - strip the installed product and dead code;
 - add no analytics or telemetry to the release build;
-- patch the built bundle to version `0.0.4` and build `1`;
+- patch the built bundle to version `0.0.5` and build `1`;
 - ad-hoc sign and verify the app;
 - create and verify a compressed DMG; and
 - replace `/Applications/Meeting Pulse.app` only after all checks pass.
@@ -44,17 +44,17 @@ toolchain supports the requested target. They:
 The assets are:
 
 ```text
-build/dmg/Meeting-Pulse-0.0.4-Apple-Silicon-arm64.dmg
-build/dmg/Meeting-Pulse-0.0.4-Intel-x86_64.dmg
+build/dmg/Meeting-Pulse-0.0.5-Apple-Silicon-arm64.dmg
+build/dmg/Meeting-Pulse-0.0.5-Intel-x86_64.dmg
 ```
 
-The 0.0.4 macOS app assets were built from the release tree after the Google
-Meet presenting-control detection fix and verified before publication.
+The 0.0.5 macOS app assets were built from the release tree after the Slack
+Huddle long-call status fix and verified before publication.
 
 | Architecture | File | SHA-256 |
 |---|---|---|
-| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.4-Apple-Silicon-arm64.dmg` | `4e5dd0c0b00a8f1e622e6f779878823e53760cab25a9137077e469ed2efd2058` |
-| Intel (`x86_64`) | `Meeting-Pulse-0.0.4-Intel-x86_64.dmg` | `2f2f0e86421defee718e7ab7fa32ce929cb2ca2c4aa1137f7a16e8bac30a5a13` |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.5-Apple-Silicon-arm64.dmg` | `7738b6cd81eb9db6e6982544e0ed995b4293ce6af7621e55895a5c1151e438ba` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.5-Intel-x86_64.dmg` | `7a0f155fc7951bff9f7c7d23ce6ef3c4c8b6b490a11d34f06b5fe722bc5ff3ea` |
 
 Both assets pass `hdiutil verify` and contain only their named target
 architecture.
@@ -78,17 +78,17 @@ Do not describe these artifacts as notarized or trusted releases.
 
 ## GitHub release
 
-The `v0.0.4` release uses the current committed `HEAD`, not uncommitted
+The `v0.0.5` release uses the current committed `HEAD`, not uncommitted
 working-tree changes. After building and verifying both assets, a maintainer
 can create it with:
 
 ```sh
-gh release create v0.0.4 \
+gh release create v0.0.5 \
   --target HEAD \
-  --title "Meeting Pulse 0.0.4" \
+  --title "Meeting Pulse 0.0.5" \
   --notes-file CHANGELOG.md \
-  build/dmg/Meeting-Pulse-0.0.4-Apple-Silicon-arm64.dmg \
-  build/dmg/Meeting-Pulse-0.0.4-Intel-x86_64.dmg
+  build/dmg/Meeting-Pulse-0.0.5-Apple-Silicon-arm64.dmg \
+  build/dmg/Meeting-Pulse-0.0.5-Intel-x86_64.dmg
 ```
 
 The release notes must retain the ad-hoc/no-notarization warning.
