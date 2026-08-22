@@ -53,7 +53,7 @@ long-call status fix and verified before publication.
 
 | Architecture | File | SHA-256 |
 |---|---|---|
-| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg` | `8427b72a34715ddb17580250ba9af9a0d7b484a5e126f2b3d3d04fee0b0143f0` |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg` | `73e378bffb0102962086ee19df96ba64a2aed177bef1a70c48899b3f72b6a591` |
 | Intel (`x86_64`) | `Meeting-Pulse-0.0.6-Intel-x86_64.dmg` | `8f89de46dc3194d600940ac28352a01dc9339e80170446e5336484d57fce647a` |
 
 Both assets pass `hdiutil verify` and contain only their named target
