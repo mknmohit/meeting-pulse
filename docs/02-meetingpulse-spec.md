@@ -411,10 +411,11 @@ RELEASE   (latchedActive → releasing → idle)
     R4. Chrome terminates.
   Apply the two-consecutive-sample settle rule (§6.6) before emitting .inactive.
 
-SAFETY VALVE
-  maxLatchDuration (default 4 h, configurable). On expiry the latch releases
-  to .unknown — NOT .inactive — so a wedged latch degrades to
-  "Status unavailable", never to a false "Available".
+TIME-BASED EXPIRY
+  The rung-2 Meet latch has no elapsed-time cutoff. A confirmed session remains
+  active while its anchored Chrome window and tab can be verified. If that
+  evidence cannot be verified, the latch emits .unknown — NOT .inactive — so
+  uncertainty degrades to "Status unavailable", never to a false "Available".
 ```
 
 **Optional corroboration (Phase 1.5, off by default).** A CoreAudio "input device in use" check may *strengthen* the latch (it can extend maintenance) but may **never** create a latch on its own and may never be the sole basis for `active`. It reads a boolean device-in-use flag only — no audio is captured, buffered, or analysed. Requires no permission. Ship it disabled behind `enableAudioCorroboration`.
@@ -427,7 +428,7 @@ SAFETY VALVE
 **Fallback ladder, in order:**
 1. Q1 = yes → the base algorithm in §7.2 is sufficient; the latch becomes a robustness bonus.
 2. Q1 = no, Q2 = yes → the latched model above ships as designed. **This is the expected outcome.**
-3. Q1 = no, Q2 = no, Q3 = yes → latch maintained on window-level liveness only; `maxLatchDuration` drops to 2 h; accuracy is reduced and this must be stated in the README.
+3. Q1 = no, Q2 = no, Q3 = yes → latch maintained on window-level liveness only; accuracy is reduced and this must be stated in the README. This fallback requires a separate implementation decision and acceptance coverage.
 4. All no → **Google Meet auto-detection is cut from the MVP.** Meet becomes manual-only, the Slack detector ships alone, and the README states the limitation plainly. Do not ship a detector that guesses.
 
 ### 7.4 Slack Huddle detector
@@ -443,8 +444,8 @@ SAFETY VALVE
 7. After confirmation, the dedicated Huddle window is liveness evidence. The
    Slack latch has no elapsed-time expiry; temporary control or AX-scan gaps
    preserve `active`, and release requires authoritative end evidence after
-   recreation grace. The Meet latch's `maxLatchDuration` safety valve does not
-   apply to Slack Huddles.
+   recreation grace. The Meet latch likewise has no production elapsed-time
+   expiry; each detector uses source-specific liveness and end evidence.
 Slack is an Electron app, so AX exposure may be less stable than a native UI. **Spike S2** is a hard gate with the same discipline as S1; if no reliable signal exists, the detector must surface `unknown` and Slack becomes manual-only. Slack often uses a **separate huddle window**, which is usually more observable than in-tab content — check this first in S2.
 
 ### 7.5 Environment observation — **NEW (audit B13)**
@@ -803,7 +804,7 @@ All 16 cells of the §6.4 table · the permission-denied collapse · override bu
 
 Recorded, **sanitized** AX snapshots or test doubles. Never store real meeting content, URLs, titles, or credentials.
 
-Meet pre-join · Meet active call · Meet leave/end · tab closed / navigated away · multiple Chrome windows and tabs · **Meet tab backgrounded (latch maintained)** · **latch released on tab close** · **`maxLatchDuration` expiry → `unknown`, not `inactive`** · Slack open without a Huddle · Slack active Huddle · Huddle end · Slack minimized/background · app not installed · app not running · Accessibility denied · unexpected/missing labels.
+Meet pre-join · Meet active call · Meet leave/end · tab closed / navigated away · multiple Chrome windows and tabs · **Meet tab backgrounded (latch maintained)** · **latch released on tab close** · **Meet active beyond four hours while the anchored tab remains live** · Slack open without a Huddle · Slack active Huddle · Huddle end · Slack minimized/background · app not installed · app not running · Accessibility denied · unexpected/missing labels.
 
 ### 12.3 Integration tests (local or test Supabase project)
 

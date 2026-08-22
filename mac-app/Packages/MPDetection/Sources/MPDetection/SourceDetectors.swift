@@ -144,7 +144,7 @@ public actor GoogleMeetDetector: MeetingDetector {
     let observation = latch.apply(
       evidence,
       now: now,
-      maxLatchDuration: .seconds(14_400)
+      maxLatchDuration: nil
     )
     publish(observation, health: sample.health)
   }

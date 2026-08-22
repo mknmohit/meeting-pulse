@@ -5,20 +5,17 @@ public struct DetectionTuning: Codable, Equatable, Sendable {
   public var idleSampleInterval: Duration
   public var activeSampleInterval: Duration
   public var endSettleCount: Int
-  public var maxLatchDuration: Duration
   public var timerLeeway: Duration
 
   public init(
     idleSampleInterval: Duration = .seconds(20),
     activeSampleInterval: Duration = .seconds(5),
     endSettleCount: Int = 2,
-    maxLatchDuration: Duration = .seconds(14_400),
     timerLeeway: Duration = .milliseconds(500)
   ) {
     self.idleSampleInterval = idleSampleInterval
     self.activeSampleInterval = activeSampleInterval
     self.endSettleCount = max(endSettleCount, 1)
-    self.maxLatchDuration = maxLatchDuration
     self.timerLeeway = timerLeeway
   }
 }

@@ -73,7 +73,7 @@ Apple silicon build:
 ```
 
 Output:
-`build/dmg/Meeting-Pulse-0.0.5-Apple-Silicon-arm64.dmg`
+`build/dmg/Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg`
 
 Intel build:
 
@@ -82,7 +82,7 @@ Intel build:
 ```
 
 Output:
-`build/dmg/Meeting-Pulse-0.0.5-Intel-x86_64.dmg`
+`build/dmg/Meeting-Pulse-0.0.6-Intel-x86_64.dmg`
 
 To build the DMG without replacing the installed app:
 

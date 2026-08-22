@@ -1324,7 +1324,7 @@ Capture each scenario, then answer the questions.
 
 1. **Q1 yes.** The direct algorithm suffices; the latch becomes a robustness bonus.
 2. **Q1 no, Q2 yes.** The latched model ships as designed. This is the expected outcome.
-3. **Q1 no, Q2 no, Q3 yes.** Latch on window-level liveness only, `maxLatchDuration` drops to 2 hours, accuracy is reduced, and the README says so plainly.
+3. **Q1 no, Q2 no, Q3 yes.** Latch on window-level liveness only; accuracy is reduced and the README says so plainly. This fallback requires a separate implementation decision and acceptance coverage.
 4. **All no.** **Google Meet auto-detection is cut.** Meet becomes manual-only, Slack ships alone, the README states the limitation, and spec §3.1 goal 1 is amended. Do not ship a detector that guesses.
 
 **Gate G1 exit criterion:** `docs/decisions/0001-meet-detection-strategy.md` exists, names a ladder rung, lists concrete selector predicates for confirmation and for liveness, names the anchor identity mechanism from Q6, and states PWA support from Q7.
@@ -1658,7 +1658,7 @@ public struct MeetLatch: Sendable {
 
     public mutating func apply(_ e: Evidence,
                                now: ContinuousClock.Instant,
-                               maxLatchDuration: Duration) -> SourceObservation
+                               maxLatchDuration: Duration? = nil) -> SourceObservation
 }
 ```
 
@@ -1676,7 +1676,6 @@ public struct MeetLatch: Sendable {
 | non-∅ | `scanCompleted`, no confirmations, no live anchors | ∅ | `.inactive` |
 | non-∅ | `scanCompleted`, some live anchors, no confirmations | = liveAnchors | `.active` |
 | non-∅ | Chrome not running | ∅ | `.inactive` |
-| non-∅ | oldest anchor older than `maxLatchDuration` | ∅ | **`.unknown`** |
 
 Four rows deserve emphasis.
 
@@ -1686,7 +1685,11 @@ Four rows deserve emphasis.
 
 **Row 8** is defect M16: release requires a complete scan finding nothing, so closing one window while another call runs does not end the session. A second call in another window keeps the latch alive through its own anchor.
 
-**Row 11** is the safety valve. A wedged latch degrades to `unknown`, never to a false `available`. `maxLatchDuration` defaults to 4 hours (ladder rung 2) or 2 hours (rung 3), from the G1 decision.
+The production Meet latch has no elapsed-time expiry. If a caller explicitly
+supplies an optional duration, expiration still degrades to `unknown`, never
+to a false `available`; Google Meet does not supply one. This keeps the policy
+available for isolated tests or a future detector decision without imposing a
+four-hour cutoff on active calls.
 
 **The latch does not settle.** It emits raw observations. Settling happens once, in the scheduler (defect M15).
 
@@ -1727,7 +1730,6 @@ public struct Tuning: Sendable, Codable {
     var idleSampleInterval: Duration   = .seconds(20)
     var activeSampleInterval: Duration = .seconds(5)
     var endSettleCount: Int            = 2
-    var maxLatchDuration: Duration     = .seconds(14400)
     var timerLeeway: Duration          = .milliseconds(500)
 }
 ```
@@ -1759,7 +1761,9 @@ Fixture-driven, using all five injected seams. These are the non-negotiable core
 
 1. `meet-active-bgtab` and `meet-active-appbg` yield **`.active`**. This is the entire point of Phase 1.
 2. `meet-closed` yields `.inactive` after the settle rule.
-3. An anchor older than `maxLatchDuration` yields **`.unknown`**, asserted specifically to be **not** `.inactive`.
+3. A confirmed Meet call remains **`.active`** beyond four hours while its
+   anchored Chrome window and tab remain live; elapsed time alone never yields
+   `.unknown`.
 4. **Scan could not complete, no anchors** yields **`.unknown`**, not `.inactive` (defect B7).
 5. `meet-two-calls`: closing one window keeps `.active` through the other anchor (defect M16).
 6. `meet-profile2` and `meet-pwa` behave per the G1 decision.
@@ -2395,7 +2399,6 @@ Log the code, never the underlying text.
 | `idleSampleInterval` | `UserDefaults` | no | no | 20 s |
 | `activeSampleInterval` | `UserDefaults` | no | no | 5 s |
 | `endSettleCount` | `UserDefaults` | no | no | 2 |
-| `maxLatchDuration` | `UserDefaults` | no | no | 14 400 s |
 | `timerLeeway` | `UserDefaults` | no | no | 500 ms |
 | `enableAudioCorroboration` | `UserDefaults` | no | no | `false` |
 | heartbeat | constant | — | — | 60 s |

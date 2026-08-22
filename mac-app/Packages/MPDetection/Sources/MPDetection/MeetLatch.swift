@@ -58,7 +58,7 @@ public struct MeetLatch: Sendable {
   public mutating func apply(
     _ evidence: Evidence,
     now: ContinuousClock.Instant,
-    maxLatchDuration: Duration
+    maxLatchDuration: Duration? = nil
   ) -> SourceObservation {
     if anchors.isEmpty {
       guard evidence.chromeRunning else {
@@ -79,9 +79,11 @@ public struct MeetLatch: Sendable {
       return .inactive
     }
 
-    if anchors.contains(where: {
-      now >= $0.confirmedAt.advanced(by: maxLatchDuration)
-    }) {
+    if let maxLatchDuration,
+      anchors.contains(where: {
+        now >= $0.confirmedAt.advanced(by: maxLatchDuration)
+      })
+    {
       anchors.removeAll()
       return .unknown
     }

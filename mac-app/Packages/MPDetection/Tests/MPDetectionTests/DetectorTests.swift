@@ -51,6 +51,50 @@ struct DetectorTests {
   }
 
   @Test
+  func longRunningMeetRemainsActiveWhenTheAnchoredTabIsLive() async {
+    let clock = TestMonotonic()
+    let detector = GoogleMeetDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        meetSnapshot(active: true),
+        meetSnapshot(active: false),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
+    clock.advance(by: .seconds(14_401))
+    await detector.requestSample()
+
+    #expect(await detector.currentObservation == .active)
+  }
+
+  @Test
+  func meetRecoversAfterATemporaryUnavailableSample() async {
+    let detector = GoogleMeetDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        meetSnapshot(active: true),
+        incompleteMeetSnapshot(),
+        meetSnapshot(active: true),
+      ]),
+      eventSource: EmptyEventSource()
+    )
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .unknown)
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+  }
+
+  @Test
   func spaceChangeKeepsMeetActiveUntilVisibilityGraceExpires() async {
     let clock = TestMonotonic()
     let detector = GoogleMeetDetector(
@@ -209,7 +253,11 @@ private final class TestMonotonic: Monotonic, @unchecked Sendable {
   }
 }
 
-private func meetSnapshot(active: Bool) -> AXSnapshot {
+private func meetSnapshot(
+  active: Bool,
+  includeTab: Bool = true,
+  scanCompleted: Bool = true
+) -> AXSnapshot {
   let controls: [AXNode] =
     active
     ? [
@@ -234,14 +282,26 @@ private func meetSnapshot(active: Bool) -> AXSnapshot {
     description: "Meet - test tab",
     windowID: 7
   )
+  let tabs = includeTab ? [tab] : []
   return AXSnapshot(
     capturedAt: Date(),
     processIdentifier: 42,
-    scanCompleted: true,
+    scanCompleted: scanCompleted,
     root: node(
       role: "AXApplication",
-      children: [node(role: "AXWindow", windowID: 7, children: [webArea, tab])]
+      children: [
+        node(role: "AXWindow", windowID: 7, children: [webArea] + tabs)
+      ]
     )
+  )
+}
+
+private func incompleteMeetSnapshot() -> AXSnapshot {
+  AXSnapshot(
+    capturedAt: Date(),
+    processIdentifier: 42,
+    scanCompleted: false,
+    root: node(role: "AXApplication")
   )
 }
 

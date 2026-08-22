@@ -233,7 +233,7 @@ struct MeetLatchTests {
   }
 
   @Test
-  func expiredLatchBecomesUnknown() {
+  func explicitlyExpiredLatchBecomesUnknown() {
     var latch = MeetLatch()
     let anchor = anchor(at: now)
     _ = latch.apply(
@@ -259,6 +259,36 @@ struct MeetLatchTests {
     )
     #expect(result == .unknown)
     #expect(latch.activeAnchors.isEmpty)
+  }
+
+  @Test
+  func activeLatchDoesNotExpireWithoutConfiguredDuration() {
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: nil
+    )
+
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [anchor]
+      ),
+      now: now.advanced(by: .seconds(14_401)),
+      maxLatchDuration: nil
+    )
+
+    #expect(result == .active)
+    #expect(latch.activeAnchors == [anchor])
   }
 
   @Test

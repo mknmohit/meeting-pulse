@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.0.6 - 2026-08-22
+
+Google Meet long-call detection fix.
+
+### macOS app
+
+- Keeps a confirmed Google Meet status active beyond four hours while the
+  anchored Chrome window and tab remain verifiable.
+- Preserves the unavailable state for incomplete or unverified Accessibility
+  evidence and still releases after positive Meet end evidence.
+
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+|---|---|---|
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg` | `8427b72a34715ddb17580250ba9af9a0d7b484a5e126f2b3d3d04fee0b0143f0` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.6-Intel-x86_64.dmg` | `8f89de46dc3194d600940ac28352a01dc9339e80170446e5336484d57fce647a` |
+
 ## 0.0.5 - 2026-08-20
 
 Slack Huddle long-call detection fix.
