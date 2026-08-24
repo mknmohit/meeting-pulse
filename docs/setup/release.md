@@ -36,7 +36,7 @@ toolchain supports the requested target. They:
 - disable testability and debug-information generation;
 - strip the installed product and dead code;
 - add no analytics or telemetry to the release build;
-- patch the built bundle to version `0.0.6` and build `1`;
+- patch the built bundle to version `0.0.7` and build `1`;
 - ad-hoc sign and verify the app;
 - create and verify a compressed DMG; and
 - replace `/Applications/Meeting Pulse.app` only after all checks pass.
@@ -44,17 +44,17 @@ toolchain supports the requested target. They:
 The assets are:
 
 ```text
-build/dmg/Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg
-build/dmg/Meeting-Pulse-0.0.6-Intel-x86_64.dmg
+build/dmg/Meeting-Pulse-0.0.7-Apple-Silicon-arm64.dmg
+build/dmg/Meeting-Pulse-0.0.7-Intel-x86_64.dmg
 ```
 
-The 0.0.6 macOS app assets are built from the release tree after the Google Meet
-long-call status fix and verified before publication.
+The 0.0.7 macOS app assets are built from the release tree after the Slack
+Huddle embedded-layout detection fix and verified before publication.
 
 | Architecture | File | SHA-256 |
 |---|---|---|
-| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg` | `73e378bffb0102962086ee19df96ba64a2aed177bef1a70c48899b3f72b6a591` |
-| Intel (`x86_64`) | `Meeting-Pulse-0.0.6-Intel-x86_64.dmg` | `8f89de46dc3194d600940ac28352a01dc9339e80170446e5336484d57fce647a` |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.7-Apple-Silicon-arm64.dmg` | `789a9d449bd9a75c8a70b4fea0c1300525fc54fa141798123581391c7122905d` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.7-Intel-x86_64.dmg` | `815d465bef550aa120a401bd14211c320c4517f9d301af1c4fad827e9a54565e` |
 
 Both assets pass `hdiutil verify` and contain only their named target
 architecture.
@@ -78,17 +78,17 @@ Do not describe these artifacts as notarized or trusted releases.
 
 ## GitHub release
 
-The `v0.0.6` release uses the current committed `HEAD`, not uncommitted
+The `v0.0.7` release uses the current committed `HEAD`, not uncommitted
 working-tree changes. After building and verifying both assets, a maintainer
 can create it with:
 
 ```sh
-gh release create v0.0.6 \
+gh release create v0.0.7 \
   --target HEAD \
-  --title "Meeting Pulse 0.0.6" \
+  --title "Meeting Pulse 0.0.7" \
   --notes-file CHANGELOG.md \
-  build/dmg/Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg \
-  build/dmg/Meeting-Pulse-0.0.6-Intel-x86_64.dmg
+  build/dmg/Meeting-Pulse-0.0.7-Apple-Silicon-arm64.dmg \
+  build/dmg/Meeting-Pulse-0.0.7-Intel-x86_64.dmg
 ```
 
 The release notes must retain the ad-hoc/no-notarization warning.

@@ -192,6 +192,31 @@ struct DetectorTests {
     await detector.requestSample()
     #expect(await detector.currentObservation == .inactive)
   }
+
+  @Test
+  func embeddedSlackHuddleUpdatesStatusAndEndsAfterControlsDisappear() async {
+    let clock = TestMonotonic()
+    let detector = SlackHuddleDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        slackEmbeddedSnapshot(active: true),
+        slackEmbeddedSnapshot(active: false),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    clock.advance(by: .seconds(21))
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .inactive)
+  }
 }
 
 private struct StaticDiscovery: AppDiscovery {
@@ -341,6 +366,36 @@ private func slackSnapshot(
     processIdentifier: 42,
     scanCompleted: true,
     root: node(role: "AXApplication", children: windows)
+  )
+}
+
+private func slackEmbeddedSnapshot(active: Bool) -> AXSnapshot {
+  let children: [AXNode] =
+    active
+    ? [
+      node(role: "AXToolbar", description: "Huddles actions"),
+      node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
+    ]
+    : [
+      node(role: "AXRow", subrole: "AXOutlineRow", description: "Huddles"),
+      node(role: "AXButton", description: "Start huddle with <contact>"),
+    ]
+  return AXSnapshot(
+    capturedAt: Date(),
+    processIdentifier: 42,
+    scanCompleted: true,
+    root: node(
+      role: "AXApplication",
+      children: [
+        node(
+          role: "AXWindow",
+          subrole: "AXStandardWindow",
+          title: "test-channel - Slack",
+          windowID: 9,
+          children: children
+        )
+      ]
+    )
   )
 }
 

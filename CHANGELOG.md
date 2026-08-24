@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.0.7 - 2026-08-24
+
+Slack Huddle embedded-layout detection fix.
+
+### macOS app
+
+- Recognizes active Slack Huddles rendered inside a standard channel window
+  through the `Huddles actions` toolbar and `Leave Huddle` control.
+- Retains support for the legacy dedicated Huddle window and excludes ordinary
+  Slack activity, the Huddles row, and `Start huddle with ...`.
+- Preserves long-running Huddle continuity, recreation grace, end settling, and
+  the existing `In a meeting` status copy.
+
+### Privacy and distribution
+
+- No new permissions, network requests, or privacy surface.
+- Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts
+  are not notarized and require Finder's one-time Open action on a fresh Mac.
+
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+| --- | --- | --- |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.7-Apple-Silicon-arm64.dmg` | `789a9d449bd9a75c8a70b4fea0c1300525fc54fa141798123581391c7122905d` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.7-Intel-x86_64.dmg` | `815d465bef550aa120a401bd14211c320c4517f9d301af1c4fad827e9a54565e` |
+
 ## 0.0.6 - 2026-08-22
 
 Google Meet long-call detection fix.
@@ -14,7 +40,7 @@ Google Meet long-call detection fix.
 ### Release assets
 
 | Architecture | Downloadable asset | SHA-256 |
-|---|---|---|
+| --- | --- | --- |
 | Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.6-Apple-Silicon-arm64.dmg` | `73e378bffb0102962086ee19df96ba64a2aed177bef1a70c48899b3f72b6a591` |
 | Intel (`x86_64`) | `Meeting-Pulse-0.0.6-Intel-x86_64.dmg` | `8f89de46dc3194d600940ac28352a01dc9339e80170446e5336484d57fce647a` |
 
@@ -40,7 +66,7 @@ Slack Huddle long-call detection fix.
 ### Release assets
 
 | Architecture | Downloadable asset | SHA-256 |
-|---|---|---|
+| --- | --- | --- |
 | Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.5-Apple-Silicon-arm64.dmg` | `7738b6cd81eb9db6e6982544e0ed995b4293ce6af7621e55895a5c1151e438ba` |
 | Intel (`x86_64`) | `Meeting-Pulse-0.0.5-Intel-x86_64.dmg` | `7a0f155fc7951bff9f7c7d23ce6ef3c4c8b6b490a11d34f06b5fe722bc5ff3ea` |
 
@@ -68,7 +94,7 @@ presenting.
 ### Release assets
 
 | Architecture | Downloadable asset | SHA-256 |
-|---|---|---|
+| --- | --- | --- |
 | Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.4-Apple-Silicon-arm64.dmg` | `4e5dd0c0b00a8f1e622e6f779878823e53760cab25a9137077e469ed2efd2058` |
 | Intel (`x86_64`) | `Meeting-Pulse-0.0.4-Intel-x86_64.dmg` | `2f2f0e86421defee718e7ab7fa32ce929cb2ca2c4aa1137f7a16e8bac30a5a13` |
 
@@ -95,7 +121,7 @@ Recovery startup hardening for anonymous auth identity changes.
 ### Release assets
 
 | Architecture | Downloadable asset | SHA-256 |
-|---|---|---|
+| --- | --- | --- |
 | Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.3-Apple-Silicon-arm64.dmg` | `4f8b85afc7586989349c07fc01e86467b904e38014b8e6663c179c44cd17742c` |
 | Intel (`x86_64`) | `Meeting-Pulse-0.0.3-Intel-x86_64.dmg` | `c1ac17730325d1d2eb2b7723d7905fbf7a5b768a72bb95d46d0dffda2669cf8b` |
 
@@ -183,7 +209,7 @@ artifacts. The two intervening commits (`a11dea8`, `41160d3`) only update the
 landing-site copy, social preview image, and design documentation.
 
 | Architecture | Downloadable asset | SHA-256 |
-|---|---|---|
+| --- | --- | --- |
 | Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.2-Apple-Silicon-arm64.dmg` | `a7a0cb0eb1fdd1d1142bfd0ed591284402dd7455ef4387e5a981aaaa4cd48bb2` |
 | Intel (`x86_64`) | `Meeting-Pulse-0.0.2-Intel-x86_64.dmg` | `cedd53cb1975ef49e212402a8a14c45a52f9b849f51fa8365833fe5f237bfe2c` |
 
@@ -245,7 +271,7 @@ Initial Meeting Pulse release for local macOS distribution.
 The assets below were rebuilt from commit `ae347e2`:
 
 | Architecture | Downloadable asset | SHA-256 |
-|---|---|---|
+| --- | --- | --- |
 | Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.1-Apple-Silicon-arm64.dmg` | `3e6ab802652985ceef5714430e50da83b8602b330354620a4cf1562135c2bc94` |
 | Intel (`x86_64`) | `Meeting-Pulse-0.0.1-Intel-x86_64.dmg` | `e980014ea28624167c39fa4d747563ce50a96f589f1e0d2090fadeb343a78b77` |
 

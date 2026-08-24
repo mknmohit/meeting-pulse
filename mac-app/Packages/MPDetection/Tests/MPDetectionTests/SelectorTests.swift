@@ -91,6 +91,57 @@ struct SelectorTests {
   }
 
   @Test
+  func slackRecognizesEmbeddedHuddleControls() {
+    let snapshot = slackEmbeddedSnapshot(active: true)
+
+    #expect(SlackSelectors.huddleWindows(in: snapshot).count == 1)
+    #expect(SlackSelectors.hasActiveHuddle(in: snapshot))
+    #expect(
+      SlackSelectors.activeAnchors(in: snapshot, confirmedAt: now).count == 1
+    )
+  }
+
+  @Test
+  func slackDoesNotConfirmAnEmbeddedHuddleWithoutBothControls() {
+    for snapshot in [
+      slackEmbeddedSnapshot(includeToolbar: false),
+      slackEmbeddedSnapshot(includeLeaveButton: false),
+    ] {
+      #expect(!SlackSelectors.hasActiveHuddle(in: snapshot))
+      #expect(
+        SlackSelectors.activeAnchors(in: snapshot, confirmedAt: now).isEmpty
+      )
+    }
+  }
+
+  @Test
+  func slackDoesNotCombineEmbeddedControlsAcrossWindows() {
+    let snapshot = snapshot(
+      children: [
+        node(
+          role: "AXWindow",
+          subrole: "AXStandardWindow",
+          windowID: 9,
+          children: [node(role: "AXToolbar", description: "Huddles actions")]
+        ),
+        node(
+          role: "AXWindow",
+          subrole: "AXStandardWindow",
+          windowID: 10,
+          children: [
+            node(role: "AXButton", roleDescription: "button", description: "Leave Huddle")
+          ]
+        ),
+      ]
+    )
+
+    #expect(!SlackSelectors.hasActiveHuddle(in: snapshot))
+    #expect(
+      SlackSelectors.activeAnchors(in: snapshot, confirmedAt: now).isEmpty
+    )
+  }
+
+  @Test
   func descendantTraversalPreservesNestedSiblings() {
     let root = node(
       role: "AXApplication",
@@ -196,6 +247,38 @@ private func slackSnapshot(
     ]
     : [main]
   return snapshot(children: windows)
+}
+
+private func slackEmbeddedSnapshot(
+  active: Bool = true,
+  includeToolbar: Bool = true,
+  includeLeaveButton: Bool = true
+) -> AXSnapshot {
+  let activeControls: [AXNode] =
+    (includeToolbar
+      ? [node(role: "AXToolbar", description: "Huddles actions")]
+      : [])
+      + (includeLeaveButton
+        ? [node(role: "AXButton", roleDescription: "button", description: "Leave Huddle")]
+        : [])
+  let children: [AXNode] =
+    active
+    ? activeControls
+    : [
+      node(role: "AXRow", subrole: "AXOutlineRow", description: "Huddles"),
+      node(role: "AXButton", description: "Start huddle with <contact>"),
+    ]
+  return snapshot(
+    children: [
+      node(
+        role: "AXWindow",
+        subrole: "AXStandardWindow",
+        title: "test-channel - Slack",
+        windowID: 9,
+        children: children
+      )
+    ]
+  )
 }
 
 private func snapshot(children: [AXNode]) -> AXSnapshot {

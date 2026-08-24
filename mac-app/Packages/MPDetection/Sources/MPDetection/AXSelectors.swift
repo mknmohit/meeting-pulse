@@ -173,7 +173,9 @@ public enum SlackSelectors {
       guard node.role == "AXWindow", node.subrole == "AXStandardWindow" else {
         return
       }
-      if normalizedAXText(node.title).hasPrefix("huddle:") {
+      if normalizedAXText(node.title).hasPrefix("huddle:")
+        || hasHuddleControls(node)
+      {
         windows.append(node)
       }
     }

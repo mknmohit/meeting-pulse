@@ -5,9 +5,13 @@
 Spike S2 was run against Slack `4.51.180` on macOS. A reliable signal exists,
 so Slack Huddle auto-detection ships in the MVP.
 
-The signal is a dedicated Huddle window. Slack's ordinary main window,
-focused state, `Huddles` row, and `Start huddle with ...` button are not
-signals of an active Huddle.
+Follow-up capture against Slack `4.51.191` found the same strong controls
+embedded in a standard channel window, so both layouts are supported.
+
+The signal is either a dedicated Huddle window or an embedded Huddle surface
+in a standard Slack window. Slack's ordinary main window, focused state,
+`Huddles` row, and `Start huddle with ...` button are not signals of an active
+Huddle.
 
 ## Observed selectors
 
@@ -20,14 +24,20 @@ All selectors are scoped to one module and are versioned by this decision.
 - Inside that window, an `AXWebArea` with the same Huddle title.
 - An `AXToolbar` described as `Huddle window actions` or `Huddles actions`.
 - A descendant `AXButton` described as `Leave Huddle`.
+- In Slack releases that embed the Huddle in the channel window, an
+  `AXStandardWindow` with the same toolbar and leave-button pair is sufficient
+  even when its title is an ordinary channel title.
 
-No `AXIdentifier` was exposed. The detector requires the dedicated Huddle
-window plus the leave control. A missing or localized signal produces
-`unknown`; it never falls back to "Slack is open" or "Slack was recently used".
+No `AXIdentifier` was exposed. The detector requires the Huddle toolbar and
+leave control in the same standard window; the dedicated-window title remains
+an additional signal for the legacy layout. A missing or localized signal
+produces `unknown`; it never falls back to "Slack is open" or "Slack was
+recently used".
 
-The main Slack window also exposed `Leave huddle` / `Leave Huddle` while the
-Huddle was active. That is corroboration only. The dedicated window is the
-primary signal because it remains distinct from normal Slack content.
+The main Slack window exposed `Leave huddle` / `Leave Huddle` while the Huddle
+was active. In the embedded layout, its `Huddles actions` toolbar and
+`Leave Huddle` button form the primary signal. The dedicated window remains
+supported as the primary signal for the legacy layout.
 
 ### Liveness
 
@@ -56,10 +66,11 @@ that was not observed.
 
 ## Conservative boundaries
 
-Before confirmation, an unreadable dedicated Huddle window or leave control
-produces `.unknown`. After confirmation, a readable dedicated window is
-liveness evidence, so a temporary control or AX-scan gap preserves `.active`
-until positive end evidence arrives. The detector never treats an open,
-focused, minimized, or recently used Slack window as a Huddle. If a future
-Slack release removes the dedicated window signal, Slack becomes manual-only
-until another empirical spike finds a replacement.
+Before confirmation, an unreadable Huddle signal or a missing member of the
+toolbar/leave pair produces `.unknown`. After confirmation, a readable
+dedicated window is liveness evidence, so a temporary control or AX-scan gap
+preserves `.active`; an embedded window with a missing pair follows the
+existing recreation grace. The detector never treats an open, focused,
+minimized, or recently used Slack window as a Huddle. If a future Slack release
+removes both supported signals, Slack becomes manual-only until another
+empirical spike finds a replacement.

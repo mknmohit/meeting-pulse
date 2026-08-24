@@ -435,17 +435,20 @@ TIME-BASED EXPIRY
 
 1. Locate Slack via `NSRunningApplication` (bundle id `com.tinyspeck.slackmacgap`); if absent → `sourceAbsent`.
 2. Inspect the Slack window and relevant AX descendants.
-3. Confirm a live Huddle through a stable huddle-specific state, a dedicated huddle window, or a leave control.
+3. Confirm a live Huddle through the Huddle toolbar and leave-control pair in
+   one standard window, including the legacy dedicated huddle window.
 4. **Never** treat Slack being open, focused, active, or recently used as a Huddle.
-5. Detect end when an authoritative scan confirms that the dedicated Huddle
-   window is gone after recreation grace, or Slack exits.
+5. Detect end when an authoritative scan confirms that the Huddle window or
+   embedded control pair is gone after recreation grace, or Slack exits.
 6. Before a Huddle is confirmed, any AX error or unrecognized structure →
    `unknown`.
-7. After confirmation, the dedicated Huddle window is liveness evidence. The
-   Slack latch has no elapsed-time expiry; temporary control or AX-scan gaps
-   preserve `active`, and release requires authoritative end evidence after
-   recreation grace. The Meet latch likewise has no production elapsed-time
-   expiry; each detector uses source-specific liveness and end evidence.
+7. After confirmation, the dedicated Huddle window is liveness evidence. An
+   embedded Huddle follows the existing recreation grace when its control pair
+   disappears. The Slack latch has no elapsed-time expiry; temporary control or
+   AX-scan gaps preserve `active`, and release requires authoritative end
+   evidence after recreation grace. The Meet latch likewise has no production
+   elapsed-time expiry; each detector uses source-specific liveness and end
+   evidence.
 Slack is an Electron app, so AX exposure may be less stable than a native UI. **Spike S2** is a hard gate with the same discipline as S1; if no reliable signal exists, the detector must surface `unknown` and Slack becomes manual-only. Slack often uses a **separate huddle window**, which is usually more observable than in-tab content — check this first in S2.
 
 ### 7.5 Environment observation — **NEW (audit B13)**
