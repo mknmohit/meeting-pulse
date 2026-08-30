@@ -23,13 +23,13 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
-    "@types/node": "^26.1.2",
-    "eslint": "^10.8.0",
+    "@types/node": "^26.4.0",
+    "eslint": "^10.9.1",
     "eslint-plugin-astro": "^3.1.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.66.0",
-    "vitest": "^4.1.10"
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
   }
 }
