@@ -290,29 +290,38 @@ private func readPayload(
   childCount: Int,
   scanCompleted: inout Bool
 ) -> Payload {
+  // Detection only needs role and label metadata. The remaining public fields
+  // stay available for compatibility but are intentionally not queried here.
   let role = attribute(element, kAXRoleAttribute as String, scanCompleted: &scanCompleted)
   let subrole = attribute(element, kAXSubroleAttribute as String, scanCompleted: &scanCompleted)
-  let roleDescription = attribute(element, kAXRoleDescriptionAttribute as String, scanCompleted: &scanCompleted)
-  let identifier = attribute(element, kAXIdentifierAttribute as String, scanCompleted: &scanCompleted)
+  let roleDescription = attribute(
+    element,
+    kAXRoleDescriptionAttribute as String,
+    scanCompleted: &scanCompleted
+  )
   let title = attribute(element, kAXTitleAttribute as String, scanCompleted: &scanCompleted)
-  let description = attribute(element, kAXDescriptionAttribute as String, scanCompleted: &scanCompleted)
-  let value = attribute(element, kAXValueAttribute as String, scanCompleted: &scanCompleted)
-  let help = attribute(element, kAXHelpAttribute as String, scanCompleted: &scanCompleted)
-  let enabled = boolAttribute(element, kAXEnabledAttribute as String, scanCompleted: &scanCompleted)
-  let focused = boolAttribute(element, kAXFocusedAttribute as String, scanCompleted: &scanCompleted)
+  let description = attribute(
+    element,
+    kAXDescriptionAttribute as String,
+    scanCompleted: &scanCompleted
+  )
+  let roleValue = stringValue(role)
+  let subroleValue = stringValue(subrole)
   return Payload(
-    role: stringValue(role),
-    subrole: stringValue(subrole),
+    role: roleValue,
+    subrole: subroleValue,
     roleDescription: stringValue(roleDescription),
-    identifier: stringValue(identifier),
+    identifier: nil,
     title: stringValue(title),
     description: stringValue(description),
-    value: stringValue(value),
-    help: stringValue(help),
-    enabled: enabled,
-    focused: focused,
+    value: nil,
+    help: nil,
+    enabled: nil,
+    focused: nil,
     childCount: childCount,
-    windowID: windowID(for: element)
+    windowID: needsWindowID(role: roleValue, subrole: subroleValue)
+      ? windowID(for: element)
+      : nil
   )
 }
 
@@ -355,12 +364,10 @@ private func attribute(
   return result.1
 }
 
-private func boolAttribute(
-  _ element: AXUIElement,
-  _ key: String,
-  scanCompleted: inout Bool
-) -> Bool? {
-  (attribute(element, key, scanCompleted: &scanCompleted) as? NSNumber)?.boolValue
+private func needsWindowID(role: String?, subrole: String?) -> Bool {
+  role == "AXWindow"
+    || role == "AXWebArea"
+    || (role == "AXRadioButton" && subrole == "AXTabButton")
 }
 
 private func benignChildrenFailure(role: String?, error: AXError) -> Bool {

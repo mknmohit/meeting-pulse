@@ -14,11 +14,14 @@ supabase test db
 ```
 
 The local config enables anonymous sign-ins and disables Realtime. The project
-uses one squashed baseline migration,
-`supabase/migrations/20260809000100_initial_schema.sql`, to create the tables,
-policies, RPCs, grants, retention cleanup, and five-viewer capacity. The local
-seed is intentionally empty. Keep the baseline for future fresh deployments;
-an empty database still needs a reproducible schema definition.
+uses a squashed baseline migration,
+`supabase/migrations/20260809000100_initial_schema.sql`, plus forward-only
+follow-up migrations such as
+`supabase/migrations/20260824000100_performance_indexes.sql`. Together they
+create the tables, policies, RPCs, grants, retention cleanup, five-viewer
+capacity, and indexes for the hot viewer and retention paths. The local seed is
+intentionally empty. Keep the baseline for future fresh deployments; an empty
+database still needs a reproducible schema definition.
 
 ## Hosted project
 

@@ -252,6 +252,9 @@ describe('viewer initial hydration', () => {
     await readOnce();
     const toggle = element('[data-couple-mode-toggle]') as HTMLButtonElement;
     toggle.click();
+    await vi.waitFor(() =>
+      expect(element('[data-supporting]').hidden).toBe(true),
+    );
 
     const headline = element('[data-headline]').textContent ?? '';
     expect(toggle.getAttribute('aria-checked')).toBe('true');
@@ -308,6 +311,10 @@ describe('viewer initial hydration', () => {
 
     boot();
     await readOnce();
+    await vi.waitFor(() => {
+      const headline = element('[data-headline]').textContent ?? '';
+      expect(COUPLE_MODE_BANKS.meeting).toContain(headline);
+    });
     const meetingHeadline = element('[data-headline]').textContent ?? '';
     expect(
       COUPLE_MODE_BANKS.meeting.some((phrase) => phrase === meetingHeadline),

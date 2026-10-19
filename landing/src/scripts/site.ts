@@ -27,6 +27,13 @@ function applyTheme(theme: Theme): void {
     choice.setAttribute("aria-pressed", String(choice.dataset.themeChoice === theme));
   });
   document.querySelectorAll<HTMLImageElement>("[data-theme-image]").forEach((image) => {
+    const themeSource = image
+      .closest("picture")
+      ?.querySelector<HTMLSourceElement>("[data-theme-source]");
+    if (themeSource) {
+      themeSource.media = resolved === "dark" ? "all" : "not all";
+      return;
+    }
     const source = resolved === "dark" ? image.dataset.darkSrc : image.dataset.lightSrc;
     if (source && image.getAttribute("src") !== source) {
       image.src = source;

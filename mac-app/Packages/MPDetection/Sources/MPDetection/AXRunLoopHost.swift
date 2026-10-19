@@ -20,7 +20,9 @@ public final class AXRunLoopHost: AXElementTree, AXEventSource, @unchecked Senda
 
   public init() {
     var continuation: AsyncStream<AXEvent>.Continuation?
-    events = AsyncStream { continuation = $0 }
+    events = AsyncStream(bufferingPolicy: .bufferingNewest(1)) {
+      continuation = $0
+    }
     eventContinuation = continuation!
     thread = nil
     let thread = Thread { [weak self] in

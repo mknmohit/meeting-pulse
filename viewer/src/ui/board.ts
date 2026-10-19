@@ -1,11 +1,6 @@
 import { CONFIG } from '../config';
 import { ensureSession } from '../lib/auth';
-import { type CoupleDisplayState } from '../lib/coupleCopy';
-import {
-  readCoupleMode,
-  selectCouplePhrase,
-  writeCoupleMode,
-} from '../lib/coupleMode';
+import { readCoupleMode, writeCoupleMode } from '../lib/coupleMode';
 import { COPY } from '../lib/copy';
 import {
   checkedLabel,
@@ -22,6 +17,8 @@ import {
 import { startPoller } from '../lib/poller';
 import { fetchPairedStatus } from '../lib/status';
 import { supabase } from '../lib/supabase';
+
+type CoupleDisplayState = Exclude<DisplayState, 'unpaired'>;
 
 declare global {
   interface Window {
@@ -54,12 +51,15 @@ export function boot(): void {
   let couplePhrase: string | null = null;
   let couplePhraseDisplayState: CoupleDisplayState | null = null;
   let couplePhraseName = '';
+  let coupleCopyModule: typeof import('../lib/coupleCopy') | undefined;
+  let coupleCopyLoad: Promise<void> | undefined;
+  let coupleCopyLoadFailed = false;
   let lastBoardRender: {
     display: DisplayState;
     status: Reading['status'] | undefined;
     offline: boolean;
     coupleMode: boolean;
-} | null = null;
+  } | null = null;
 
   const render = (): void => {
     if (!initialHydrationComplete) {
@@ -126,13 +126,13 @@ export function boot(): void {
     const name = status?.displayName?.trim() ?? '';
     elements.plate.dataset.hasName = String(Boolean(name));
 
-    if (coupleMode && isCoupleDisplayState(effective)) {
+    if (coupleMode && isCoupleDisplayState(effective) && coupleCopyModule) {
       if (
         couplePhrase === null ||
         couplePhraseDisplayState !== effective ||
         couplePhraseName !== name
       ) {
-        couplePhrase = selectCouplePhrase(effective, name);
+        couplePhrase = coupleCopyModule.selectCouplePhrase(effective, name);
         couplePhraseDisplayState = effective;
         couplePhraseName = name;
       }
@@ -140,6 +140,9 @@ export function boot(): void {
       elements.supporting.textContent = '';
       elements.supporting.hidden = true;
     } else {
+      if (coupleMode && isCoupleDisplayState(effective)) {
+        ensureCoupleCopy();
+      }
       elements.supporting.hidden = false;
       if (effective === 'meeting') {
         elements.headline.textContent = name
@@ -165,6 +168,31 @@ export function boot(): void {
     elements.checked.textContent = checkedLabel(
       (now - lastFetchMonotonic) / 1000,
     );
+  };
+
+  const ensureCoupleCopy = (): void => {
+    if (coupleCopyModule || coupleCopyLoad || coupleCopyLoadFailed) {
+      return;
+    }
+    coupleCopyLoad = import('../lib/coupleCopy')
+      .then((module) => {
+        coupleCopyModule = module;
+        coupleCopyLoad = undefined;
+        lastBoardRender = null;
+        render();
+      })
+      .catch((error: unknown) => {
+        coupleCopyLoad = undefined;
+        coupleCopyLoadFailed = true;
+        coupleMode = false;
+        writeCoupleMode(false);
+        couplePhrase = null;
+        couplePhraseDisplayState = null;
+        couplePhraseName = '';
+        lastBoardRender = null;
+        console.error('Meeting Pulse: Couple mode copy failed to load.', error);
+        render();
+      });
   };
 
   const syncCoupleModeControl = (): void => {

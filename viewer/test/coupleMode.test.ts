@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { COUPLE_MODE_BANKS } from '../src/lib/coupleCopy';
+import { COUPLE_MODE_BANKS, selectCouplePhrase } from '../src/lib/coupleCopy';
 import {
   COUPLE_MODE_NAME_TOKEN,
   COUPLE_MODE_STORAGE_KEY,
   readCoupleMode,
-  selectCouplePhrase,
   writeCoupleMode,
 } from '../src/lib/coupleMode';
 

@@ -227,18 +227,13 @@ public actor GoogleMeetDetector: MeetingDetector {
           maxElements: 3_000
         )
         scanCompleted = scanCompleted && snapshot.scanCompleted
-        confirmedSessions.formUnion(
-          MeetSelectors.strongAnchors(
-            in: snapshot,
-            confirmedAt: monotonic.now()
-          )
+        let analysis = MeetSelectors.analyze(
+          in: snapshot,
+          anchors: existingAnchors,
+          confirmedAt: monotonic.now()
         )
-        liveAnchors.formUnion(
-          MeetSelectors.liveAnchors(
-            in: snapshot,
-            anchors: existingAnchors
-          )
-        )
+        confirmedSessions.formUnion(analysis.confirmedSessions)
+        liveAnchors.formUnion(analysis.liveAnchors)
         if !snapshot.scanCompleted {
           health = .degraded(DiagnosticCode(rawValue: "MEET_SCAN_INCOMPLETE"))
         }
@@ -492,14 +487,13 @@ public actor SlackHuddleDetector: MeetingDetector {
           maxElements: 3_000
         )
         scanCompleted = scanCompleted && snapshot.scanCompleted
-        huddleWindowPresent =
-          huddleWindowPresent || !SlackSelectors.huddleWindows(in: snapshot).isEmpty
-        confirmedSessions.formUnion(
-          SlackSelectors.activeAnchors(
-            in: snapshot,
-            confirmedAt: monotonic.now()
-          )
+        let analysis = SlackSelectors.analyze(
+          in: snapshot,
+          confirmedAt: monotonic.now()
         )
+        huddleWindowPresent =
+          huddleWindowPresent || !analysis.huddleWindows.isEmpty
+        confirmedSessions.formUnion(analysis.activeAnchors)
         if !snapshot.scanCompleted {
           health = .degraded(DiagnosticCode(rawValue: "SLACK_SCAN_INCOMPLETE"))
         }

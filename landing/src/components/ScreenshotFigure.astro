@@ -25,6 +25,11 @@ const {
 <figure class:list={["screenshot", className]}>
   <div class="screenshot__surface">
     <picture>
+      <source
+        media="(prefers-color-scheme: dark)"
+        srcset={dark}
+        data-theme-source
+      />
       <img
         src={light}
         alt={alt}

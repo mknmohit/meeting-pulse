@@ -897,10 +897,6 @@ CREATE UNIQUE INDEX "viewers_one_active_per_viewer" ON "public"."viewers" USING 
 
 
 
-CREATE INDEX "viewers_viewer_idx" ON "public"."viewers" USING "btree" ("viewer_user_id") WHERE ("revoked_at" IS NULL);
-
-
-
 ALTER TABLE ONLY "public"."current_status"
     ADD CONSTRAINT "current_status_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "public"."devices"("id") ON DELETE CASCADE;
 
@@ -1150,7 +1146,6 @@ begin
   end if;
 end;
 $$;
-
 
 
 
