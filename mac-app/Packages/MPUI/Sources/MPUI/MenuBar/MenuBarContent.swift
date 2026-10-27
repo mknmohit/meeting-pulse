@@ -21,7 +21,7 @@ public struct MenuBarContent: View {
     // stack guard within ~85 frames
     // (`EXC_BAD_ACCESS / KERN_PROTECTION_FAILURE` inside
     // `ViewRendererHost.render`). The menu is open for a few seconds at a
-    // time, so a static text snapshot of the reason line is sufficient —
+    // time, so a static text snapshot of the reason line is sufficient:
     // any countdown will be re-read the next time the user opens the menu,
     // when SwiftUI re-evaluates the body against the latest store state.
     Text(store.reasonLine(at: .now, presentation: .menuBar))

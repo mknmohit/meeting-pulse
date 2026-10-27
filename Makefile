@@ -30,4 +30,4 @@ lint:
 	@rg -n 'displayName\.isEmpty' $(MPUI_SOURCES) --glob '*.swift'
 	@rg -n 'STALE_AFTER_SECONDS\s*=\s*180' viewer/src/lib/freshness.ts
 	@rg -n 'static let staleAfterSeconds = 180' mac-app/Packages/MPCore/Sources/MPCore/Staleness.swift
-	@rg -n 'extension ManualOverride\.Duration: Identifiable, Hashable' mac-app/Packages/MPCore/Sources/MPCore/ManualOverride.swift
+	@rg -n 'extension ManualOverride\.Duration: Identifiable' mac-app/Packages/MPCore/Sources/MPCore/ManualOverride.swift

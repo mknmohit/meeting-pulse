@@ -5,5 +5,5 @@ import Testing
 @Test
 func syncModuleLoads() {
   #expect(MPSyncModule.name == "MPCore sync")
-  #expect(MPSyncModule.clientProduct == "Supabase")
+  #expect(MPSyncModule.clientProduct == "Auth+PostgREST")
 }

@@ -15,6 +15,9 @@ APP_BUNDLE="$APP_NAME.app"
 : "${MP_DMG_VERSION:=}"
 : "${MP_DMG_ARCH:=}"
 : "${MP_DMG_ARCH_LABEL:=}"
+# The asset renderer and the Finder layout writer need Pillow and ds_store.
+# Set MP_PYTHON to a interpreter that has both, for example a virtualenv.
+: "${MP_PYTHON:=python3}"
 
 PLIST="$MP_DMG_APP/Contents/Info.plist"
 if [ ! -f "$PLIST" ]; then
@@ -57,7 +60,7 @@ MP_DMG_APP="$MP_DMG_APP" \
 MP_DMG_VERSION="$MP_DMG_VERSION" \
 MP_DMG_ARCH_LABEL="$MP_DMG_ARCH_LABEL" \
 MP_DMG_ASSET_DIR="$MP_DMG_ASSET_DIR" \
-python3 "$ROOT/mac-app/Tools/render-dmg-assets.py"
+"$MP_PYTHON" "$ROOT/mac-app/Tools/render-dmg-assets.py"
 
 STAGE="$MP_DMG_STAGE"
 RW="$MP_DMG_OUT_DIR/.Meeting-Pulse-$MP_DMG_VERSION-$MP_DMG_ARCH_LABEL-$MP_DMG_ARCH.rw.dmg"
@@ -91,7 +94,7 @@ SetFile -c icnL "$STAGE/.VolumeIcon.icns" 2>/dev/null || true
 SetFile -a V "$STAGE/.VolumeIcon.icns" 2>/dev/null || true
 
 printf '%s\n' "build-dmg: writing Finder layout"
-MP_DMG_STAGE="$STAGE" python3 "$ROOT/mac-app/Tools/write-ds-store.py"
+MP_DMG_STAGE="$STAGE" "$MP_PYTHON" "$ROOT/mac-app/Tools/write-ds-store.py"
 
 SetFile -a B "$STAGE/.background" 2>/dev/null || true
 SetFile -a E "$STAGE/.DS_Store" 2>/dev/null || true

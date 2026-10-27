@@ -87,11 +87,28 @@ struct DetectorTests {
     await detector.requestSample()
     #expect(await detector.currentObservation == .active)
 
+    // A truncated scan cannot disprove the call, so the confirmed session
+    // stays active instead of flipping the status to unavailable.
     await detector.requestSample()
-    #expect(await detector.currentObservation == .unknown)
+    #expect(await detector.currentObservation == .active)
 
     await detector.requestSample()
     #expect(await detector.currentObservation == .active)
+  }
+
+  @Test
+  func incompleteMeetScanWithoutAnAnchorIsUnknown() async {
+    let detector = GoogleMeetDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        incompleteMeetSnapshot(),
+      ]),
+      eventSource: EmptyEventSource()
+    )
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .unknown)
   }
 
   @Test
@@ -143,7 +160,65 @@ struct DetectorTests {
 
     clock.advance(by: .seconds(21))
     await detector.requestSample()
+    // The grace absorbed the space change. Once it expires the huddle window
+    // is still gone, so the huddle ended instead of sticking as active.
+    #expect(await detector.currentObservation == .inactive)
+  }
+
+  @Test
+  func meetRecoversFromUnavailableVisibilityWhenTheSurfaceIsReadable() async {
+    let clock = TestMonotonic()
+    let detector = GoogleMeetDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        meetSnapshot(active: true),
+        meetSnapshot(active: false, readableSurface: true),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
     #expect(await detector.currentObservation == .active)
+
+    await detector.spaceDidChange()
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    // The grace expired while the Meet page is readable and shows no call
+    // controls, so the call is over and the status must not fall back to
+    // "unavailable".
+    clock.advance(by: .seconds(21))
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .inactive)
+  }
+
+  @Test
+  func meetRecoversFromUnavailableVisibilityWhenTheSurfaceIsAbsent() async {
+    let clock = TestMonotonic()
+    let detector = GoogleMeetDetector(
+      appDiscovery: StaticDiscovery(),
+      permissionProbe: StaticPermission(),
+      elementTree: DelayedTree(snapshots: [
+        meetSnapshot(active: true),
+        meetSnapshot(active: false, includeTab: false, includeSurface: false),
+      ]),
+      eventSource: EmptyEventSource(),
+      monotonic: clock
+    )
+
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    await detector.spaceDidChange()
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .active)
+
+    // The Meet tab was closed, which is end evidence for the call.
+    clock.advance(by: .seconds(21))
+    await detector.requestSample()
+    #expect(await detector.currentObservation == .inactive)
   }
 
   @Test
@@ -281,7 +356,9 @@ private final class TestMonotonic: Monotonic, @unchecked Sendable {
 private func meetSnapshot(
   active: Bool,
   includeTab: Bool = true,
-  scanCompleted: Bool = true
+  scanCompleted: Bool = true,
+  readableSurface: Bool = false,
+  includeSurface: Bool = true
 ) -> AXSnapshot {
   let controls: [AXNode] =
     active
@@ -293,12 +370,18 @@ private func meetSnapshot(
       node(role: "AXButton", roleDescription: "button", description: "Share screen"),
     ]
     : []
+  // A readable Meet page still exposes content after the call ended, which is
+  // what makes the missing call controls end evidence instead of a gap.
+  let pageContent: [AXNode] =
+    readableSurface
+    ? [node(role: "AXGroup", roleDescription: "group", description: "Meet page")]
+    : []
   let webArea = node(
     role: "AXWebArea",
     roleDescription: "HTML content",
     title: "Meet - test",
     windowID: 7,
-    children: controls
+    children: controls + pageContent
   )
   let tab = node(
     role: "AXRadioButton",
@@ -308,6 +391,7 @@ private func meetSnapshot(
     windowID: 7
   )
   let tabs = includeTab ? [tab] : []
+  let windowChildren = includeSurface ? [webArea] + tabs : tabs
   return AXSnapshot(
     capturedAt: Date(),
     processIdentifier: 42,
@@ -315,7 +399,7 @@ private func meetSnapshot(
     root: node(
       role: "AXApplication",
       children: [
-        node(role: "AXWindow", windowID: 7, children: [webArea] + tabs)
+        node(role: "AXWindow", windowID: 7, children: windowChildren)
       ]
     )
   )

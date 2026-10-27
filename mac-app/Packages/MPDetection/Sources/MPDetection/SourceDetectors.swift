@@ -18,6 +18,7 @@ public actor GoogleMeetDetector: MeetingDetector {
   private var latch = MeetLatch()
   private var visibility = DetectionVisibility.authoritative
   private var visibilityGraceDeadline: ContinuousClock.Instant?
+  private var unavailableSince: ContinuousClock.Instant?
   private var generation: UInt64 = 0
   private var samplingTask: Task<MeetSample, Never>?
   private var eventTask: Task<Void, Never>?
@@ -80,6 +81,7 @@ public actor GoogleMeetDetector: MeetingDetector {
     samplingTask = nil
     visibility = .authoritative
     visibilityGraceDeadline = nil
+    unavailableSince = nil
     for pid in observedPIDs {
       await eventSource.stopObserving(pid: pid)
     }
@@ -92,6 +94,7 @@ public actor GoogleMeetDetector: MeetingDetector {
     latch = MeetLatch()
     visibility = .authoritative
     visibilityGraceDeadline = nil
+    unavailableSince = nil
     publish(.unknown, health: .permissionDenied)
   }
 
@@ -101,6 +104,7 @@ public actor GoogleMeetDetector: MeetingDetector {
     }
     visibility = .transitionGrace
     visibilityGraceDeadline = monotonic.now().advanced(by: .seconds(20))
+    unavailableSince = nil
   }
 
   public func requestSample() async {
@@ -139,7 +143,9 @@ public actor GoogleMeetDetector: MeetingDetector {
       scanCompleted: sample.evidence.scanCompleted,
       confirmedSessions: sample.evidence.confirmedSessions,
       liveAnchors: sample.evidence.liveAnchors,
-      visibility: visibility
+      visibility: visibility,
+      meetSurfaceReadable: sample.evidence.meetSurfaceReadable,
+      meetSurfaceAbsent: sample.evidence.meetSurfaceAbsent
     )
     let observation = latch.apply(
       evidence,
@@ -156,11 +162,13 @@ public actor GoogleMeetDetector: MeetingDetector {
     guard evidence.chromeRunning else {
       visibility = .authoritative
       visibilityGraceDeadline = nil
+      unavailableSince = nil
       return .authoritative
     }
     if !evidence.confirmedSessions.isEmpty {
       visibility = .authoritative
       visibilityGraceDeadline = nil
+      unavailableSince = nil
       return .authoritative
     }
     if visibility == .transitionGrace,
@@ -169,6 +177,26 @@ public actor GoogleMeetDetector: MeetingDetector {
     {
       visibility = .unavailable
       visibilityGraceDeadline = nil
+      unavailableSince = now
+    }
+    if visibility == .unavailable {
+      if evidence.scanCompleted,
+        evidence.meetSurfaceReadable || evidence.meetSurfaceAbsent
+      {
+        // The degraded state is recoverable: the Meet page is readable and
+        // exposes no call controls, or the Meet surface is gone entirely.
+        // Either way the call is provably over.
+        visibility = .authoritative
+        visibilityGraceDeadline = nil
+        unavailableSince = nil
+      } else if let since = unavailableSince,
+        now >= since.advanced(by: .seconds(45))
+      {
+        // Backstop: a degraded visibility must never stick forever.
+        visibility = .authoritative
+        visibilityGraceDeadline = nil
+        unavailableSince = nil
+      }
     }
     return visibility
   }
@@ -217,14 +245,16 @@ public actor GoogleMeetDetector: MeetingDetector {
     var scanCompleted = true
     var confirmedSessions = Set<MeetLatch.Anchor>()
     var liveAnchors = Set<MeetLatch.Anchor>()
+    var meetSurfaceReadable = false
+    var meetSurfacePresent = false
     var health: DetectorHealth = .ok
 
     for app in apps {
       do {
         let snapshot = try await elementTree.snapshot(
           pid: app.processIdentifier,
-          maxDepth: 20,
-          maxElements: 3_000
+          maxDepth: 24,
+          maxElements: 8_000
         )
         scanCompleted = scanCompleted && snapshot.scanCompleted
         let analysis = MeetSelectors.analyze(
@@ -234,6 +264,8 @@ public actor GoogleMeetDetector: MeetingDetector {
         )
         confirmedSessions.formUnion(analysis.confirmedSessions)
         liveAnchors.formUnion(analysis.liveAnchors)
+        meetSurfaceReadable = meetSurfaceReadable || analysis.meetSurfaceReadable
+        meetSurfacePresent = meetSurfacePresent || analysis.meetSurfacePresent
         if !snapshot.scanCompleted {
           health = .degraded(DiagnosticCode(rawValue: "MEET_SCAN_INCOMPLETE"))
         }
@@ -251,7 +283,9 @@ public actor GoogleMeetDetector: MeetingDetector {
         chromeRunning: true,
         scanCompleted: scanCompleted,
         confirmedSessions: confirmedSessions,
-        liveAnchors: liveAnchors
+        liveAnchors: liveAnchors,
+        meetSurfaceReadable: meetSurfaceReadable,
+        meetSurfaceAbsent: scanCompleted && !meetSurfacePresent
       ),
       health: health,
       permissionDenied: false
@@ -271,6 +305,7 @@ public actor SlackHuddleDetector: MeetingDetector {
   private var visibility = DetectionVisibility.authoritative
   private var visibilityGraceDeadline: ContinuousClock.Instant?
   private var recreationGraceConsumed = false
+  private var unavailableSince: ContinuousClock.Instant?
   private var generation: UInt64 = 0
   private var samplingTask: Task<SlackSample, Never>?
   private var eventTask: Task<Void, Never>?
@@ -335,6 +370,7 @@ public actor SlackHuddleDetector: MeetingDetector {
     visibility = .authoritative
     visibilityGraceDeadline = nil
     recreationGraceConsumed = false
+    unavailableSince = nil
     for pid in observedPIDs {
       await eventSource.stopObserving(pid: pid)
     }
@@ -348,6 +384,7 @@ public actor SlackHuddleDetector: MeetingDetector {
     visibility = .authoritative
     visibilityGraceDeadline = nil
     recreationGraceConsumed = false
+    unavailableSince = nil
     publish(.unknown, health: .permissionDenied)
   }
 
@@ -358,6 +395,7 @@ public actor SlackHuddleDetector: MeetingDetector {
     visibility = .transitionGrace
     visibilityGraceDeadline = monotonic.now().advanced(by: .seconds(20))
     recreationGraceConsumed = false
+    unavailableSince = nil
   }
 
   public func requestSample() async {
@@ -406,12 +444,14 @@ public actor SlackHuddleDetector: MeetingDetector {
       visibility = .authoritative
       visibilityGraceDeadline = nil
       recreationGraceConsumed = false
+      unavailableSince = nil
       return .authoritative
     }
     if !evidence.confirmedSessions.isEmpty {
       visibility = .authoritative
       visibilityGraceDeadline = nil
       recreationGraceConsumed = false
+      unavailableSince = nil
       return .authoritative
     }
     if visibility == .authoritative,
@@ -419,13 +459,17 @@ public actor SlackHuddleDetector: MeetingDetector {
       !latch.activeAnchors.isEmpty,
       !recreationGraceConsumed
     {
+      // Slack briefly recreates the huddle window when the huddle moves
+      // between windows or spaces. The grace covers that short window, it is
+      // not a licence to keep reporting a huddle for half a minute.
       visibility = .recreationGrace
-      visibilityGraceDeadline = now.advanced(by: .seconds(20))
+      visibilityGraceDeadline = now.advanced(by: .seconds(5))
     }
     if let deadline = visibilityGraceDeadline, now >= deadline {
       switch visibility {
       case .transitionGrace:
         visibility = .unavailable
+        unavailableSince = now
       case .recreationGrace:
         visibility = .authoritative
         recreationGraceConsumed = true
@@ -433,6 +477,22 @@ public actor SlackHuddleDetector: MeetingDetector {
         break
       }
       visibilityGraceDeadline = nil
+    }
+    if visibility == .unavailable {
+      if evidence.scanCompleted, !evidence.huddleWindowPresent {
+        // The huddle window is gone and the scan was complete, so the huddle
+        // ended. The degraded state is recoverable.
+        visibility = .authoritative
+        visibilityGraceDeadline = nil
+        unavailableSince = nil
+      } else if let since = unavailableSince,
+        now >= since.advanced(by: .seconds(45))
+      {
+        // Backstop: a degraded visibility must never stick forever.
+        visibility = .authoritative
+        visibilityGraceDeadline = nil
+        unavailableSince = nil
+      }
     }
     return visibility
   }
@@ -484,7 +544,7 @@ public actor SlackHuddleDetector: MeetingDetector {
         let snapshot = try await elementTree.snapshot(
           pid: app.processIdentifier,
           maxDepth: 20,
-          maxElements: 3_000
+          maxElements: 6_000
         )
         scanCompleted = scanCompleted && snapshot.scanCompleted
         let analysis = SlackSelectors.analyze(

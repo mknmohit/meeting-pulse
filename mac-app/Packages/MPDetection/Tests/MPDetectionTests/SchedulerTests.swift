@@ -12,10 +12,22 @@ struct SchedulerTests {
   }
 
   @Test
-  func unknownNeverSettlesToInactive() {
+  func unknownIsNotAVoteThatEndsAnActiveCall() {
     var settler = ObservationSettler(value: .active)
-    #expect(settler.apply(.unknown, settleCount: 2) == .unknown)
+
+    // A single unknown sample must not turn a confirmed call into
+    // "unavailable", and repeating it must not cancel a pending end either.
+    #expect(settler.apply(.unknown, settleCount: 2) == .active)
+    #expect(settler.apply(.unknown, settleCount: 2) == .active)
+    #expect(settler.apply(.inactive, settleCount: 2) == .active)
     #expect(settler.apply(.inactive, settleCount: 2) == .inactive)
+  }
+
+  @Test
+  func repeatedUnknownSettlesToUnknownWhenTheCallIsNotActive() {
+    var settler = ObservationSettler(value: .inactive)
+    #expect(settler.apply(.unknown, settleCount: 2) == .inactive)
+    #expect(settler.apply(.unknown, settleCount: 2) == .unknown)
   }
 
   @Test

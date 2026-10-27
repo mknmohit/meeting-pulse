@@ -1,5 +1,87 @@
 # Changelog
 
+## 0.0.9 - 2026-10-27
+
+Google Meet picture-in-picture disconnect and Slack huddle end fixes.
+
+### macOS app
+
+- Recovers the correct status after a Google Meet call is ended from the
+  picture-in-picture popover. Ending a call that way left the app stuck on
+  `Meeting status unavailable` instead of returning to no call. The Meet page
+  is now read once per scan without re-reading the application root, which
+  used to abort the whole scan and report the call as unreadable. A Meet page
+  that is still readable but shows no call controls is now treated as
+  positive evidence that the call ended, and an unreadable scan resolves on
+  its own instead of staying unavailable. A single uncertain reading no longer
+  overrides a call that was just detected, and a detected call now needs two
+  agreeing readings before it is cleared.
+- Updates the Slack huddle status much faster when a huddle ends. Leaving a
+  huddle previously took around 30 seconds to change from `In a meeting` to no
+  call. The window-recreation grace period is now 5 seconds instead of 20, so
+  a huddle that is gone is reported in roughly 10 to 15 seconds, while a
+  huddle window that is momentarily missing is still given time to come back.
+- Keeps the Google Meet and Slack huddle detection improvements shipped with
+  0.0.8, along with the automatic reconnect after a long internet outage and
+  the correct status for meetings that run for hours. The source for those
+  changes is included in this release.
+
+### Privacy and distribution
+
+- No new permissions, network requests, or privacy surface. Detection still
+  runs locally and only the status is published.
+- Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts
+  are not notarized and require Finder's one-time Open action on a fresh Mac.
+
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+| --- | --- | --- |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.9-Apple-Silicon-arm64.dmg` | `2b4e181e8cac342e7e56ca51977c0c09f94321d35d8b694c235489b90485267d` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.9-Intel-x86_64.dmg` | `2aeb9fd2e76378e6ffa97a358d31e03cf54a73183aceff21932402cfe90b57f4` |
+
+## 0.0.8 - 2026-10-27
+
+Reconnect, long-meeting status, and detection accuracy release.
+
+### macOS app
+
+- Recovers automatically after a long internet outage. The app no longer
+  needs a restart when the network comes back: a stalled publish is abandoned
+  after a deadline, the retry backoff is reset when connectivity returns, and
+  a launch that failed while offline is retried automatically.
+- Keeps the correct status for meetings that run for hours. Long calls grow
+  the accessibility tree, which used to exhaust the scan budget and report
+  the call as unavailable. The scan is now breadth-first, budgeted per
+  window, and a truncated scan keeps the call active instead of dropping it.
+  The status heartbeat also stays inside the viewer's 180-second freshness
+  window, and a refresh that fails no longer replaces the signed-in identity,
+  so the device keeps publishing after an hour.
+- Improves Google Meet detection. The call is confirmed from the leave
+  control plus other in-call controls, the `Call controls` landmark is no
+  longer required, and the tab strip and web areas are matched in a second
+  pass so a call is recognized even when the web area title is not a Meet
+  title.
+- Improves Slack Huddle detection. The detached window titled `Huddle` is
+  recognized, the toolbar may be described as `Huddle actions`,
+  `Huddle controls`, or `Huddle toolbar`, the leave control accepts
+  `Leave the huddle` and `End huddle`, and a window titled `Huddles` is
+  ignored as a list view.
+
+### Privacy and distribution
+
+- No new permissions, network requests, or privacy surface. Detection still
+  runs locally and only the status is published.
+- Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts
+  are not notarized and require Finder's one-time Open action on a fresh Mac.
+
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+| --- | --- | --- |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.8-Apple-Silicon-arm64.dmg` | `c2196bf45f6e930dbe08834914b38793043643eef0d4665696367ea2babacf6c` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.8-Intel-x86_64.dmg` | `dd641d92a8418bf44a3c575e11938b6cdd8622b5d9efeab7382ef940b61e3ea0` |
+
 ## 0.0.7 - 2026-08-24
 
 Slack Huddle embedded-layout detection fix.

@@ -69,6 +69,9 @@ public struct SlackHuddleLatch: Sendable {
         return .active
       }
       guard evidence.visibility == .authoritative else {
+        if evidence.visibility == .unavailable, evidence.scanCompleted {
+          return .inactive
+        }
         return .unknown
       }
       return evidence.scanCompleted ? .inactive : .unknown
@@ -88,7 +91,17 @@ public struct SlackHuddleLatch: Sendable {
     case .transitionGrace, .recreationGrace:
       return .active
     case .unavailable:
-      return .active
+      if evidence.huddleWindowPresent {
+        // The huddle window is the liveness signal for a huddle, so it keeps
+        // the call alive even while the visibility is degraded.
+        return .active
+      }
+      if evidence.scanCompleted {
+        // The window is gone and the scan was complete, so the huddle ended.
+        anchors.removeAll()
+        return .inactive
+      }
+      return .unknown
     case .authoritative:
       break
     }

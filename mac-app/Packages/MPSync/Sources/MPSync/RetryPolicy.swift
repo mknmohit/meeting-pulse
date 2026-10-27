@@ -16,12 +16,16 @@ public struct RetryPolicy: Equatable, Sendable {
     self.maximumDelay = maximumDelay
   }
 
+  /// The delay before the next retry attempt.
+  ///
+  /// Jitter is applied to the exponential backoff but never below half of it,
+  /// so a retry loop can never spin without pausing.
   public func delay(for attempt: Int, randomUnit: Double) -> Duration {
     let boundedAttempt = max(attempt, 0)
     let exponential = baseDelay.secondsValue * pow(multiplier, Double(boundedAttempt))
     let capped = min(maximumDelay.secondsValue, exponential)
     let unit = min(max(randomUnit, 0), 1)
-    return .seconds(capped * unit)
+    return .seconds(capped * (0.5 + 0.5 * unit))
   }
 }
 

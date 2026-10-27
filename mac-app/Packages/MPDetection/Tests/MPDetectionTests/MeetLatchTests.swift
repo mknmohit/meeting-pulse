@@ -145,7 +145,7 @@ struct MeetLatchTests {
   }
 
   @Test
-  func incompleteScanWithoutLiveAnchorIsUnknown() {
+  func unavailableVisibilityWithAReadableMeetSurfaceEndsTheCall() {
     var latch = MeetLatch()
     let anchor = anchor(at: now)
     _ = latch.apply(
@@ -159,6 +159,111 @@ struct MeetLatchTests {
       maxLatchDuration: .seconds(14_400)
     )
 
+    // The Meet page is still readable and shows no call controls, so the call
+    // is provably over even though the visibility is degraded.
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [],
+        visibility: .unavailable,
+        meetSurfaceReadable: true
+      ),
+      now: now.advanced(by: .seconds(30)),
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    #expect(result == .inactive)
+    #expect(latch.activeAnchors.isEmpty)
+  }
+
+  @Test
+  func unavailableVisibilityWithAnAbsentMeetSurfaceEndsTheCall() {
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    // A complete scan that found no Meet page and no Meet tab means the tab
+    // was closed, so the call is over.
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [],
+        visibility: .unavailable,
+        meetSurfaceAbsent: true
+      ),
+      now: now.advanced(by: .seconds(30)),
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    #expect(result == .inactive)
+    #expect(latch.activeAnchors.isEmpty)
+  }
+
+  @Test
+  func authoritativeScanWithAReadableMeetSurfaceEndsTheCall() {
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    // Leaving a call from the picture-in-picture popover keeps the Meet tab
+    // open. The page is readable and the call controls are gone, which is
+    // positive evidence that the call ended.
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [],
+        meetSurfaceReadable: true
+      ),
+      now: now.advanced(by: .seconds(10)),
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    #expect(result == .inactive)
+    #expect(latch.activeAnchors.isEmpty)
+  }
+
+  @Test
+  func incompleteScanWithoutLiveAnchorKeepsTheLatchActive() {
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    // A truncated scan cannot prove the call ended, so the confirmed session
+    // stays active. This is the long running meeting case: the accessibility
+    // tree outgrows the element budget and the scan no longer completes.
     let result = latch.apply(
       .init(
         chromeRunning: true,
@@ -169,8 +274,26 @@ struct MeetLatchTests {
       now: now.advanced(by: .seconds(10)),
       maxLatchDuration: .seconds(14_400)
     )
-    #expect(result == .unknown)
+    #expect(result == .active)
     #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
+  func incompleteScanWithoutAnyAnchorIsUnknown() {
+    var latch = MeetLatch()
+
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: false,
+        confirmedSessions: [],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+    #expect(result == .unknown)
+    #expect(latch.activeAnchors.isEmpty)
   }
 
   @Test

@@ -73,6 +73,42 @@ struct SelectorTests {
   }
 
   @Test
+  func meetSurfaceIsReadableWhenThePageExposesItsContent() {
+    // The Meet page is still rendered after the call ended, so the missing
+    // call controls are end evidence rather than a missing signal.
+    let analysis = MeetSelectors.analyze(
+      in: meetSurfaceSnapshot(readable: true),
+      anchors: [],
+      confirmedAt: now
+    )
+    #expect(analysis.meetSurfaceReadable)
+    #expect(analysis.meetSurfacePresent)
+    #expect(analysis.confirmedSessions.isEmpty)
+  }
+
+  @Test
+  func meetSurfaceIsPresentButUnreadableWithoutRenderedContent() {
+    let analysis = MeetSelectors.analyze(
+      in: meetSurfaceSnapshot(readable: false),
+      anchors: [],
+      confirmedAt: now
+    )
+    #expect(!analysis.meetSurfaceReadable)
+    #expect(analysis.meetSurfacePresent)
+  }
+
+  @Test
+  func meetSurfaceIsAbsentWhenNoPageAndNoTabRemain() {
+    let analysis = MeetSelectors.analyze(
+      in: meetSurfaceSnapshot(readable: false, includeSurface: false, includeTab: false),
+      anchors: [],
+      confirmedAt: now
+    )
+    #expect(!analysis.meetSurfaceReadable)
+    #expect(!analysis.meetSurfacePresent)
+  }
+
+  @Test
   func slackRequiresDedicatedWindowAndLeaveControl() {
     let snapshot = slackSnapshot(active: true)
     #expect(SlackSelectors.huddleWindows(in: snapshot).count == 1)
@@ -157,6 +193,211 @@ struct SelectorTests {
     root.forEachDescendant { roles.append($0.role) }
     #expect(roles == ["AXGroup", "AXButton", "AXWindow"])
   }
+
+  @Test
+  func meetAcceptsTheEndsTheCurrentCallLabel() {
+    let snapshot = meetWebAreaSnapshot(
+      controls: [
+        node(role: "AXButton", roleDescription: "button", description: "Ends the current call"),
+        node(role: "AXButton", roleDescription: "button", description: "Turn on camera"),
+      ]
+    )
+
+    #expect(MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).count == 1)
+  }
+
+  @Test
+  func meetAcceptsTheLeaveLabelFromTheTitleAttribute() {
+    let snapshot = meetWebAreaSnapshot(
+      controls: [
+        node(role: "AXButton", roleDescription: "button", title: "Leave call"),
+        node(role: "AXButton", roleDescription: "button", title: "Participants"),
+      ]
+    )
+
+    #expect(MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).count == 1)
+  }
+
+  @Test
+  func meetDoesNotConfirmWithoutTheLeaveControl() {
+    let snapshot = meetWebAreaSnapshot(
+      controls: [
+        node(role: "AXButton", roleDescription: "button", description: "Share screen"),
+        node(role: "AXButton", roleDescription: "button", description: "Turn on camera"),
+      ]
+    )
+
+    #expect(MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).isEmpty)
+  }
+
+  @Test
+  func meetConfirmsWithoutATabStripEntry() {
+    let snapshot = meetWebAreaSnapshot(
+      controls: [
+        node(role: "AXButton", roleDescription: "button", description: "Leave call"),
+        node(role: "AXButton", roleDescription: "button", description: "Share screen"),
+      ],
+      includeTab: false
+    )
+
+    let anchors = MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now)
+    #expect(anchors.count == 1)
+    #expect(
+      anchors.first?.tabIdentity
+        == MeetSelectors.webAreaIdentity(title: "Meet - test")
+    )
+  }
+
+  @Test
+  func meetConfirmsWhenTheWebAreaTitleIsNotAMeetTitle() {
+    let webArea = node(
+      role: "AXWebArea",
+      roleDescription: "HTML content",
+      title: "New Tab",
+      windowID: 7,
+      children: [
+        node(role: "AXButton", roleDescription: "button", description: "Leave call"),
+        node(role: "AXButton", roleDescription: "button", description: "Share screen"),
+      ]
+    )
+    let tab = node(
+      role: "AXRadioButton",
+      subrole: "AXTabButton",
+      description: "Meet - test tab",
+      windowID: 7
+    )
+    let snapshot = snapshot(
+      children: [node(role: "AXWindow", windowID: 7, children: [webArea, tab])]
+    )
+
+    #expect(MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).count == 1)
+  }
+
+  @Test
+  func meetDoesNotConfirmAnUnrelatedWebArea() {
+    let webArea = node(
+      role: "AXWebArea",
+      roleDescription: "HTML content",
+      title: "New Tab",
+      windowID: 7,
+      children: [
+        node(role: "AXButton", roleDescription: "button", description: "Leave call"),
+        node(role: "AXButton", roleDescription: "button", description: "Share screen"),
+      ]
+    )
+    let snapshot = snapshot(
+      children: [node(role: "AXWindow", windowID: 7, children: [webArea])]
+    )
+
+    #expect(MeetSelectors.strongAnchors(in: snapshot, confirmedAt: now).isEmpty)
+  }
+
+  @Test
+  func slackAcceptsTheDetachedHuddleWindowTitle() {
+    let window = node(
+      role: "AXWindow",
+      subrole: "AXStandardWindow",
+      title: "Huddle",
+      windowID: 8,
+      children: [
+        node(role: "AXWebArea", title: "Huddle", windowID: 8),
+        node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
+      ]
+    )
+    let snapshot = snapshot(children: [window])
+
+    #expect(SlackSelectors.huddleWindows(in: snapshot).count == 1)
+    #expect(SlackSelectors.hasActiveHuddle(in: snapshot))
+  }
+
+  @Test
+  func slackAcceptsTheLeaveTheHuddleLabel() {
+    let window = node(
+      role: "AXWindow",
+      subrole: "AXStandardWindow",
+      title: "Huddle - standup",
+      windowID: 8,
+      children: [
+        node(role: "AXButton", roleDescription: "button", description: "Leave the huddle"),
+      ]
+    )
+    let snapshot = snapshot(children: [window])
+
+    #expect(SlackSelectors.hasActiveHuddle(in: snapshot))
+  }
+
+  @Test
+  func slackAcceptsTheHuddleActionsToolbar() {
+    let window = node(
+      role: "AXWindow",
+      subrole: "AXStandardWindow",
+      title: "test-channel - Slack",
+      windowID: 9,
+      children: [
+        node(role: "AXToolbar", description: "huddle actions"),
+        node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
+      ]
+    )
+    let snapshot = snapshot(children: [window])
+
+    #expect(SlackSelectors.hasActiveHuddle(in: snapshot))
+  }
+
+  @Test
+  func slackIgnoresTheHuddlesListWindow() {
+    let window = node(
+      role: "AXWindow",
+      subrole: "AXStandardWindow",
+      title: "Huddles",
+      windowID: 8,
+      children: [
+        node(role: "AXRow", subrole: "AXOutlineRow", description: "Huddles"),
+        node(role: "AXButton", description: "Start huddle with <contact>"),
+      ]
+    )
+    let snapshot = snapshot(children: [window])
+
+    #expect(SlackSelectors.huddleWindows(in: snapshot).isEmpty)
+    #expect(!SlackSelectors.hasActiveHuddle(in: snapshot))
+  }
+
+  @Test
+  func slackDoesNotConfirmALeaveButtonWithoutTheToolbar() {
+    let window = node(
+      role: "AXWindow",
+      subrole: "AXStandardWindow",
+      title: "test-channel - Slack",
+      windowID: 9,
+      children: [
+        node(role: "AXButton", roleDescription: "button", description: "Leave Huddle"),
+      ]
+    )
+    let snapshot = snapshot(children: [window])
+
+    #expect(!SlackSelectors.hasActiveHuddle(in: snapshot))
+  }
+}
+
+private func meetWebAreaSnapshot(
+  controls: [AXNode],
+  includeTab: Bool = true
+) -> AXSnapshot {
+  let webArea = node(
+    role: "AXWebArea",
+    roleDescription: "HTML content",
+    title: "Meet - test",
+    windowID: 7,
+    children: controls
+  )
+  let tab = node(
+    role: "AXRadioButton",
+    subrole: "AXTabButton",
+    roleDescription: "radio button",
+    description: "Meet - test tab",
+    windowID: 7
+  )
+  let children = includeTab ? [webArea, tab] : [webArea]
+  return snapshot(children: [node(role: "AXWindow", windowID: 7, children: children)])
 }
 
 private let now = ContinuousClock().now
@@ -209,6 +450,44 @@ private func meetBackgroundSnapshot() -> AXSnapshot {
     windowID: 7
   )
   return snapshot(children: [node(role: "AXWindow", windowID: 7, children: [webArea, tab])])
+}
+
+/// A Meet window without any call controls.
+///
+/// `readable` models the renderer handing the page contents to the
+/// accessibility API, which is what turns a missing call control into end
+/// evidence.
+private func meetSurfaceSnapshot(
+  readable: Bool,
+  includeSurface: Bool = true,
+  includeTab: Bool = true
+) -> AXSnapshot {
+  let content: [AXNode] =
+    readable
+    ? [node(role: "AXGroup", roleDescription: "group", description: "Meet page")]
+    : []
+  let webArea = node(
+    role: "AXWebArea",
+    roleDescription: "HTML content",
+    title: "Meet - test",
+    windowID: 7,
+    children: content
+  )
+  let tab = node(
+    role: "AXRadioButton",
+    subrole: "AXTabButton",
+    roleDescription: "radio button",
+    description: "Meet - test tab",
+    windowID: 7
+  )
+  var children: [AXNode] = []
+  if includeSurface {
+    children.append(webArea)
+  }
+  if includeTab {
+    children.append(tab)
+  }
+  return snapshot(children: [node(role: "AXWindow", windowID: 7, children: children)])
 }
 
 private func slackSnapshot(

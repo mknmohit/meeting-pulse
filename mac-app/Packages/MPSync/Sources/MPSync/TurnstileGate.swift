@@ -9,6 +9,7 @@ public enum TurnstileReason: Sendable {
 public enum TurnstileError: Error, Equatable, Sendable {
   case unavailable
   case emptyToken
+  case timedOut
 }
 
 @MainActor
@@ -67,6 +68,11 @@ public final class LazyTurnstileProvider: TurnstileProvider, @unchecked Sendable
 }
 
 public actor TurnstileGate {
+  /// Upper bound for a single token acquisition.
+  ///
+  /// The underlying provider already bounds its own page load and token wait;
+  /// this is the backstop that guarantees a caller is never stuck.
+  public static let tokenDeadline: Duration = .seconds(75)
   private let provider: any TurnstileProvider
   private let onTokenStarted: (@MainActor @Sendable () -> Void)?
   private let onTokenFinished: (@MainActor @Sendable () -> Void)?
@@ -85,9 +91,14 @@ public actor TurnstileGate {
     let rawToken: String
     do {
       await onTokenStarted?()
-      rawToken = try await provider.token(for: reason)
+      rawToken = try await withDeadline(Self.tokenDeadline) { [provider] in
+        try await provider.token(for: reason)
+      }
     } catch {
       await finishTokenWork()
+      if error is DeadlineError {
+        throw TurnstileError.timedOut
+      }
       throw error
     }
     await finishTokenWork()
@@ -123,11 +134,18 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
   @unchecked Sendable
 {
   private static let messageName = "meetingPulse"
+  /// A page that never finishes loading (for example because a remote
+  /// subresource cannot be fetched while offline) must not stall the caller.
+  static let pageLoadTimeout: Duration = .seconds(20)
+  /// The Turnstile script never hands back a token when it cannot reach the
+  /// challenge service, so token acquisition is bounded as well.
+  static let tokenTimeout: Duration = .seconds(45)
   private let siteKey: String
   private var webView: WKWebView?
   private var continuation: CheckedContinuation<String, Error>?
+  private var tokenTimeoutTask: Task<Void, Never>?
   private var pageLoaded = false
-  private var loadWaiters = [CheckedContinuation<Void, Error>]()
+  private var loadWaiters = [PageWaiter]()
   private var isShutdown = false
 
   public var view: WKWebView {
@@ -177,6 +195,13 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     }
     return try await withCheckedThrowingContinuation { continuation in
       self.continuation = continuation
+      self.tokenTimeoutTask = Task { [weak self] in
+        try? await Task.sleep(for: Self.tokenTimeout)
+        guard let self, !Task.isCancelled else {
+          return
+        }
+        self.resume(with: .failure(TurnstileError.timedOut))
+      }
       webView.evaluateJavaScript(
         "window.meetingPulseTurnstile.render(\(key));"
       ) { [weak self] _, error in
@@ -200,6 +225,8 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
     for waiter in waiters {
       waiter.resume(throwing: TurnstileError.unavailable)
     }
+    tokenTimeoutTask?.cancel()
+    tokenTimeoutTask = nil
 
     guard let webView else {
       return
@@ -280,6 +307,8 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
       return
     }
     self.continuation = nil
+    tokenTimeoutTask?.cancel()
+    tokenTimeoutTask = nil
     continuation.resume(with: result)
   }
 
@@ -291,8 +320,66 @@ public final class WKTurnstileProvider: NSObject, TurnstileProvider, WKScriptMes
       return
     }
     try await withCheckedThrowingContinuation { continuation in
-      loadWaiters.append(continuation)
+      let waiter = PageWaiter(continuation: continuation)
+      loadWaiters.append(waiter)
+      waiter.armTimeout(after: Self.pageLoadTimeout) { [weak self] in
+        self?.loadWaiters.removeAll { $0 === waiter }
+      }
     }
+  }
+}
+
+/// A page-load waiter that can only be resumed once.
+///
+/// The waiter is completed either by the navigation delegate or by the load
+/// timeout, and the first completion wins.
+@MainActor
+private final class PageWaiter {
+  private var continuation: CheckedContinuation<Void, Error>?
+  private var timeoutTask: Task<Void, Never>?
+
+  init(continuation: CheckedContinuation<Void, Error>) {
+    self.continuation = continuation
+  }
+
+  func armTimeout(after duration: Duration, onExpire: @escaping @MainActor @Sendable () -> Void) {
+    timeoutTask = Task { @MainActor [weak self] in
+      try? await Task.sleep(for: duration)
+      guard !Task.isCancelled else {
+        return
+      }
+      self?.expire(onExpire: onExpire)
+    }
+  }
+
+  private func expire(onExpire: @escaping @MainActor @Sendable () -> Void) {
+    guard let continuation else {
+      return
+    }
+    self.continuation = nil
+    timeoutTask = nil
+    continuation.resume(throwing: TurnstileError.timedOut)
+    onExpire()
+  }
+
+  func resume() {
+    guard let continuation else {
+      return
+    }
+    self.continuation = nil
+    timeoutTask?.cancel()
+    timeoutTask = nil
+    continuation.resume()
+  }
+
+  func resume(throwing error: Error) {
+    guard let continuation else {
+      return
+    }
+    self.continuation = nil
+    timeoutTask?.cancel()
+    timeoutTask = nil
+    continuation.resume(throwing: error)
   }
 }
 

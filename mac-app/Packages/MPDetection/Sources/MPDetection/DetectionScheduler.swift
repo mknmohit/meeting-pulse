@@ -36,33 +36,73 @@ public struct SchedulerReading: Equatable, Sendable {
   }
 }
 
+/// Smooths the raw per-sample observations of a single source.
+///
+/// The rules are deliberately asymmetric:
+///
+/// * `.active` is believed immediately — a confirmed call must never be hidden.
+/// * `.unknown` is *not a vote*. It means "this sample could not tell", so it
+///   never flips the value on its own and never cancels an end that is already
+///   settling. It only becomes visible when it repeats.
+/// * A definite end (`.inactive` / `.sourceAbsent`) that follows an `.active`
+///   needs `settleCount` agreeing samples before it is published.
+/// * A definite value that follows a non-active value applies immediately.
+///
+/// The previous implementation flipped an `.active` value to `.unknown` on a
+/// single noisy sample, which surfaced as a "Meeting status unavailable" flash
+/// for every transient accessibility hiccup.
 struct ObservationSettler: Sendable {
   private(set) var value: SourceObservation
-  private var pendingNonActive = 0
+  /// The definite candidate that is currently settling.
+  private var pendingCandidate: SourceObservation?
+  /// How many samples in a row agreed on `pendingCandidate`.
+  private var pendingCount = 0
+  /// How many consecutive `.unknown` samples were seen.
+  private var unknownCount = 0
 
   init(value: SourceObservation = .unknown) {
     self.value = value
   }
 
   mutating func apply(_ next: SourceObservation, settleCount: Int) -> SourceObservation {
-    guard next != .active else {
-      pendingNonActive = 0
+    let required = max(settleCount, 1)
+
+    if next == .active {
+      pendingCandidate = nil
+      pendingCount = 0
+      unknownCount = 0
       value = .active
       return value
     }
+
+    if next == .unknown {
+      // Unknown neither flips the value nor cancels a pending end. It only
+      // surfaces once it keeps repeating, so a single bad sample is ignored.
+      unknownCount += 1
+      if value != .active, unknownCount >= required {
+        unknownCount = 0
+        value = .unknown
+      }
+      return value
+    }
+
+    // A definite observation: the call is over or the source is gone.
+    unknownCount = 0
     guard value == .active else {
-      pendingNonActive = 0
+      pendingCandidate = nil
+      pendingCount = 0
       value = next
       return value
     }
-    guard next == .inactive || next == .sourceAbsent else {
-      pendingNonActive = 0
-      value = .unknown
-      return value
+
+    if pendingCandidate != next {
+      pendingCandidate = next
+      pendingCount = 0
     }
-    pendingNonActive += 1
-    if pendingNonActive >= settleCount {
-      pendingNonActive = 0
+    pendingCount += 1
+    if pendingCount >= required {
+      pendingCandidate = nil
+      pendingCount = 0
       value = next
     }
     return value

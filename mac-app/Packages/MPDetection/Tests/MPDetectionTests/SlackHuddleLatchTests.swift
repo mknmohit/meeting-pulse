@@ -102,7 +102,37 @@ struct SlackHuddleLatchTests {
   }
 
   @Test
-  func unavailableScanPreservesActiveHuddle() {
+  func incompleteUnavailableScanKeepsTheHuddleAnchored() {
+    var latch = SlackHuddleLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: true,
+        confirmedSessions: [anchor]
+      )
+    )
+
+    // The scan could not be completed, so the huddle may still be running.
+    // The observation stays unknown, but the anchors are kept so the huddle
+    // is not dropped.
+    let result = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: false,
+        huddleWindowPresent: false,
+        confirmedSessions: [],
+        visibility: .unavailable
+      )
+    )
+
+    #expect(result == .unknown)
+    #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
+  func unavailableScanWithTheHuddleWindowPresentKeepsTheHuddleActive() {
     var latch = SlackHuddleLatch()
     let anchor = anchor(at: now)
     _ = latch.apply(
@@ -118,7 +148,7 @@ struct SlackHuddleLatchTests {
       .init(
         slackRunning: true,
         scanCompleted: false,
-        huddleWindowPresent: false,
+        huddleWindowPresent: true,
         confirmedSessions: [],
         visibility: .unavailable
       )
@@ -126,6 +156,35 @@ struct SlackHuddleLatchTests {
 
     #expect(result == .active)
     #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
+  func unavailableScanWithoutTheHuddleWindowEndsTheHuddle() {
+    var latch = SlackHuddleLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: true,
+        confirmedSessions: [anchor]
+      )
+    )
+
+    // The scan completed and no huddle window is left, so the huddle ended
+    // even though the visibility is degraded.
+    let result = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: false,
+        confirmedSessions: [],
+        visibility: .unavailable
+      )
+    )
+
+    #expect(result == .inactive)
+    #expect(latch.activeAnchors.isEmpty)
   }
 
   @Test

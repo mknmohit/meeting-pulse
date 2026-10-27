@@ -10,6 +10,9 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
     case recoveryHashConflict
     case invalidRemoteResponse
     case remoteFailure(String)
+    /// The device row is no longer bound to the signed-in identity, so
+    /// `publish_status` cannot resolve `mp_current_device_id()`.
+    case deviceNotRegistered
   }
 
   private let client: SupabaseClientLite
@@ -89,10 +92,18 @@ public final class SupabaseStatusTransport: StatusTransport, @unchecked Sendable
       } ?? .null,
       "p_screen_sharing": payload.screenSharing.map { .string($0) } ?? .null,
     ]
-    let response: PublishResponse = try await client.rpc("publish_status", params: params)
-      .single()
-      .execute()
-      .value
+    let response: PublishResponse
+    do {
+      response = try await client.rpc("publish_status", params: params)
+        .single()
+        .execute()
+        .value
+    } catch let error as PostgrestError where error.code == "42704" {
+      // `mp_current_device_id()` resolved to NULL, which means the device is
+      // not bound to the current identity. Retrying the same publish can never
+      // succeed, so the caller is told to re-register the device instead.
+      throw TransportError.deviceNotRegistered
+    }
     return PublishResult(
       superseded: response.superseded,
       lastSeenAt: response.lastSeenAt
@@ -229,6 +240,12 @@ struct SupabaseClientLite: Sendable {
 
 protocol AuthSessionProvider: Sendable {
   func requireValidSession() async throws
+  /// Reports whether a session is still stored locally.
+  ///
+  /// A stored session means the device already belongs to an identity, so a
+  /// failed refresh is a transient condition rather than a reason to mint a
+  /// brand new identity.
+  func hasStoredSession() async -> Bool
   func signInAnonymously(captchaToken: String) async throws
 }
 
@@ -245,6 +262,14 @@ struct AuthSessionBootstrap: Sendable {
     do {
       try await auth.requireValidSession()
     } catch {
+      // Signing in anonymously here would create a *new* identity. The
+      // previously paired device would then be orphaned: `mp_current_device_id()`
+      // resolves to NULL and every publish fails with `no_device`. A stored
+      // session whose refresh failed is a transient condition (offline, or a
+      // failed refresh request), so the error is surfaced instead.
+      guard await auth.hasStoredSession() == false else {
+        throw error
+      }
       let token = try await turnstile.token(for: .firstRegistration)
       try await auth.signInAnonymously(captchaToken: token)
       try await auth.requireValidSession()
@@ -257,6 +282,10 @@ private struct SupabaseAuthSessionProvider: AuthSessionProvider {
 
   func requireValidSession() async throws {
     _ = try await auth.session
+  }
+
+  func hasStoredSession() async -> Bool {
+    auth.currentSession != nil
   }
 
   func signInAnonymously(captchaToken: String) async throws {

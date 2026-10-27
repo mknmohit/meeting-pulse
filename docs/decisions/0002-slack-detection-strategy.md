@@ -74,3 +74,69 @@ existing recreation grace. The detector never treats an open, focused,
 minimized, or recently used Slack window as a Huddle. If a future Slack release
 removes both supported signals, Slack becomes manual-only until another
 empirical spike finds a replacement.
+
+## Amendment: current window titles and toolbar labels
+
+Later Slack builds title the detached Huddle window `Huddle` without the
+trailing subject, and a window titled `Huddles` is a list view rather than a
+live Huddle. The strategy is amended as follows.
+
+- A window title is a Huddle window when it is `Huddle`, starts with
+  `Huddle:`, `Huddle -`, `Huddle with`, or `Huddle/`. A title of `Huddles` or
+  `Huddles ...` is explicitly rejected, because it is the Huddle list.
+- The toolbar description may be `Huddle window actions`, `Huddles actions`,
+  `Huddle actions`, `Huddle controls`, or `Huddle toolbar`.
+- The leave control is matched on the description or the title attribute and
+  accepts `Leave Huddle`, `Leave the huddle`, and `End huddle`.
+- Confirmation requires the leave control plus a Huddle window title or a
+  Huddle toolbar. The leave button alone is never sufficient, so a stray
+  `Leave` button in another part of Slack cannot start a Huddle.
+
+## Amendment: long-running huddles
+
+A Huddle that runs for a long time grows the Slack accessibility tree. The
+Slack detector therefore uses the same breadth-first traversal, per-window
+element budget, per-role attribute pruning, and graceful truncation as the
+Meet detector (see Decision 0001). A truncated scan keeps the partial tree
+and reports `scanCompleted == false`; the latch keeps the Huddle `active`
+when a live anchor is still present and returns `unknown` only when no anchor
+can be read at all.
+
+## Amendment: faster and recoverable huddle ends
+
+Leaving a Slack Huddle took around thirty seconds for the app to report "no
+meeting". The end path was a twenty second window-recreation grace followed by
+a two sample settle, and the detector could additionally sit in a permanent
+`.unavailable` state after a space change. The strategy is amended as follows.
+
+### Shorter recreation grace
+
+The recreation grace is shortened from twenty seconds to five. It only exists
+to absorb the brief window churn that Slack produces while the Huddle window
+is rebuilt, and five seconds is comfortably longer than that churn. The end
+settle then needs two agreeing samples, so a Huddle end is published roughly
+ten to fifteen seconds after the user leaves.
+
+### Recoverable unavailability
+
+A space change expires the transition grace and used to leave the detector
+permanently `.unavailable`, which surfaced as "unavailable" until the app was
+restarted. `.unavailable` is now recoverable. When the Huddle window is still
+present the state resolves to `.active`, and when the scan completed and the
+window is gone it resolves to `.inactive`. A forty-five second backstop
+resolves any remaining ambiguity in favour of "no meeting".
+
+### Unknown is not a vote
+
+The scheduler treats `.unknown` as "this sample could not tell" rather than as
+an observation: it never flips a confirmed `.active` Huddle on its own and
+never cancels an end that is already settling (see Decision 0001). A definite
+end still requires two agreeing samples.
+
+### The title-only hold stays unbounded
+
+The detached Huddle window may keep its `Huddle` title after the user leaves,
+because Slack keeps the window around for a while. The title-only hold is
+therefore deliberately unbounded for a long-running Huddle; the controls and
+the window themselves are what end it, not the title.
+

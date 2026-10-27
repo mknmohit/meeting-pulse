@@ -5,7 +5,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 APP_NAME="Meeting Pulse"
 APP_BUNDLE="$APP_NAME.app"
 PROJECT="$ROOT/mac-app/MeetingPulse.xcodeproj"
-VERSION="${MP_RELEASE_VERSION:-0.0.7}"
+VERSION="${MP_RELEASE_VERSION:-0.0.9}"
 BUILD_NUMBER="${MP_RELEASE_BUILD_NUMBER:-1}"
 INSTALL="${MP_RELEASE_INSTALL:-1}"
 
@@ -35,17 +35,22 @@ case "$TARGET_ARCH" in
 esac
 
 case "$VERSION" in
-  0.0.1|0.0.2|0.0.3|0.0.4|0.0.5|0.0.6|0.0.7) ;;
-  *) fail "unsupported release version '$VERSION'; expected 0.0.1, 0.0.2, 0.0.3, 0.0.4, 0.0.5, 0.0.6, or 0.0.7." ;;
+  0.0.1|0.0.2|0.0.3|0.0.4|0.0.5|0.0.6|0.0.7|0.0.8|0.0.9) ;;
+  *) fail "unsupported release version '$VERSION'; expected 0.0.1 through 0.0.9." ;;
 esac
 
 if [ ! -f "$ROOT/mac-app/Config.xcconfig" ]; then
   fail "mac-app/Config.xcconfig is required. Copy mac-app/Config.xcconfig.example first."
 fi
 
-for command_name in xcodebuild codesign lipo hdiutil ditto otool python3; do
+for command_name in xcodebuild codesign lipo hdiutil ditto otool; do
   command -v "$command_name" >/dev/null 2>&1 || fail "required tool '$command_name' is not installed."
 done
+
+# The DMG helper needs an interpreter with Pillow and ds_store.
+PYTHON="${MP_PYTHON:-python3}"
+command -v "$PYTHON" >/dev/null 2>&1 \
+  || fail "required tool 'python3' (Pillow, ds_store) is not installed."
 
 DMG_SCRIPT="$ROOT/mac-app/Tools/build-dmg.sh"
 [ -x "$DMG_SCRIPT" ] || fail "DMG helper is missing or not executable: $DMG_SCRIPT"
@@ -117,6 +122,7 @@ MP_DMG_VOLUME_NAME="$APP_NAME $VERSION ($ARCH_LABEL)" \
 MP_DMG_VERSION="$VERSION" \
 MP_DMG_ARCH="$TARGET_ARCH" \
 MP_DMG_ARCH_LABEL="$ARCH_LABEL" \
+MP_PYTHON="$PYTHON" \
 "$DMG_SCRIPT"
 
 [ -f "$DMG" ] || fail "DMG helper did not produce $DMG."

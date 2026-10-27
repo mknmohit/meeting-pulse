@@ -22,7 +22,7 @@ struct AuthSessionBootstrapTests {
 
   @Test
   func invalidSessionIsReplacedAndValidated() async throws {
-    let auth = FakeAuthSessionProvider(validationFailures: 1)
+    let auth = FakeAuthSessionProvider(validationFailures: 1, storedSession: false)
     let bootstrap = AuthSessionBootstrap(
       auth: auth,
       turnstile: TurnstileGate(provider: FixedTurnstileProvider(value: " token "))
@@ -32,6 +32,23 @@ struct AuthSessionBootstrapTests {
 
     #expect(await auth.validationCount == 2)
     #expect(await auth.signInTokens == ["token"])
+  }
+
+  @Test
+  func storedSessionWithAFailedRefreshDoesNotMintANewIdentity() async {
+    let auth = FakeAuthSessionProvider(validationFailures: 1, storedSession: true)
+    let bootstrap = AuthSessionBootstrap(
+      auth: auth,
+      turnstile: TurnstileGate(provider: FixedTurnstileProvider(value: "token"))
+    )
+
+    await #expect(throws: TestError.invalidSession) {
+      try await bootstrap.ensureSession()
+    }
+
+    // A new anonymous identity would orphan the paired device, so the
+    // refresh failure is surfaced instead of silently re-registering.
+    #expect(await auth.signInTokens.isEmpty)
   }
 
   @Test
@@ -50,11 +67,13 @@ struct AuthSessionBootstrapTests {
 
 private actor FakeAuthSessionProvider: AuthSessionProvider {
   private var remainingValidationFailures: Int
+  private let storedSession: Bool
   private(set) var validationCount = 0
   private(set) var signInTokens = [String]()
 
-  init(validationFailures: Int = 0) {
+  init(validationFailures: Int = 0, storedSession: Bool = false) {
     remainingValidationFailures = validationFailures
+    self.storedSession = storedSession
   }
 
   func requireValidSession() async throws {
@@ -63,6 +82,10 @@ private actor FakeAuthSessionProvider: AuthSessionProvider {
       remainingValidationFailures -= 1
       throw TestError.invalidSession
     }
+  }
+
+  func hasStoredSession() async -> Bool {
+    storedSession
   }
 
   func signInAnonymously(captchaToken: String) async throws {

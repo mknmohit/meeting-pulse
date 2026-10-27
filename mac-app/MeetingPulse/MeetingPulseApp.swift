@@ -303,8 +303,26 @@ final class OwnerRuntime {
         case .superseded:
           self.store?.publishState = .superseded
         case .idle:
-          break
+          if let lastPublished = await self.sync?.lastSuccessfulSync {
+            self.store?.publishState = .published(at: lastPublished)
+          }
         }
+      },
+      nonceRefresh: { [weak self] in
+        guard let self else {
+          return nil
+        }
+        // The device was re-bound elsewhere, so the server side nonce moved
+        // on. Registering the stored device again returns the current nonce.
+        return try? await self.recovery.registerStoredDevice()?.instanceNonce
+      },
+      deviceRecovery: { [weak self] in
+        guard let self else {
+          return nil
+        }
+        // The device is no longer bound to the signed-in identity. The
+        // recovery phrase re-binds it (and rotates the instance nonce).
+        return try? await self.recovery.registerStoredDevice()
       }
     )
     overrideStore = ManualOverrideStore(
@@ -325,7 +343,11 @@ final class OwnerRuntime {
           return
         }
         self.store?.isOnline = online
-        if !online {
+        if online {
+          // The network came back: publish the pending status right away
+          // instead of waiting for the retry backoff to expire.
+          await self.sync?.connectionRestored()
+        } else {
           self.store?.publishState = .offline
         }
       }
@@ -575,7 +597,10 @@ final class OwnerRuntime {
     if store?.mode != .automatic {
       interval = .seconds(30)
     } else if store?.stationVisible == false {
-      interval = .seconds(300)
+      // The viewer treats a status as stale after 180 seconds, so the
+      // heartbeat has to stay well below that window even when the station
+      // window is hidden.
+      interval = .seconds(60)
     } else {
       interval = .seconds(60)
     }
@@ -904,6 +929,12 @@ final class AppLaunchCoordinator {
   private var runtime: OwnerRuntime?
   private var turnstileGate: TurnstileGate?
   private var permissionTask: Task<Void, Never>?
+  private var launchRetryTask: Task<Void, Never>?
+  private var launchRetryCount = 0
+  /// Upper bound for automatic launch retries so a permanent failure cannot
+  /// loop forever.
+  private static let maxLaunchAutoRetries = 5
+  private static let launchRetryDelay: Duration = .seconds(10)
   private(set) var state: LaunchState = .starting
 
   func start(
@@ -1010,6 +1041,9 @@ final class AppLaunchCoordinator {
       store?.setupFailure = nil
       store?.setupFailureHeadline = MPString.error.genericSetup
       NSLog("Meeting Pulse detection runtime started")
+      launchRetryCount = 0
+      launchRetryTask?.cancel()
+      launchRetryTask = nil
       state = installLocationIsValid ? .running : .wrongInstallLocation
     } catch let error as SupabaseStatusTransport.TransportError
       where error == .identityLost && allowIdentityRecovery {
@@ -1052,7 +1086,74 @@ final class AppLaunchCoordinator {
       store?.setupFailureHeadline = MPString.error.launchFailed
       store?.setupFailure = detail
       state = .setupRequired(detail)
+      scheduleLaunchRetry(model: model, store: store, openStation: openStation)
     }
+  }
+
+  /// Waits for connectivity and retries the launch automatically.
+  ///
+  /// A launch that failed while the machine was offline used to require a
+  /// restart: the setup screen was shown and nothing else happened when the
+  /// network came back.
+  private func scheduleLaunchRetry(
+    model: OwnerAppModel,
+    store: PulseStore?,
+    openStation: @escaping @MainActor () -> Void
+  ) {
+    launchRetryTask?.cancel()
+    let monitor = NetworkMonitor()
+    launchRetryTask = Task { [weak self] in
+      monitor.start()
+      let changes = monitor.changes
+      var sawOffline = false
+      for await online in changes {
+        guard let self else {
+          monitor.stop()
+          return
+        }
+        if !online {
+          sawOffline = true
+          continue
+        }
+        monitor.stop()
+        if sawOffline {
+          // The network came back: retry the launch right away.
+          await self.performLaunchRetry(
+            model: model,
+            store: store,
+            openStation: openStation
+          )
+        } else {
+          // The network was reachable when the launch failed, so the failure
+          // is probably not connectivity related. Retry once after a short
+          // delay in case the remote side was temporarily unavailable.
+          try? await Task.sleep(for: Self.launchRetryDelay)
+          guard !Task.isCancelled else {
+            return
+          }
+          await self.performLaunchRetry(
+            model: model,
+            store: store,
+            openStation: openStation
+          )
+        }
+        return
+      }
+      monitor.stop()
+    }
+  }
+
+  private func performLaunchRetry(
+    model: OwnerAppModel,
+    store: PulseStore?,
+    openStation: @escaping @MainActor () -> Void
+  ) async {
+    guard launchRetryCount < Self.maxLaunchAutoRetries else {
+      return
+    }
+    launchRetryCount += 1
+    NSLog("Meeting Pulse automatic launch retry %d", launchRetryCount)
+    await retryLaunch(model: model, store: store, openStation: openStation)
   }
 
   func retryLaunch(

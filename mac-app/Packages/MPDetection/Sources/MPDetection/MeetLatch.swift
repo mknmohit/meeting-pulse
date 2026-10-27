@@ -31,19 +31,29 @@ public struct MeetLatch: Sendable {
     public let confirmedSessions: Set<Anchor>
     public let liveAnchors: Set<Anchor>
     public let visibility: DetectionVisibility
+    /// A Meet page is present and exposes its content, so the absence of call
+    /// controls is positive evidence that no call is running.
+    public let meetSurfaceReadable: Bool
+    /// A complete scan found no Meet page and no Meet tab, so the Meet tab
+    /// was closed and the call is over.
+    public let meetSurfaceAbsent: Bool
 
     public init(
       chromeRunning: Bool,
       scanCompleted: Bool,
       confirmedSessions: Set<Anchor>,
       liveAnchors: Set<Anchor>,
-      visibility: DetectionVisibility = .authoritative
+      visibility: DetectionVisibility = .authoritative,
+      meetSurfaceReadable: Bool = false,
+      meetSurfaceAbsent: Bool = false
     ) {
       self.chromeRunning = chromeRunning
       self.scanCompleted = scanCompleted
       self.confirmedSessions = confirmedSessions
       self.liveAnchors = liveAnchors
       self.visibility = visibility
+      self.meetSurfaceReadable = meetSurfaceReadable
+      self.meetSurfaceAbsent = meetSurfaceAbsent
     }
   }
 
@@ -67,6 +77,14 @@ public struct MeetLatch: Sendable {
       if !evidence.confirmedSessions.isEmpty {
         anchors = evidence.confirmedSessions
         return .active
+      }
+      if evidence.visibility == .transitionGrace || evidence.visibility == .recreationGrace {
+        return .unknown
+      }
+      if evidence.scanCompleted, evidence.meetSurfaceReadable {
+        // The Meet page is readable and exposes no call controls, so there is
+        // no call running. This is positive end evidence, not a missing signal.
+        return .inactive
       }
       guard evidence.visibility == .authoritative else {
         return .unknown
@@ -97,18 +115,38 @@ public struct MeetLatch: Sendable {
     case .transitionGrace, .recreationGrace:
       return .active
     case .unavailable:
+      if evidence.scanCompleted,
+        evidence.meetSurfaceReadable || evidence.meetSurfaceAbsent
+      {
+        // The error state is recoverable: the Meet page is readable and shows
+        // no call controls, or the Meet surface is gone entirely. Either way
+        // the call is provably over.
+        anchors.removeAll()
+        return .inactive
+      }
       return .unknown
     case .authoritative:
       break
     }
 
-    if !evidence.liveAnchors.isEmpty {
-      anchors = evidence.liveAnchors
+    if !evidence.scanCompleted {
+      // The scan was truncated, so a missing call control is not evidence that
+      // the call ended. A long running meeting grows the accessibility tree
+      // well past the element budget, so the latch keeps reporting the
+      // confirmed call until a complete scan proves it is gone.
       return .active
     }
 
-    if !evidence.scanCompleted {
-      return .unknown
+    if evidence.meetSurfaceReadable {
+      // The page is readable and no call control was found, which is positive
+      // evidence that the call ended.
+      anchors.removeAll()
+      return .inactive
+    }
+
+    if !evidence.liveAnchors.isEmpty {
+      anchors = evidence.liveAnchors
+      return .active
     }
 
     anchors.removeAll()
