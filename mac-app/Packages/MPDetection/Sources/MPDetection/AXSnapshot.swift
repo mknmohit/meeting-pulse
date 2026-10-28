@@ -115,17 +115,60 @@ public struct AXSnapshot: Codable, Equatable, Sendable {
   public let processIdentifier: pid_t
   public let scanCompleted: Bool
   public let root: AXNode
+  /// False when the application exposed no window and no web content at all.
+  ///
+  /// A structurally unreadable tree cannot prove that no meeting is running,
+  /// so the detection layer has to treat it as unknown instead of inactive.
+  /// The scan itself can still be complete: a browser whose accessibility
+  /// server collapsed into its menu bar can be walked end to end.
+  public let contentReadable: Bool
 
   public init(
     capturedAt: Date,
     processIdentifier: pid_t,
     scanCompleted: Bool,
-    root: AXNode
+    root: AXNode,
+    contentReadable: Bool = true
   ) {
     self.capturedAt = capturedAt
     self.processIdentifier = processIdentifier
     self.scanCompleted = scanCompleted
     self.root = root
+    self.contentReadable = contentReadable
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case capturedAt, processIdentifier, scanCompleted, root, contentReadable
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.capturedAt = try c.decode(Date.self, forKey: .capturedAt)
+    self.processIdentifier = try c.decode(pid_t.self, forKey: .processIdentifier)
+    self.scanCompleted = try c.decode(Bool.self, forKey: .scanCompleted)
+    self.root = try c.decode(AXNode.self, forKey: .root)
+    // Fixtures written before the field existed describe readable content.
+    self.contentReadable =
+      try c.decodeIfPresent(Bool.self, forKey: .contentReadable) ?? true
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(capturedAt, forKey: .capturedAt)
+    try c.encode(processIdentifier, forKey: .processIdentifier)
+    try c.encode(scanCompleted, forKey: .scanCompleted)
+    try c.encode(root, forKey: .root)
+    try c.encode(contentReadable, forKey: .contentReadable)
+  }
+
+  /// The number of elements the scan kept.
+  ///
+  /// A shared accessibility graph can be walked many times, so this is the
+  /// size of the result, not the number of reads.
+  public var elementCount: Int {
+    var count = 1
+    root.forEachDescendant { _ in count += 1 }
+    return count
   }
 }
 
@@ -133,6 +176,8 @@ public enum AXSnapshotError: Error, Equatable, Sendable {
   case permissionDenied
   case treeTooLarge
   case unreadable(Int32)
+  /// The read did not finish within the deadline of the detector.
+  case timedOut
 }
 
 // MARK: - Tree source
@@ -179,7 +224,44 @@ protocol AXTreeSource<Element> {
   /// as incomplete even though every window had been scanned successfully,
   /// which turned a healthy scan into "status unavailable".
   func rootPayload(of element: Element, childCount: Int) -> Payload
+  /// A stable identity for an element, or `nil` when the source cannot
+  /// provide one.
+  ///
+  /// Chromium builds its accessibility tree as a directed acyclic graph: the
+  /// same element is reachable through many parent paths. A traversal that
+  /// does not deduplicate therefore visits hundreds of thousands of nodes to
+  /// cover a few hundred unique elements and exhausts the element budget
+  /// before it reaches any window content.
+  func identity(of element: Element) -> Int?
+  /// The window elements of an application, when the source can answer the
+  /// question without walking the tree.
+  func windows(of element: Element) -> [Element]?
 }
+
+extension AXTreeSource {
+  /// Sources that cannot identify elements fall back to the plain walk.
+  func identity(of element: Element) -> Int? {
+    nil
+  }
+
+  /// Sources that cannot enumerate windows fall back to the tree walk.
+  func windows(of element: Element) -> [Element]? {
+    nil
+  }
+}
+
+/// Roles whose subtree never carries a meeting signal.
+///
+/// A browser exposes its whole menu bar through the accessibility API, and
+/// that subtree is large enough to consume the entire element budget of a
+/// scan on its own. Pruning it keeps the budget for the content that can
+/// actually report a call.
+private let prunedRoles: Set<String> = [
+  "AXMenu",
+  "AXMenuBar",
+  "AXMenuBarItem",
+  "AXMenuItem",
+]
 
 /// Result of a bounded traversal.
 struct AXScanResult {
@@ -196,6 +278,12 @@ struct AXScanResult {
 /// budget on the first branch and loses the call controls, which is what made
 /// a long meeting read as "unavailable" once the accessibility tree grew.
 ///
+/// The walk visits every element at most once. Chromium builds its
+/// accessibility tree as a directed acyclic graph, so the same element is
+/// reachable through many parent paths; without deduplication the traversal
+/// spent its whole element budget inside the shared menu subtree and never
+/// reached a single window, which made a healthy browser look unreadable.
+///
 /// The traversal never fails when the budget is exhausted. It stops, keeps the
 /// partial tree and reports `scanCompleted = false` so a truncated scan still
 /// carries the shallow call signals instead of discarding everything.
@@ -210,6 +298,7 @@ func scanBreadthFirst<Element>(
   payloads.reserveCapacity(min(max(maxElements, 0), 8_192))
   childIndices.reserveCapacity(min(max(maxElements, 0), 8_192))
   var scanCompleted = true
+  var visited = Set<Int>()
 
   var work: [(element: Element, remainingDepth: Int, parentIndex: Int)] = [
     (root, maxDepth, -1)
@@ -219,6 +308,14 @@ func scanBreadthFirst<Element>(
   while head < work.count {
     let item = work[head]
     head += 1
+
+    // Visit every element once. A repeated element is skipped before it can
+    // consume a slot of the element budget.
+    if let identity = source.identity(of: item.element),
+      !visited.insert(identity).inserted
+    {
+      continue
+    }
 
     guard payloads.count < maxElements else {
       scanCompleted = false
@@ -237,6 +334,14 @@ func scanBreadthFirst<Element>(
     childIndices.append([])
     if item.parentIndex >= 0 {
       childIndices[item.parentIndex].append(myIndex)
+    }
+
+    guard !prunedRoles.contains(payload.role ?? "") else {
+      // The subtree below a menu never carries a meeting signal and is large
+      // enough to eat the whole budget on its own, so the walk stops here.
+      payload.childCount = 0
+      payloads[myIndex] = payload
+      continue
     }
 
     guard item.remainingDepth > 0 else {
@@ -259,7 +364,10 @@ func scanBreadthFirst<Element>(
 /// Shallow walk that collects the top-level windows of an application.
 ///
 /// The pass only reads the role and the child list of each node, so it stays
-/// cheap even when the application exposes a very large tree.
+/// cheap even when the application exposes a very large tree. Elements are
+/// visited once and menu subtrees are skipped, because Chromium shares its
+/// menu bar through the whole tree and a walk without those two rules spent
+/// its budget on menu entries instead of on windows.
 func discoverWindows<Element>(
   root: Element,
   maxDepth: Int,
@@ -267,23 +375,33 @@ func discoverWindows<Element>(
   source: some AXTreeSource<Element>
 ) -> [Element] {
   var windows: [Element] = []
-  var visited = 0
+  var visited = Set<Int>()
+  var count = 0
   var work: [(element: Element, remainingDepth: Int)] = [(root, maxDepth)]
   var head = 0
 
   while head < work.count {
     let item = work[head]
     head += 1
-    guard visited < maxElements else {
+    guard count < maxElements else {
       break
     }
-    visited += 1
+    count += 1
+    if let identity = source.identity(of: item.element),
+      !visited.insert(identity).inserted
+    {
+      continue
+    }
     guard item.remainingDepth > 0 else {
       continue
     }
     for child in source.children(of: item.element) {
-      if source.role(of: child) == "AXWindow" {
+      let role = source.role(of: child)
+      if role == "AXWindow" {
         windows.append(child)
+        continue
+      }
+      if let role, prunedRoles.contains(role) {
         continue
       }
       work.append((child, item.remainingDepth - 1))
@@ -384,6 +502,34 @@ struct AXUITreeSource: AXTreeSource {
       scanCompleted: &complete
     )
   }
+
+  /// A stable identity for an accessibility element.
+  ///
+  /// Chromium publishes its accessibility tree as a shared graph, so the
+  /// traversal has to recognise an element it has already seen. Hashing the
+  /// element is the cheapest way to do that: one call, no attribute read.
+  func identity(of element: AXUIElement) -> Int? {
+    Int(bitPattern: CFHash(element))
+  }
+
+  /// The window elements of an application.
+  ///
+  /// Chromium keeps the window list in its own attribute. The list survives a
+  /// tree that cannot be walked, so it is the way back to the browser content
+  /// when the tree walk comes up empty. An empty list means the application
+  /// really has no window; a failed read returns `nil`, which means the
+  /// question could not be answered at all.
+  func windows(of element: AXUIElement) -> [AXUIElement]? {
+    let result = copyAttribute(element, kAXWindowsAttribute as String)
+    switch result.0 {
+    case .success:
+      return (result.1 as? [AXUIElement]) ?? []
+    case .noValue:
+      return []
+    default:
+      return nil
+    }
+  }
 }
 
 func makeSnapshot(
@@ -416,12 +562,28 @@ func makeSnapshot<Element>(
 ) -> AXSnapshot {
   var scanCompleted = true
 
-  let windows = discoverWindows(
+  var windows = discoverWindows(
     root: root,
     maxDepth: 6,
     maxElements: 512,
     source: source
   )
+  var applicationHasNoWindow = false
+  if windows.isEmpty {
+    // The tree walk reached no window. Chromium keeps the window list in its
+    // own attribute, so ask for it directly before falling back to a scan of
+    // the application root.
+    switch source.windows(of: root) {
+    case .some(let directWindows) where directWindows.isEmpty:
+      // The application positively has no window. There is no content to
+      // read, and nothing that could host a meeting.
+      applicationHasNoWindow = true
+    case .some(let directWindows):
+      windows = directWindows
+    case .none:
+      break
+    }
+  }
 
   var children: [AXNode] = []
   if windows.isEmpty {
@@ -481,8 +643,22 @@ func makeSnapshot<Element>(
     capturedAt: Date(),
     processIdentifier: processIdentifier,
     scanCompleted: scanCompleted,
-    root: root
+    root: root,
+    contentReadable: applicationHasNoWindow || children.contains(where: exposesContent)
   )
+}
+
+/// True when a node, or one of its descendants, is a window or a web area.
+///
+/// A browser whose accessibility server collapsed into its menu bar can be
+/// walked end to end and still exposes no window and no web content. Such a
+/// tree cannot prove that no meeting is running, so the detection layer has
+/// to treat it as unknown instead of inactive.
+private func exposesContent(_ node: AXNode) -> Bool {
+  if node.role == "AXWindow" || node.role == "AXWebArea" {
+    return true
+  }
+  return node.children.contains(where: exposesContent)
 }
 
 /// Attributes that are worth reading for a given role. Detection only needs

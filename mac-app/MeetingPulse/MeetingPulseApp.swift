@@ -361,10 +361,12 @@ final class OwnerRuntime {
       NSLog("Meeting Pulse scheduler started")
       for await reading in stream {
         NSLog(
-          "Meeting Pulse reading meet=%@ slack=%@ permission=%d",
+          "Meeting Pulse reading meet=%@ slack=%@ permission=%d health=%@/%@",
           reading.meet.rawValue,
           reading.slack.rawValue,
-          reading.accessibilityGranted
+          reading.accessibilityGranted,
+          reading.meetHealth.diagnosticCode,
+          reading.slackHealth.diagnosticCode
         )
         let status = StatusReducer.reduce(
           ReducerInput(
@@ -376,7 +378,13 @@ final class OwnerRuntime {
             monotonicNow: SystemMonotonicClock().now()
           )
         )
-        self.model.applyAutomatic(status)
+        let attention = SourceAttention(
+          meet: reading.meet,
+          slack: reading.slack,
+          meetHealth: reading.meetHealth,
+          slackHealth: reading.slackHealth
+        )
+        self.model.applyAutomatic(status, attention: attention)
         let readingSnapshot = SchedulerReadingSnapshot(
           meet: reading.meet,
           slack: reading.slack,
@@ -885,14 +893,15 @@ final class OwnerAppModel {
     }
   }
 
-  func applyAutomatic(_ status: EffectiveStatus) {
+  func applyAutomatic(_ status: EffectiveStatus, attention: SourceAttention = .none) {
     guard manualOverride == nil else {
       return
     }
     NSLog(
-      "Meeting Pulse reducer state=%@ reason=%@",
+      "Meeting Pulse reducer state=%@ reason=%@ attention=%@",
       status.state.rawValue,
-      status.reason.rawValue
+      status.reason.rawValue,
+      String(describing: attention)
     )
     state = status.state
     callOkay = status.callOkay
@@ -904,8 +913,40 @@ final class OwnerAppModel {
       case .busy:
         MPString.mast.modeBusy
       case .unavailable:
-        MPString.board.genericHeadline
+        Self.unavailableLine(status: status, attention: attention)
       }
+  }
+
+  /// The menu bar line for an unavailable status.
+  ///
+  /// The board keeps its plain headline, but the menu bar names the source
+  /// that needs attention so the user knows where to look.
+  private static func unavailableLine(
+    status: EffectiveStatus,
+    attention: SourceAttention
+  ) -> String {
+    switch status.reason {
+    case .permissionDenied:
+      return MPString.mast.reasonAccessibilityMissing
+    case .untrustedSource:
+      guard attention != .none else {
+        return MPString.board.genericHeadline
+      }
+      return MPString.mast.sourceNeedsAttention(sourceName(for: attention))
+    case .manualOverride, .confirmedActiveSource, .allSourcesInactive:
+      return MPString.board.genericHeadline
+    }
+  }
+
+  private static func sourceName(for attention: SourceAttention) -> String {
+    switch attention {
+    case .none:
+      ""
+    case .googleMeet:
+      MPString.station.googleMeet
+    case .slackHuddle:
+      MPString.station.slack
+    }
   }
 }
 

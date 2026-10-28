@@ -49,6 +49,10 @@ public enum MPString {
     public static let reasonDetected = "call detected"
     public static let reasonUntrusted = "A window looked like a call. Not sure enough."
     public static let reasonAutomatic = "Watching automatically"
+    /// The menu bar line that names the source needing attention.
+    public static func sourceNeedsAttention(_ name: String) -> String {
+      "Check \(name)"
+    }
     public static let callsOkayWhenBusy = "Calls are okay when you are busy."
     public static let nothingPublished = "Nothing published yet"
     public static let publishing = "Publishing..."
@@ -159,6 +163,7 @@ public enum MPString {
     public static let openAccessibilitySettings = "Open Accessibility settings"
     public static let accessibilityFallback = "Open System Settings, then Privacy & Security, then Accessibility."
     public static let googleMeet = "Google Meet"
+    public static let slack = "Slack"
     public static let slackHuddles = "Slack huddles"
     public static let inCall = "In a call"
     public static let noCall = "No call"

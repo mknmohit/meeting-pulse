@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.0.10 - 2026-10-28
+
+Fixes the `Meeting status unavailable` state that Chrome could trigger, and
+names the source that needs attention when the status cannot be trusted.
+
+### macOS app
+
+- Stops the accessibility scan from exhausting its budget inside Chrome's
+  shared accessibility tree. Chrome exposes the same node through many
+  parents, so the scan visited hundreds of thousands of elements for a few
+  hundred real nodes and ran out of budget before it ever reached the Meet
+  page. The scan now visits each node once and skips menu subtrees, which
+  no detector reads. A Chrome window with a Meet call is now scanned in a
+  fraction of a second instead of timing out, and the app recovers on its own
+  once the browser's tree recovers.
+- Keeps a confirmed call active while the browser tree is unreadable. When a
+  Google Meet call ends from the picture-in-picture popover, the browser
+  collapses its tree for a moment. That collapsed tree is not evidence that
+  the call ended, so a busy meeting no longer drops to
+  `Meeting status unavailable` during teardown.
+- Fails closed with a stable reason. An unreadable tree is reported as
+  `unknown` rather than as a missing source, and the status stays
+  `Meeting status unavailable` instead of guessing that nobody is in a
+  meeting.
+- Names the source that needs attention in the menu bar. The board copy is
+  unchanged, but the menu bar line now says `Check Google Meet` or
+  `Check Slack` instead of a generic message, so it is obvious which app to
+  look at.
+- Reports a per-source health code (`OK`, `MEET_NOT_STARTED`,
+  `MEET_AX_DEGENERATE`, `MEET_AX_TIMEOUT`, `SLACK_AX_DEGENERATE`,
+  `SLACK_SCAN_INCOMPLETE`, and similar) in the diagnostics log, so a stuck
+  status can be traced without guesswork.
+- Bounds every accessibility read with a deadline, so a slow or hung browser
+  can no longer stall detection.
+
+### Privacy and distribution
+
+- No new permissions, network requests, or privacy surface. Detection still
+  runs locally and only the status is published.
+- Ships optimized, ad-hoc signed arm64 and x86_64 DMGs. These local artifacts
+  are not notarized and require Finder's one-time Open action on a fresh Mac.
+
+### Release assets
+
+| Architecture | Downloadable asset | SHA-256 |
+| --- | --- | --- |
+| Apple Silicon (`arm64`) | `Meeting-Pulse-0.0.10-Apple-Silicon-arm64.dmg` | `ba2e3f7000e6d5960a790c72dd8fa436a2daa5b281ae19d95c83c3f7f9044831` |
+| Intel (`x86_64`) | `Meeting-Pulse-0.0.10-Intel-x86_64.dmg` | `19c4d6030c702669c349b230aee2cdead5b78d1da61cf73c68d83339905f16f6` |
+
 ## 0.0.9 - 2026-10-27
 
 Google Meet picture-in-picture disconnect and Slack huddle end fixes.

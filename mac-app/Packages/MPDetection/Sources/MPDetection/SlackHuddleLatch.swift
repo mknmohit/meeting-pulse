@@ -24,19 +24,32 @@ public struct SlackHuddleLatch: Sendable {
     public let huddleWindowPresent: Bool
     public let confirmedSessions: Set<Anchor>
     public let visibility: DetectionVisibility
+    /// The application exposed readable content.
+    ///
+    /// A collapsed accessibility tree can be walked end to end and still
+    /// expose no window and no huddle content. Such a tree cannot prove that
+    /// no huddle is running, so the latch reports it as unknown instead of
+    /// inactive.
+    public let contentReadable: Bool
+    /// The number of elements the scan kept.
+    public let elementCount: Int
 
     public init(
       slackRunning: Bool,
       scanCompleted: Bool,
       huddleWindowPresent: Bool,
       confirmedSessions: Set<Anchor>,
-      visibility: DetectionVisibility = .authoritative
+      visibility: DetectionVisibility = .authoritative,
+      contentReadable: Bool = true,
+      elementCount: Int = 0
     ) {
       self.slackRunning = slackRunning
       self.scanCompleted = scanCompleted
       self.huddleWindowPresent = huddleWindowPresent
       self.confirmedSessions = confirmedSessions
       self.visibility = visibility
+      self.contentReadable = contentReadable
+      self.elementCount = elementCount
     }
   }
 
@@ -69,9 +82,17 @@ public struct SlackHuddleLatch: Sendable {
         return .active
       }
       guard evidence.visibility == .authoritative else {
-        if evidence.visibility == .unavailable, evidence.scanCompleted {
+        if evidence.visibility == .unavailable,
+          evidence.scanCompleted,
+          evidence.contentReadable
+        {
           return .inactive
         }
+        return .unknown
+      }
+      guard evidence.contentReadable else {
+        // The application exposed no window and no huddle content, so the
+        // missing huddle signal is not evidence that no huddle is running.
         return .unknown
       }
       return evidence.scanCompleted ? .inactive : .unknown
@@ -96,6 +117,11 @@ public struct SlackHuddleLatch: Sendable {
         // the call alive even while the visibility is degraded.
         return .active
       }
+      if !evidence.contentReadable {
+        // The tree collapsed, so the missing huddle window is not evidence
+        // that the huddle ended. The confirmed huddle is held.
+        return .active
+      }
       if evidence.scanCompleted {
         // The window is gone and the scan was complete, so the huddle ended.
         anchors.removeAll()
@@ -104,6 +130,10 @@ public struct SlackHuddleLatch: Sendable {
       return .unknown
     case .authoritative:
       break
+    }
+
+    if !evidence.contentReadable {
+      return .active
     }
 
     if !evidence.scanCompleted {

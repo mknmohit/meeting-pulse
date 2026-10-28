@@ -24,15 +24,23 @@ public struct SchedulerReading: Equatable, Sendable {
   public let meet: SourceObservation
   public let slack: SourceObservation
   public let accessibilityGranted: Bool
+  /// The health of the Meet detector at the time of the reading.
+  public let meetHealth: DetectorHealth
+  /// The health of the Slack detector at the time of the reading.
+  public let slackHealth: DetectorHealth
 
   public init(
     meet: SourceObservation,
     slack: SourceObservation,
-    accessibilityGranted: Bool
+    accessibilityGranted: Bool,
+    meetHealth: DetectorHealth = .ok,
+    slackHealth: DetectorHealth = .ok
   ) {
     self.meet = meet
     self.slack = slack
     self.accessibilityGranted = accessibilityGranted
+    self.meetHealth = meetHealth
+    self.slackHealth = slackHealth
   }
 }
 
@@ -173,17 +181,17 @@ public actor DetectionScheduler {
     }
     await meet.start()
     await slack.start()
-    _ = ingest(
+    _ = await ingest(
       source: .googleMeet,
       value: await meet.currentObservation,
       emitReading: false
     )
-    _ = ingest(
+    _ = await ingest(
       source: .slackHuddle,
       value: await slack.currentObservation,
       emitReading: false
     )
-    emit()
+    await emit()
     await tick()
   }
 
@@ -207,7 +215,7 @@ public actor DetectionScheduler {
 
   public func requestImmediateSample() async {
     await tick()
-    emit()
+    await emit()
   }
 
   public func updateTuning(_ tuning: DetectionTuning) {
@@ -227,23 +235,23 @@ public actor DetectionScheduler {
       await slack.invalidate()
       meetSettler = ObservationSettler(value: .unknown)
       slackSettler = ObservationSettler(value: .unknown)
-      emit()
+      await emit()
     }
     if trusted {
       await meet.requestSample()
       await slack.requestSample()
-      let meetChanged = ingest(
+      let meetChanged = await ingest(
         source: .googleMeet,
         value: await meet.currentObservation,
         emitReading: false
       )
-      let slackChanged = ingest(
+      let slackChanged = await ingest(
         source: .slackHuddle,
         value: await slack.currentObservation,
         emitReading: false
       )
       if meetChanged || slackChanged {
-        emit()
+        await emit()
       }
     }
     scheduleTimer()
@@ -282,7 +290,7 @@ public actor DetectionScheduler {
     source: SourceID,
     value: SourceObservation,
     emitReading: Bool = true
-  ) -> Bool {
+  ) async -> Bool {
     let previous: SourceObservation
     let next: SourceObservation
     switch source {
@@ -295,18 +303,20 @@ public actor DetectionScheduler {
     }
     let changed = previous != next
     if emitReading && changed {
-      emit()
+      await emit()
     }
     scheduleTimer()
     return changed
   }
 
-  private func emit() {
+  private func emit() async {
     continuation.yield(
       SchedulerReading(
         meet: meetSettler.value,
         slack: slackSettler.value,
-        accessibilityGranted: accessibilityGranted
+        accessibilityGranted: accessibilityGranted,
+        meetHealth: await meet.health,
+        slackHealth: await slack.health
       )
     )
   }

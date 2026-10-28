@@ -440,6 +440,92 @@ struct MeetLatchTests {
     )
     #expect(result == .inactive)
   }
+
+  @Test
+  func unreadableTreeIsUnknownInsteadOfInactive() {
+    // A collapsed accessibility tree exposes no window and no web area. It
+    // cannot prove that no call is running, so the latch fails closed.
+    var latch = MeetLatch()
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [],
+        contentReadable: false
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+    #expect(result == .unknown)
+  }
+
+  @Test
+  func unreadableTreeHoldsAConfirmedCall() {
+    // A busy meeting is never downgraded to unknown because the tree
+    // collapsed while it was being read.
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [],
+        liveAnchors: [],
+        contentReadable: false
+      ),
+      now: now.advanced(by: .seconds(5)),
+      maxLatchDuration: .seconds(14_400)
+    )
+    #expect(result == .active)
+    #expect(latch.activeAnchors == [anchor])
+  }
+
+  @Test
+  func unavailableVisibilityWithAnUnreadableTreeHoldsTheCall() {
+    // Leaving a call from the picture-in-picture popover tears the browser
+    // window down. While the tree is collapsed the missing call control is
+    // not evidence that the call ended, so a busy meeting keeps its hold
+    // instead of turning into "status unavailable".
+    var latch = MeetLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: true,
+        confirmedSessions: [anchor],
+        liveAnchors: []
+      ),
+      now: now,
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    let result = latch.apply(
+      .init(
+        chromeRunning: true,
+        scanCompleted: false,
+        confirmedSessions: [],
+        liveAnchors: [],
+        visibility: .unavailable,
+        contentReadable: false
+      ),
+      now: now.advanced(by: .seconds(5)),
+      maxLatchDuration: .seconds(14_400)
+    )
+
+    #expect(result == .active)
+    #expect(latch.activeAnchors == [anchor])
+  }
 }
 
 private let now = ContinuousClock().now

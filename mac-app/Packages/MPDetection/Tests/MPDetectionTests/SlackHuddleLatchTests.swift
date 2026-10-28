@@ -238,6 +238,53 @@ struct SlackHuddleLatchTests {
     #expect(result == .sourceAbsent)
     #expect(latch.activeAnchors.isEmpty)
   }
+
+  @Test
+  func unreadableTreeIsUnknownInsteadOfInactive() {
+    // A collapsed accessibility tree exposes no window and no huddle
+    // content. It cannot prove that no huddle is running.
+    var latch = SlackHuddleLatch()
+    let result = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: false,
+        confirmedSessions: [],
+        contentReadable: false
+      )
+    )
+
+    #expect(result == .unknown)
+  }
+
+  @Test
+  func unreadableTreeHoldsAConfirmedHuddle() {
+    // A busy huddle is never downgraded because the tree collapsed while it
+    // was being read.
+    var latch = SlackHuddleLatch()
+    let anchor = anchor(at: now)
+    _ = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: true,
+        confirmedSessions: [anchor]
+      )
+    )
+
+    let result = latch.apply(
+      .init(
+        slackRunning: true,
+        scanCompleted: true,
+        huddleWindowPresent: false,
+        confirmedSessions: [],
+        contentReadable: false
+      )
+    )
+
+    #expect(result == .active)
+    #expect(latch.activeAnchors == [anchor])
+  }
 }
 
 private let now = ContinuousClock().now

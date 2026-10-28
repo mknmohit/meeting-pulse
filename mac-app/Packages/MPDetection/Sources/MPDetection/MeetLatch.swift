@@ -37,6 +37,15 @@ public struct MeetLatch: Sendable {
     /// A complete scan found no Meet page and no Meet tab, so the Meet tab
     /// was closed and the call is over.
     public let meetSurfaceAbsent: Bool
+    /// The application exposed readable content.
+    ///
+    /// A browser whose accessibility server collapsed into its menu bar can
+    /// be walked end to end and still expose no window and no web area. Such
+    /// a tree cannot prove that no call is running, so the latch reports it
+    /// as unknown instead of inactive.
+    public let contentReadable: Bool
+    /// The number of elements the scan kept.
+    public let elementCount: Int
 
     public init(
       chromeRunning: Bool,
@@ -45,7 +54,9 @@ public struct MeetLatch: Sendable {
       liveAnchors: Set<Anchor>,
       visibility: DetectionVisibility = .authoritative,
       meetSurfaceReadable: Bool = false,
-      meetSurfaceAbsent: Bool = false
+      meetSurfaceAbsent: Bool = false,
+      contentReadable: Bool = true,
+      elementCount: Int = 0
     ) {
       self.chromeRunning = chromeRunning
       self.scanCompleted = scanCompleted
@@ -54,6 +65,8 @@ public struct MeetLatch: Sendable {
       self.visibility = visibility
       self.meetSurfaceReadable = meetSurfaceReadable
       self.meetSurfaceAbsent = meetSurfaceAbsent
+      self.contentReadable = contentReadable
+      self.elementCount = elementCount
     }
   }
 
@@ -87,6 +100,12 @@ public struct MeetLatch: Sendable {
         return .inactive
       }
       guard evidence.visibility == .authoritative else {
+        return .unknown
+      }
+      guard evidence.contentReadable else {
+        // The application exposed no window and no web content. The tree
+        // collapsed, so the missing call control is not evidence that no call
+        // is running.
         return .unknown
       }
       return evidence.scanCompleted ? .inactive : .unknown
@@ -124,9 +143,22 @@ public struct MeetLatch: Sendable {
         anchors.removeAll()
         return .inactive
       }
+      if !evidence.contentReadable {
+        // The tree collapsed, so the missing call control is not evidence
+        // that the call ended. The confirmed call keeps its hold instead of
+        // downgrading a busy meeting to unavailable.
+        return .active
+      }
       return .unknown
     case .authoritative:
       break
+    }
+
+    if !evidence.contentReadable {
+      // The tree collapsed into its menu bar. A missing call control is not
+      // evidence that the call ended, so the latch keeps reporting the
+      // confirmed call instead of downgrading a busy meeting.
+      return .active
     }
 
     if !evidence.scanCompleted {

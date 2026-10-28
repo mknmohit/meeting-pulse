@@ -7,6 +7,13 @@ private let detectorNotifications = [
   kAXUIElementDestroyedNotification as String,
 ]
 
+/// The longest a single accessibility read may take.
+///
+/// A browser that stops answering holds the read on the accessibility
+/// thread. The deadline keeps the detector producing readings and lets it
+/// fail closed instead of waiting forever.
+private let snapshotDeadline = Duration.seconds(12)
+
 public actor GoogleMeetDetector: MeetingDetector {
   public nonisolated let sourceIdentifier: SourceID = .googleMeet
 
@@ -145,12 +152,23 @@ public actor GoogleMeetDetector: MeetingDetector {
       liveAnchors: sample.evidence.liveAnchors,
       visibility: visibility,
       meetSurfaceReadable: sample.evidence.meetSurfaceReadable,
-      meetSurfaceAbsent: sample.evidence.meetSurfaceAbsent
+      meetSurfaceAbsent: sample.evidence.meetSurfaceAbsent,
+      contentReadable: sample.evidence.contentReadable,
+      elementCount: sample.evidence.elementCount
     )
     let observation = latch.apply(
       evidence,
       now: now,
       maxLatchDuration: nil
+    )
+    NSLog(
+      "Meeting Pulse meet scan completed=%@ readable=%@ surface=%@ anchors=%@ elements=%d health=%@",
+      sample.evidence.scanCompleted ? "1" : "0",
+      sample.evidence.contentReadable ? "1" : "0",
+      sample.evidence.meetSurfaceReadable ? "1" : "0",
+      String(sample.evidence.confirmedSessions.count),
+      sample.evidence.elementCount,
+      sample.health.diagnosticCode
     )
     publish(observation, health: sample.health)
   }
@@ -181,6 +199,7 @@ public actor GoogleMeetDetector: MeetingDetector {
     }
     if visibility == .unavailable {
       if evidence.scanCompleted,
+        evidence.contentReadable,
         evidence.meetSurfaceReadable || evidence.meetSurfaceAbsent
       {
         // The degraded state is recoverable: the Meet page is readable and
@@ -247,15 +266,19 @@ public actor GoogleMeetDetector: MeetingDetector {
     var liveAnchors = Set<MeetLatch.Anchor>()
     var meetSurfaceReadable = false
     var meetSurfacePresent = false
+    var contentReadable = true
+    var elementCount = 0
     var health: DetectorHealth = .ok
 
     for app in apps {
       do {
-        let snapshot = try await elementTree.snapshot(
-          pid: app.processIdentifier,
-          maxDepth: 24,
-          maxElements: 8_000
-        )
+        let snapshot = try await withDeadline(snapshotDeadline) {
+          try await elementTree.snapshot(
+            pid: app.processIdentifier,
+            maxDepth: 24,
+            maxElements: 8_000
+          )
+        }
         scanCompleted = scanCompleted && snapshot.scanCompleted
         let analysis = MeetSelectors.analyze(
           in: snapshot,
@@ -266,8 +289,14 @@ public actor GoogleMeetDetector: MeetingDetector {
         liveAnchors.formUnion(analysis.liveAnchors)
         meetSurfaceReadable = meetSurfaceReadable || analysis.meetSurfaceReadable
         meetSurfacePresent = meetSurfacePresent || analysis.meetSurfacePresent
+        contentReadable = contentReadable && snapshot.contentReadable
+        elementCount += snapshot.elementCount
         if !snapshot.scanCompleted {
           health = .degraded(DiagnosticCode(rawValue: "MEET_SCAN_INCOMPLETE"))
+        } else if !snapshot.contentReadable {
+          // The browser exposed neither a window nor a web area. The tree
+          // collapsed, so the absence of a call control proves nothing.
+          health = .degraded(DiagnosticCode(rawValue: "MEET_AX_DEGENERATE"))
         }
       } catch let error as AXSnapshotError {
         scanCompleted = false
@@ -285,7 +314,9 @@ public actor GoogleMeetDetector: MeetingDetector {
         confirmedSessions: confirmedSessions,
         liveAnchors: liveAnchors,
         meetSurfaceReadable: meetSurfaceReadable,
-        meetSurfaceAbsent: scanCompleted && !meetSurfacePresent
+        meetSurfaceAbsent: scanCompleted && contentReadable && !meetSurfacePresent,
+        contentReadable: contentReadable,
+        elementCount: elementCount
       ),
       health: health,
       permissionDenied: false
@@ -426,7 +457,18 @@ public actor SlackHuddleDetector: MeetingDetector {
       scanCompleted: sample.evidence.scanCompleted,
       huddleWindowPresent: sample.evidence.huddleWindowPresent,
       confirmedSessions: sample.evidence.confirmedSessions,
-      visibility: visibility
+      visibility: visibility,
+      contentReadable: sample.evidence.contentReadable,
+      elementCount: sample.evidence.elementCount
+    )
+    NSLog(
+      "Meeting Pulse slack scan completed=%@ readable=%@ huddle=%@ anchors=%@ elements=%d health=%@",
+      sample.evidence.scanCompleted ? "1" : "0",
+      sample.evidence.contentReadable ? "1" : "0",
+      sample.evidence.huddleWindowPresent ? "1" : "0",
+      String(sample.evidence.confirmedSessions.count),
+      sample.evidence.elementCount,
+      sample.health.diagnosticCode
     )
     publish(
       latch.apply(
@@ -479,7 +521,10 @@ public actor SlackHuddleDetector: MeetingDetector {
       visibilityGraceDeadline = nil
     }
     if visibility == .unavailable {
-      if evidence.scanCompleted, !evidence.huddleWindowPresent {
+      if evidence.scanCompleted,
+        evidence.contentReadable,
+        !evidence.huddleWindowPresent
+      {
         // The huddle window is gone and the scan was complete, so the huddle
         // ended. The degraded state is recoverable.
         visibility = .authoritative
@@ -537,15 +582,19 @@ public actor SlackHuddleDetector: MeetingDetector {
 
     var scanCompleted = true
     var huddleWindowPresent = false
+    var elementCount = 0
     var confirmedSessions = Set<SlackHuddleLatch.Anchor>()
+    var contentReadable = true
     var health: DetectorHealth = .ok
     for app in apps {
       do {
-        let snapshot = try await elementTree.snapshot(
-          pid: app.processIdentifier,
-          maxDepth: 20,
-          maxElements: 6_000
-        )
+        let snapshot = try await withDeadline(snapshotDeadline) {
+          try await elementTree.snapshot(
+            pid: app.processIdentifier,
+            maxDepth: 20,
+            maxElements: 6_000
+          )
+        }
         scanCompleted = scanCompleted && snapshot.scanCompleted
         let analysis = SlackSelectors.analyze(
           in: snapshot,
@@ -554,8 +603,14 @@ public actor SlackHuddleDetector: MeetingDetector {
         huddleWindowPresent =
           huddleWindowPresent || !analysis.huddleWindows.isEmpty
         confirmedSessions.formUnion(analysis.activeAnchors)
+        contentReadable = contentReadable && snapshot.contentReadable
+        elementCount += snapshot.elementCount
         if !snapshot.scanCompleted {
           health = .degraded(DiagnosticCode(rawValue: "SLACK_SCAN_INCOMPLETE"))
+        } else if !snapshot.contentReadable {
+          // The application exposed neither a window nor a web area. The tree
+          // collapsed, so the absence of a huddle window proves nothing.
+          health = .degraded(DiagnosticCode(rawValue: "SLACK_AX_DEGENERATE"))
         }
       } catch let error as AXSnapshotError {
         scanCompleted = false
@@ -571,7 +626,9 @@ public actor SlackHuddleDetector: MeetingDetector {
         slackRunning: true,
         scanCompleted: scanCompleted,
         huddleWindowPresent: huddleWindowPresent,
-        confirmedSessions: confirmedSessions
+        confirmedSessions: confirmedSessions,
+        contentReadable: contentReadable,
+        elementCount: elementCount
       ),
       health: health
     )
@@ -595,6 +652,8 @@ private func meetDiagnostic(for error: AXSnapshotError) -> String {
     "MEET_AX_DENIED"
   case .treeTooLarge:
     "MEET_TREE_TOO_LARGE"
+  case .timedOut:
+    "MEET_AX_TIMEOUT"
   case .unreadable:
     "MEET_TREE_UNREADABLE"
   }
@@ -606,6 +665,8 @@ private func slackDiagnostic(for error: AXSnapshotError) -> String {
     "SLACK_AX_DENIED"
   case .treeTooLarge:
     "SLACK_TREE_TOO_LARGE"
+  case .timedOut:
+    "SLACK_AX_TIMEOUT"
   case .unreadable:
     "SLACK_TREE_UNREADABLE"
   }

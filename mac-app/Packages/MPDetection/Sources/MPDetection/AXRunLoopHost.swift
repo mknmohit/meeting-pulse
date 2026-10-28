@@ -17,6 +17,7 @@ public final class AXRunLoopHost: AXElementTree, AXEventSource, @unchecked Senda
   private var workSource: CFRunLoopSource?
   private var observers = [pid_t: AXObserver]()
   private var observerContexts = [pid_t: ObserverContext]()
+  private var stopped = false
 
   public init() {
     var continuation: AsyncStream<AXEvent>.Continuation?
@@ -35,6 +36,10 @@ public final class AXRunLoopHost: AXElementTree, AXEventSource, @unchecked Senda
   }
 
   deinit {
+    workLock.lock()
+    stopped = true
+    workItems.removeAll()
+    workLock.unlock()
     eventContinuation.finish()
     if let runLoop {
       CFRunLoopStop(runLoop)
@@ -102,7 +107,7 @@ public final class AXRunLoopHost: AXElementTree, AXEventSource, @unchecked Senda
   }
 
   public func stopObserving(pid: pid_t) async {
-    await perform {
+    try? await performThrowing {
       guard let observer = self.observers.removeValue(forKey: pid) else {
         return
       }
@@ -119,21 +124,21 @@ public final class AXRunLoopHost: AXElementTree, AXEventSource, @unchecked Senda
     eventContinuation.yield(event)
   }
 
-  private func perform<T: Sendable>(
-    _ body: @escaping @Sendable () -> T
-  ) async -> T {
-    await withCheckedContinuation { continuation in
-      schedule {
-        continuation.resume(returning: body())
-      }
-    }
-  }
-
   private func performThrowing<T: Sendable>(
     _ body: @escaping @Sendable () throws -> T
   ) async throws -> T {
     try await withCheckedThrowingContinuation { continuation in
-      schedule {
+      let accepted = schedule {
+        do {
+          continuation.resume(returning: try body())
+        } catch {
+          continuation.resume(throwing: error)
+        }
+      }
+      if !accepted {
+        // The host is gone and the work can never run. The caller still has
+        // to be released, otherwise the detector waits for a reading that
+        // will never arrive.
         do {
           continuation.resume(returning: try body())
         } catch {
@@ -143,15 +148,24 @@ public final class AXRunLoopHost: AXElementTree, AXEventSource, @unchecked Senda
     }
   }
 
-  private func schedule(_ body: @escaping @Sendable () -> Void) {
-    guard let runLoop, let workSource else {
-      return
-    }
+  /// Hands work to the accessibility thread.
+  ///
+  /// The result reports whether the work was accepted. A work item that is
+  /// dropped silently leaves its caller waiting forever, so the caller needs
+  /// to know that the host can no longer run the work.
+  private func schedule(_ body: @escaping @Sendable () -> Void) -> Bool {
     workLock.lock()
-    workItems.append(body)
+    let accepted = runLoop != nil && workSource != nil && !stopped
+    if accepted {
+      workItems.append(body)
+    }
     workLock.unlock()
-    CFRunLoopSourceSignal(workSource)
-    CFRunLoopWakeUp(runLoop)
+    guard accepted else {
+      return false
+    }
+    CFRunLoopSourceSignal(workSource!)
+    CFRunLoopWakeUp(runLoop!)
+    return true
   }
 
   private func run() {
